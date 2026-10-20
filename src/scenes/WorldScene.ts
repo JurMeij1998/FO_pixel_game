@@ -9,6 +9,8 @@ import type { Exit } from '../core/gridMap';
 import type { Lootable } from '../core/loot';
 import { tileTextureKey } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
+import { ApGauge } from '../ui/apGauge';
+import type { Rect } from '../ui/gaugePlacement';
 import { postMessage } from '../ui/messages';
 import { FONT } from '../ui/theme';
 
@@ -24,7 +26,9 @@ const STEP: Record<Direction, GridPos> = {
 
 const MOVE_DURATION_MS = 140;
 
-const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, effects: 10 };
+const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, gauge: 9, effects: 10 };
+/** Height of the HUD's combat bar under the status bar, in screen pixels. */
+const COMBAT_BAR_HEIGHT = 30;
 const FADE_MS = 250;
 
 /** Pixel position of a tile's centre. */
@@ -45,6 +49,7 @@ export class WorldScene extends Phaser.Scene {
   private readonly chestImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly creatureImages = new Map<Creature, Phaser.GameObjects.Image>();
   private targetMarker!: Phaser.GameObjects.Graphics;
+  private apGauge!: ApGauge;
   private keys!: Record<Direction, Phaser.Input.Keyboard.Key[]>;
 
   constructor() {
@@ -83,6 +88,7 @@ export class WorldScene extends Phaser.Scene {
     const start = state.player.pos;
     this.player = this.add.image(toPixel(start.x), toPixel(start.y), 'player_down').setDepth(DEPTH.player);
     this.targetMarker = this.add.graphics().setDepth(DEPTH.marker);
+    this.apGauge = new ApGauge(this, state.player.maxActionPoints, DEPTH.gauge);
 
     // Let the camera scroll past the map edges by the HUD's height, so the HUD never hides a tile.
     const top = HUD_TOP / WORLD_ZOOM;
@@ -127,8 +133,9 @@ export class WorldScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.RESUME, onResume));
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
     this.drawTargetMarker();
+    this.updateApGauge(delta);
     if (this.busy) return;
     const direction = this.heldDirection();
     if (!direction) return;
@@ -374,6 +381,45 @@ export class WorldScene extends Phaser.Scene {
 
   private wait(ms: number): Promise<void> {
     return new Promise((resolve) => this.time.delayedCall(ms, resolve));
+  }
+
+  private updateApGauge(delta: number): void {
+    const combat = state.combat;
+    this.apGauge.update(delta, {
+      active: combat !== null,
+      playerTurn: combat?.isPlayerTurn ?? false,
+      actionPoints: combat?.actionPoints ?? state.player.maxActionPoints,
+      anchor: { x: this.player.x, y: this.player.y },
+      obstacles: this.gaugeObstacles(),
+      view: this.visibleWorld(),
+    });
+  }
+
+  /** What the AP gauge must never cover: everything the player might want to see or click. */
+  private gaugeObstacles(): Rect[] {
+    const map = state.map;
+    const tile = (x: number, y: number): Rect => ({ x: x * TILE_SIZE, y: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE });
+    // Living creatures use their sprites, which may be mid-step.
+    const around = (image: Phaser.GameObjects.Image): Rect => ({
+      x: image.x - TILE_SIZE / 2,
+      y: image.y - TILE_SIZE / 2,
+      width: TILE_SIZE,
+      height: TILE_SIZE,
+    });
+    const rects = [...map.chests.map((c) => tile(c.x, c.y)), ...map.exits.map((e) => tile(e.x, e.y))];
+    for (const creature of map.creatures) {
+      if (!creature.isDead) rects.push(around(this.imageFor(creature)));
+      else if (!creature.contents.isEmpty) rects.push(tile(creature.pos.x, creature.pos.y)); // lootable corpse
+    }
+    return rects;
+  }
+
+  /** The part of the world on screen, not counting what the HUD covers at the top and bottom. */
+  private visibleWorld(): Rect {
+    const view = this.cameras.main.worldView;
+    const top = (HUD_TOP + (state.combat ? COMBAT_BAR_HEIGHT : 0)) / WORLD_ZOOM;
+    const bottom = HUD_BOTTOM / WORLD_ZOOM;
+    return { x: view.x, y: view.y + top, width: view.width, height: view.height - top - bottom };
   }
 
   private drawTargetMarker(): void {

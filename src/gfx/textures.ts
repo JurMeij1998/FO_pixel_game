@@ -2,6 +2,14 @@ import Phaser from 'phaser';
 import { TILE_SIZE } from '../config';
 import type { TileType } from '../core/gridMap';
 import { hashSeed, Random } from '../core/random';
+import {
+  GLYPH_HEIGHT,
+  GLYPH_TEXTURE_HEIGHT,
+  GLYPH_TEXTURE_WIDTH,
+  GLYPH_WIDTH,
+  GLYPHS,
+  glyphTextureKey,
+} from './pixelFont';
 import { SPRITES, type PixelSprite } from './sprites';
 
 /**
@@ -18,6 +26,25 @@ export function createTextures(scene: Phaser.Scene): void {
   for (const [key, sprite] of Object.entries(SPRITES)) {
     createSpriteTexture(scene, key, sprite);
   }
+  for (const [char, rows] of Object.entries(GLYPHS)) {
+    createGlyphTexture(scene, char, rows);
+  }
+}
+
+/**
+ * A white glyph with a dark outline around it. Drawn white so it can be tinted any colour;
+ * the outline stays dark because tinting multiplies.
+ */
+function createGlyphTexture(scene: Phaser.Scene, char: string, rows: string[]): void {
+  const lit = (x: number, y: number) => rows[y]?.[x] === '#';
+  createTexture(scene, glyphTextureKey(char), GLYPH_TEXTURE_WIDTH, GLYPH_TEXTURE_HEIGHT, (ctx) => {
+    for (let y = -1; y <= GLYPH_HEIGHT; y++) {
+      for (let x = -1; x <= GLYPH_WIDTH; x++) {
+        if (lit(x, y)) pixel(ctx, x + 1, y + 1, '#ffffff');
+        else if ([-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => lit(x + dx, y + dy)))) pixel(ctx, x + 1, y + 1, '#0a0f0a');
+      }
+    }
+  });
 }
 
 /** Each tile type gets a few randomized versions so the ground doesn't look like a grid. */

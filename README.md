@@ -112,7 +112,13 @@ the new ones just start fresh.
 
 Fallout-style and turn-based, on the same grid you explore. Combat starts when a creature
 sees you (or you attack one). You act first with your Action Points, then each enemy
-takes its turn. Hit chance is your weapon skill minus the target's Armor Class (minus a
+takes its turn.
+
+During a fight an AP gauge floats beside you (`ui/apGauge.ts`): "AP 8" in a 3x5 pixel font
+(`gfx/pixelFont.ts`) over a row of pips. Spending AP counts the number down, flashes the
+spent pips and pops a superscript "-3"; a new turn refills it with a "+N". It bobs gently,
+dims during the enemy turn, and picks whichever spot around you covers no chest, creature,
+lootable corpse or exit (`ui/gaugePlacement.ts`). Hit chance is your weapon skill minus the target's Armor Class (minus a
 range penalty for guns; the spear's reach of 2 is still melee), damage is reduced by Damage Resistance, and Luck is your critical
 chance. Guns fire from their magazine (10mm pistol 12, hunting rifle 5) and are reloaded
 from the backpack with R: free while exploring, 2 AP in combat. A gun you unequip puts its
