@@ -126,7 +126,8 @@ sees you (or you attack one). You act first with your Action Points, then each e
 takes its turn.
 
 During a fight an AP gauge floats beside you (`ui/apGauge.ts`): the AP left in a 3x5 pixel
-font (`gfx/pixelFont.ts`) over a row of pips. Spending AP counts the number down, flashes the
+font (`gfx/pixelFont.ts`) inside a round seal, with a bar of pips sweeping out of it. Its
+light green border pulses and a glint sweeps across it every few seconds. Spending AP counts the number down, flashes the
 spent pips and pops a superscript "-3"; a new turn refills it with a "+N". It bobs gently,
 dims during the enemy turn, and picks whichever spot around you covers no chest, creature,
 lootable corpse or exit (`ui/gaugePlacement.ts`). Hit chance is your weapon skill minus the target's Armor Class (minus a

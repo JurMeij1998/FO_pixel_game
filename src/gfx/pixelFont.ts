@@ -26,6 +26,12 @@ export const GLYPH_HEIGHT = 5;
 export const GLYPH_TEXTURE_WIDTH = GLYPH_WIDTH + 2;
 export const GLYPH_TEXTURE_HEIGHT = GLYPH_HEIGHT + 2;
 
+/** The outlined glyph, for text drawn straight onto the map. */
 export function glyphTextureKey(char: string): string {
   return `glyph_${char}`;
+}
+
+/** The plain 3x5 glyph without an outline, for text on a solid background such as the AP gauge. */
+export function plainGlyphKey(char: string): string {
+  return `glyph_plain_${char}`;
 }

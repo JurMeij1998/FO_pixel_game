@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GLYPH_WIDTH, glyphTextureKey } from '../gfx/pixelFont';
+import { GLYPH_HEIGHT, GLYPH_WIDTH, glyphTextureKey, plainGlyphKey } from '../gfx/pixelFont';
+import { SEAL_SIZE, SEAL_TEXTURE } from '../gfx/textures';
 import { choosePlacement, placementOffsets, type Offset, type Rect } from './gaugePlacement';
 
 /** Everything the gauge needs to know each frame. Positions are in world pixels. */
@@ -16,17 +17,27 @@ export interface ApGaugeState {
   view: Rect;
 }
 
-const PADDING = 2;
-/** Glyph textures are 5 wide including their outline; overlapping outlines by 1 spaces glyphs evenly. */
+/** Glyphs are 3 wide with 1 pixel between them (the outlined ones overlap by their outline). */
 const ADVANCE = GLYPH_WIDTH + 1;
-const PIP_WIDTH = 2;
-const PIP_HEIGHT = 3;
+const PIP_WIDTH = 1;
+const PIP_HEIGHT = 2;
 const PIP_GAP = 1;
+/** Around the pips: 1 pixel of space, the green border, then a black edge. */
+const BAR_FRAME = 3;
+const BAR_HEIGHT = PIP_HEIGHT + BAR_FRAME * 2;
+/** How far the bar starts underneath the seal, so the two read as one shape. */
+const BAR_OVERLAP = 4;
 const PLAYER_SIZE = 16;
+/** Space between the gauge and the player. */
+const GAP = 5;
 
 const COLOR = {
   plate: 0x0a140c,
   border: 0x3cd070,
+  /** The border's colour at the top of its pulse, and the glint that sweeps across it. */
+  borderPulse: 0x9dffb0,
+  borderShine: 0xffffff,
+  edge: 0x000000,
   number: 0xd8ffb0,
   empty: 0xff6a4d,
   pipFull: 0xa8ff60,
@@ -37,6 +48,13 @@ const COLOR = {
   refillDelta: 0x7dff9a,
 };
 
+/** How long one slow pulse of the border takes, and how often a glint sweeps across it. */
+const PULSE_MS = 1600;
+const SHINE_EVERY_MS = 2600;
+/** How long the glint takes to cross, and how wide it is (in diagonal pixels). */
+const SHINE_MS = 700;
+const SHINE_WIDTH = 2.5;
+
 /** Milliseconds per step when the number counts towards a new value, and for a pip's flash. */
 const COUNT_STEP_MS = 70;
 const FLASH_MS = 180;
@@ -45,16 +63,20 @@ const DELTA_MS = 900;
 const FOLLOW_RATE = 0.012;
 
 /**
- * A small plate floating beside the player in combat: the AP left, in pixel digits, centred
- * over a row of pips, one per action point. Spending AP counts the number down, flashes the spent pips and
- * pops a superscript "-3" that rises and fades; a new turn refills it with a "+N". It bobs
- * gently, and moves around the player so it never covers a chest, creature or exit.
+ * A small badge floating beside the player in combat: the AP left, in pixel digits, inside a
+ * round seal, with a bar of pips (one per action point) sweeping out of it to the right, a bit
+ * like a swoosh. Spending AP counts the number down, flashes the spent pips and pops a
+ * superscript "-3" that rises and fades; a new turn refills it with a "+N". It bobs gently,
+ * and moves around the player so it never covers a chest, creature or exit.
  */
 export class ApGauge {
   private readonly root: Phaser.GameObjects.Container;
   /** Child of root that bobs, so the bob doesn't disturb positioning. */
   private readonly body: Phaser.GameObjects.Container;
   private readonly pips: Phaser.GameObjects.Graphics;
+  /** The light green border (the seal's ring and the bar's border), redrawn each frame to pulse and shine. */
+  private readonly glow: Phaser.GameObjects.Graphics;
+  private readonly borderPixels: Array<{ x: number; y: number }> = [];
   private readonly digits: Phaser.GameObjects.Image[] = [];
   private readonly offsets: Offset[];
   private readonly width: number;
@@ -77,23 +99,48 @@ export class ApGauge {
     private readonly maxActionPoints: number,
     depth: number,
   ) {
-    const textWidth = numberWidth(2); // up to two digits
     const pipsWidth = maxActionPoints * (PIP_WIDTH + PIP_GAP) - PIP_GAP;
-    this.width = Math.max(textWidth, pipsWidth) + PADDING * 2;
-    this.height = 7 + 1 + PIP_HEIGHT + PADDING * 2 - 1;
-    this.offsets = placementOffsets(this.width, this.height, PLAYER_SIZE);
+    // The seal, then the pips just past its edge, framed by the bar.
+    this.width = SEAL_SIZE + 1 + pipsWidth + BAR_FRAME;
+    this.height = SEAL_SIZE;
+    this.offsets = placementOffsets(this.width, this.height, PLAYER_SIZE, GAP);
 
-    const left = -this.width / 2;
-    const top = -this.height / 2;
-    const plate = scene.add.graphics();
-    plate.fillStyle(COLOR.plate, 0.88).fillRect(left, top, this.width, this.height);
-    plate.lineStyle(1, COLOR.border, 0.9).strokeRect(left + 0.5, top + 0.5, this.width - 1, this.height - 1);
+    const { left, top } = this.corner();
+    // The bar runs along the lower half of the seal and starts where the seal curves away. It
+    // only fills pixels outside the seal's circle, rather than lying underneath it, so nothing
+    // shows through when the gauge is dimmed or fading.
+    const bar = this.barRect();
+    const frame = scene.add.graphics();
+    const radius = SEAL_SIZE / 2;
+    for (let y = bar.y; y < bar.y + bar.height; y++) {
+      const row = y - bar.y;
+      const onEdge = row === 0 || row === bar.height - 1;
+      const onBorder = row === 1 || row === bar.height - 2;
+      for (let x = bar.x; x < bar.x + bar.width; x++) {
+        const insideSeal = Math.hypot(x + 0.5 - (left + radius), y + 0.5 - (top + radius)) <= radius;
+        if (insideSeal) continue;
+        const column = bar.x + bar.width - 1 - x; // counted from the bar's right end
+        const color =
+          onEdge || column === 0 ? COLOR.edge : onBorder || column === 1 ? COLOR.border : COLOR.plate;
+        frame.fillStyle(color, 1).fillRect(x, y, 1, 1);
+        if (color === COLOR.border) this.borderPixels.push({ x, y });
+      }
+    }
+    const seal = scene.add.image(left, top, SEAL_TEXTURE).setOrigin(0);
+    // The seal's green ring (as drawn in its texture), so it can glow along with the bar's border.
+    for (let y = 0; y < SEAL_SIZE; y++) {
+      for (let x = 0; x < SEAL_SIZE; x++) {
+        const d = Math.hypot(x + 0.5 - radius, y + 0.5 - radius);
+        if (d <= radius - 1 && d > radius - 2) this.borderPixels.push({ x: left + x, y: top + y });
+      }
+    }
+    this.glow = scene.add.graphics();
 
-    const textY = top + PADDING - 1;
-    for (let i = 0; i < 2; i++) this.digits.push(scene.add.image(0, textY, glyphTextureKey('0')).setOrigin(0));
+    // Plain digits (no outline): they sit on the seal, not on the map.
+    for (let i = 0; i < 2; i++) this.digits.push(scene.add.image(0, 0, plainGlyphKey('0')).setOrigin(0));
     this.pips = scene.add.graphics();
 
-    this.body = scene.add.container(0, 0, [plate, ...this.digits, this.pips]);
+    this.body = scene.add.container(0, 0, [frame, seal, this.glow, ...this.digits, this.pips]);
     this.root = scene.add.container(0, 0, [this.body]).setDepth(depth).setAlpha(0).setVisible(false);
   }
 
@@ -115,6 +162,7 @@ export class ApGauge {
     }
     this.countTowardsTarget(deltaMs);
     this.drawPips(deltaMs);
+    this.drawGlow();
 
     // Float beside the player in the least obstructive spot, gliding there smoothly, with a gentle bob.
     this.placement = choosePlacement(s.anchor, this.size(), this.offsets, s.obstacles, s.view, this.placement);
@@ -149,29 +197,59 @@ export class ApGauge {
     }
   }
 
-  /** The number, centred over the pips. */
+  /**
+   * Pulses the light green border slowly between its normal and a brighter green, and every
+   * few seconds sweeps a white glint diagonally across it, from the seal to the bar's end.
+   */
+  private drawGlow(): void {
+    const pulse = (Math.sin((this.time / PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const base = mixColor(COLOR.border, COLOR.borderPulse, pulse * 0.75);
+    const { left, top } = this.corner();
+    const sinceShine = this.time % SHINE_EVERY_MS;
+    // Position of the glint along the diagonal (x + y), travelling past the whole gauge.
+    const sweep = sinceShine < SHINE_MS ? -SHINE_WIDTH + (sinceShine / SHINE_MS) * (this.width + this.height + 2 * SHINE_WIDTH) : null;
+    this.glow.clear();
+    for (const p of this.borderPixels) {
+      const diagonal = p.x - left + (p.y - top);
+      const shine = sweep === null ? 0 : Math.max(0, 1 - Math.abs(diagonal - sweep) / SHINE_WIDTH);
+      this.glow.fillStyle(mixColor(base, COLOR.borderShine, shine), 1).fillRect(p.x, p.y, 1, 1);
+    }
+  }
+
+  /** The number, centred in the seal. */
   private drawNumber(): void {
     const text = String(this.shown);
-    const left = this.numberLeft(text);
+    const { left, top } = this.corner();
+    const x = Math.round(left + SEAL_SIZE / 2 - numberWidth(text.length) / 2);
+    const y = Math.round(top + SEAL_SIZE / 2 - GLYPH_HEIGHT / 2);
     this.digits.forEach((digit, i) => {
       const char = text[i];
       digit.setVisible(char !== undefined);
       if (char) {
         digit
-          .setTexture(glyphTextureKey(char))
-          .setX(left + i * ADVANCE)
+          .setTexture(plainGlyphKey(char))
+          .setPosition(x + i * ADVANCE, y)
           .setTint(this.shown === 0 ? COLOR.empty : COLOR.number);
       }
     });
   }
 
-  private numberLeft(text: string): number {
-    return -Math.round(numberWidth(text.length) / 2);
+  /** Top-left corner of the gauge, relative to its centre (whole pixels, so the art stays crisp). */
+  private corner(): { left: number; top: number } {
+    return { left: -Math.floor(this.width / 2), top: -Math.floor(this.height / 2) };
+  }
+
+  /** The pip bar's frame: from under the seal to past the last pip, along the seal's lower half. */
+  private barRect(): Rect {
+    const { left, top } = this.corner();
+    const x = left + SEAL_SIZE - BAR_OVERLAP;
+    const y = top + Math.floor(SEAL_SIZE / 2) - 1;
+    return { x, y, width: left + this.width - x, height: BAR_HEIGHT };
   }
 
   private drawPips(deltaMs: number): void {
-    const left = -this.width / 2 + PADDING + (this.width - PADDING * 2 - this.pipsWidth()) / 2;
-    const top = this.height / 2 - PADDING - PIP_HEIGHT;
+    const left = this.corner().left + SEAL_SIZE + 1;
+    const top = this.barRect().y + BAR_FRAME;
     this.pips.clear();
     for (let i = 0; i < this.maxActionPoints; i++) {
       const flash = this.flashes.get(i);
@@ -189,19 +267,14 @@ export class ApGauge {
     return { width: this.width, height: this.height };
   }
 
-  private pipsWidth(): number {
-    return this.maxActionPoints * (PIP_WIDTH + PIP_GAP) - PIP_GAP;
-  }
-
   /** A superscript "-3" or "+8" beside the number that pops, rises and fades. */
   private showDelta(delta: number): void {
     const text = `${delta > 0 ? '+' : '-'}${Math.abs(delta)}`;
     const color = delta > 0 ? COLOR.refillDelta : COLOR.spentDelta;
     const glyphs = [...text].map((char, i) => this.scene.add.image(i * ADVANCE, 0, glyphTextureKey(char)).setOrigin(0).setTint(color));
-    // Superscript: just past the number's right edge, raised above the plate's top.
-    const shown = String(this.shown);
-    const numberRight = this.numberLeft(shown) + numberWidth(shown.length);
-    const floater = this.scene.add.container(numberRight, -this.height / 2 - 5, glyphs).setScale(1.3);
+    // Superscript: at the seal's top right, raised above it.
+    const { left, top } = this.corner();
+    const floater = this.scene.add.container(left + SEAL_SIZE - 4, top - 5, glyphs).setScale(1.3);
     this.body.add(floater);
     this.scene.tweens.add({ targets: floater, scale: 1, duration: 120, ease: 'Back.Out' });
     this.scene.tweens.add({
@@ -215,7 +288,17 @@ export class ApGauge {
   }
 }
 
-/** Width of a number in outlined glyphs, which overlap by their 1-pixel outline. */
+/** Width of a number in plain glyphs. */
 function numberWidth(digits: number): number {
-  return digits * ADVANCE + 1;
+  return digits * ADVANCE - 1;
+}
+
+/** Blends two 0xRRGGBB colours; t = 0 gives a, t = 1 gives b. */
+function mixColor(a: number, b: number, t: number): number {
+  const channel = (shift: number) => {
+    const from = (a >> shift) & 0xff;
+    const to = (b >> shift) & 0xff;
+    return Math.round(from + (to - from) * t) << shift;
+  };
+  return channel(16) | channel(8) | channel(0);
 }

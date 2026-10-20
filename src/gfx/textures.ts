@@ -9,6 +9,7 @@ import {
   GLYPH_WIDTH,
   GLYPHS,
   glyphTextureKey,
+  plainGlyphKey,
 } from './pixelFont';
 import { SPRITES, type PixelSprite } from './sprites';
 
@@ -28,7 +29,37 @@ export function createTextures(scene: Phaser.Scene): void {
   }
   for (const [char, rows] of Object.entries(GLYPHS)) {
     createGlyphTexture(scene, char, rows);
+    createPlainGlyphTexture(scene, char, rows);
   }
+  createSealTexture(scene);
+}
+
+/** Diameter of the AP gauge's seal, in pixels. */
+export const SEAL_SIZE = 15;
+export const SEAL_TEXTURE = 'ap_seal';
+
+/**
+ * The round seal the AP number sits in: a dark disc with a green ring and a thin black edge
+ * outside it, so it reads on any ground. Drawn pixel by pixel to match the rest of the art.
+ */
+function createSealTexture(scene: Phaser.Scene): void {
+  createTexture(scene, SEAL_TEXTURE, SEAL_SIZE, SEAL_SIZE, (ctx) => {
+    const center = SEAL_SIZE / 2;
+    for (let y = 0; y < SEAL_SIZE; y++) {
+      for (let x = 0; x < SEAL_SIZE; x++) {
+        const d = Math.hypot(x + 0.5 - center, y + 0.5 - center);
+        if (d > center) continue;
+        pixel(ctx, x, y, d > center - 1 ? '#000000' : d > center - 2 ? '#3cd070' : '#0a140c');
+      }
+    }
+  });
+}
+
+/** The glyph alone, white so it can be tinted, for text on a solid background. */
+function createPlainGlyphTexture(scene: Phaser.Scene, char: string, rows: string[]): void {
+  createTexture(scene, plainGlyphKey(char), GLYPH_WIDTH, GLYPH_HEIGHT, (ctx) => {
+    rows.forEach((row, y) => [...row].forEach((c, x) => c === '#' && pixel(ctx, x, y, '#ffffff')));
+  });
 }
 
 /**
