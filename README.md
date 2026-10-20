@@ -38,7 +38,8 @@ npm run build      # typecheck + production build into dist/
 The world is a set of maps joined by exits (signposts on the map edge); walking onto one
 takes you to the linked map, next to its exit back. `data/world.ts` lists the maps and how
 they connect. A map is either drawn by hand as ASCII art (`data/wasteland.ts`) or generated
-from a **biome**: the wasteland's east exit leads to a randomly generated forest.
+from a **biome**: the wasteland's east exit leads to a randomly generated forest, its south
+exit to a randomly generated village.
 
 Generated maps are rebuilt from a seed (the world seed, which is new for every game, plus the
 map id), so the same game always gets the same forest and saves only store what changed:
@@ -50,7 +51,8 @@ Afterwards it carves paths so every exit, chest and creature can be reached. The
 
 - `MapBuilder`: paint tiles, stamp prefabs, place chests, creatures and exits.
 - `Prefab`: a hand-drawn structure in the map legend, with `$` for its chest and `&` for its
-  creatures (a logging camp, a hunter's cabin, ...).
+  creatures (a logging camp, a hunter's cabin, ...). `flipVertical()` turns one around, e.g.
+  for houses on the other side of a street; `builder.lock()` keeps roads free of buildings.
 - `LootTable` / `SpawnTable`: what a chest can contain, which creatures can appear.
 - `terrain.ts`: scatter, cellular smoothing (for groves and caves), blobs, borders, winding
   paths, finding free spots.
@@ -58,6 +60,11 @@ Afterwards it carves paths so every exit, chest and creature can be reached. The
 The forest (`data/biomes/forest.ts`) has smoothed groves of trees, dirt and grass patches,
 sometimes a pond, a raider-held logging camp, a hunter's cabin, campsites and hidden
 stashes, and mole rats, radroaches and wild dogs kept out of sight of where you arrive.
+
+The village (`data/biomes/village.ts`) is abandoned and overgrown: a main street with wooden
+and brick houses on both sides (doors facing the street), a general store being looted by a
+raider, a barn with hay and vermin, fenced fields with mole rats, a well, and feral ghouls,
+wild dogs and radroaches roaming the streets.
 
 **Adding a biome** (village, plains, caves...):
 
@@ -68,7 +75,8 @@ stashes, and mole rats, radroaches and wild dogs kept out of sight of where you 
    blocking/opaque sets), and a painter in `gfx/textures.ts`; TypeScript flags any you miss.
 3. Register it in `data/biomes/index.ts` and give it a place in `data/world.ts`, with an exit
    on a neighbouring map leading to it.
-4. Copy `data/biomes/forest.test.ts`: it checks determinism and reachability over many seeds.
+4. Copy `data/biomes/village.test.ts`: it runs `playabilityProblems()` (every exit, chest and
+   creature reachable; nothing can see you arrive) and a determinism check over many seeds.
 
 ## Levelling
 

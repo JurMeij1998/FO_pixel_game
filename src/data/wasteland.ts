@@ -22,7 +22,7 @@ export const WASTELAND: MapDef = {
     'o..~~~..R....c......,..........o',
     'o...R...,..........oo......X...o',
     'o...........................d..o',
-    'oooooooooooooooooooooooooooooooo',
+    'ooooooooooooooo2oooooooooooooooo',
   ],
   chests: {
     a: {
@@ -66,5 +66,6 @@ export const WASTELAND: MapDef = {
   },
   exits: {
     '1': { to: 'forest' },
+    '2': { to: 'village' },
   },
 };

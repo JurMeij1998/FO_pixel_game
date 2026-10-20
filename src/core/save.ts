@@ -71,7 +71,12 @@ export function loadGame(data: unknown, buildMap: MapBuilderFn): GameData {
     applyMapState(map, state);
     maps[id] = map;
   }
-  return { player: Character.fromData(save.player), worldSeed: save.worldSeed, maps, currentMap: save.currentMap };
+  const player = Character.fromData(save.player);
+  // If the map has changed since the save (a new version of the game), the saved spot may now
+  // be a wall or a tree; put the player somewhere they can stand.
+  const current = maps[save.currentMap];
+  if (!current.isWalkable(player.pos.x, player.pos.y)) player.pos = { ...current.playerStart };
+  return { player, worldSeed: save.worldSeed, maps, currentMap: save.currentMap };
 }
 
 function upgrade(data: unknown): SaveData {

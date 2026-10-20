@@ -64,8 +64,38 @@ const SIGNPOST_PALETTE = {
   p: '#5e3c1c', // post
 };
 
+const GHOUL_PALETTE = {
+  k: '#1a1a14', // outline
+  s: '#8a9a6a', // rotting skin
+  S: '#6a7a4e', // skin shade
+  e: '#d8d040', // glowing eyes
+  c: '#5a4a3a', // rags
+  C: '#3e3428', // rag shade
+};
+
 // Creature sprites are keyed by creature id (see core/creature.ts).
 export const SPRITES: Record<string, PixelSprite> = {
+  feral_ghoul: {
+    palette: GHOUL_PALETTE,
+    rows: [
+      '................',
+      '.....kkkkkk.....',
+      '....kssssssk....',
+      '....ksSssSsk....',
+      '....kseSSesk....',
+      '....ksskkssk....',
+      '.....kssssk.....',
+      '...kkccCCcckk...',
+      '..kskccCCccksk..',
+      '..ks.kcccck.sk..',
+      '..kk.kcCCck.kk..',
+      '.....kSkkSk.....',
+      '.....kSk.kSk....',
+      '.....kkk.kkk....',
+      '................',
+      '................',
+    ],
+  },
   // Side view, facing right.
   wild_dog: {
     palette: DOG_PALETTE,

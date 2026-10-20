@@ -1,5 +1,6 @@
 import type { Biome } from '../../core/generation/biome';
 import { FOREST } from './forest';
+import { VILLAGE } from './village';
 
 /**
  * Every kind of generated map. To add one (village, plains, caves...): write a Biome in this
@@ -8,6 +9,7 @@ import { FOREST } from './forest';
  */
 export const BIOMES = {
   forest: FOREST,
+  village: VILLAGE,
 } satisfies Record<string, Biome>;
 
 export type BiomeId = keyof typeof BIOMES;

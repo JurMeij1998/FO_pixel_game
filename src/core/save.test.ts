@@ -107,6 +107,13 @@ describe('save and load', () => {
     expect(loaded.maps.wasteland).toBeDefined();
   });
 
+  it('moves the player off a tile that is no longer walkable', () => {
+    const game = freshGame();
+    game.player.pos = { x: 0, y: 0 }; // a rock, as if the map had changed under the save
+    const loaded = roundTrip(game);
+    expect(loaded.player.pos).toEqual(game.maps.wasteland.playerStart);
+  });
+
   it('only stores maps that have been visited', () => {
     const save = saveJson(freshGame());
     expect(Object.keys(save.maps)).toEqual(['wasteland']);

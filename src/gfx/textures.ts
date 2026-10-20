@@ -156,6 +156,61 @@ const TILE_PAINTERS: Record<TileType, Painter> = {
     ctx.fillStyle = '#3a2414';
     ctx.fillRect(0, 0, TILE_SIZE, 2);
   },
+
+  // Two rails between posts. Fences run both ways, so the same tile serves for both.
+  fence: (ctx, rand) => {
+    paintForestFloor(ctx, rand);
+    ctx.fillStyle = '#6e5232';
+    ctx.fillRect(0, 5, TILE_SIZE, 2);
+    ctx.fillRect(0, 10, TILE_SIZE, 2);
+    ctx.fillStyle = '#4a3420';
+    ctx.fillRect(2, 3, 2, 11);
+    ctx.fillRect(12, 3, 2, 11);
+    ctx.fillStyle = '#8a6a44';
+    ctx.fillRect(0, 5, TILE_SIZE, 1);
+    ctx.fillRect(0, 10, TILE_SIZE, 1);
+  },
+
+  // Tilled furrows with rows of withered sprouts.
+  crops: (ctx, rand) => {
+    fill(ctx, '#5a4428');
+    ctx.fillStyle = '#4a3820';
+    for (let y = 1; y < TILE_SIZE; y += 4) ctx.fillRect(0, y, TILE_SIZE, 1);
+    for (let y = 2; y < TILE_SIZE; y += 4) {
+      for (let x = 1 + Math.floor(rand() * 3); x < TILE_SIZE; x += 3 + Math.floor(rand() * 2)) {
+        pixel(ctx, x, y, rand() < 0.3 ? '#8a8a3a' : '#6a7a30');
+        pixel(ctx, x, y - 1, '#7a8a38');
+      }
+    }
+  },
+
+  // A bale of hay on the barn floor, its binding twine across it.
+  hay: (ctx, rand) => {
+    TILE_PAINTERS.planks(ctx, rand);
+    ctx.fillStyle = '#b8963c';
+    ctx.fillRect(1, 2, 14, 12);
+    speckle(ctx, rand, ['#d0b050', '#a08030', '#c8a848'], 40);
+    ctx.fillStyle = '#7a5e24';
+    ctx.fillRect(1, 13, 14, 1);
+    ctx.fillRect(4, 2, 1, 12);
+    ctx.fillRect(11, 2, 1, 12);
+  },
+
+  // A shop shelf seen from above: wooden edge with tins and boxes on it.
+  shelf: (ctx, rand) => {
+    TILE_PAINTERS.planks(ctx, rand);
+    ctx.fillStyle = '#4a3018';
+    ctx.fillRect(0, 2, TILE_SIZE, 12);
+    ctx.fillStyle = '#6a4626';
+    ctx.fillRect(1, 3, 14, 10);
+    const goods = ['#b84a3a', '#c8c0a0', '#4a7aa8', '#c8a040', '#7a8a6a'];
+    for (let x = 2; x < 14; x += 3) {
+      ctx.fillStyle = goods[Math.floor(rand() * goods.length)];
+      ctx.fillRect(x, 4 + Math.floor(rand() * 2), 2, 3);
+      ctx.fillStyle = goods[Math.floor(rand() * goods.length)];
+      ctx.fillRect(x, 9, 2, 3);
+    }
+  },
 };
 
 function paintForestFloor(ctx: CanvasRenderingContext2D, rand: () => number): void {

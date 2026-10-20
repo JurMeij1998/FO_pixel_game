@@ -20,6 +20,18 @@ export interface Prefab {
   creatures?: SpawnTable;
 }
 
+/**
+ * The prefab upside down, entrance included: a house whose door faces south becomes one whose
+ * door faces north, for the other side of a street.
+ */
+export function flipVertical(prefab: Prefab): Prefab {
+  return {
+    ...prefab,
+    rows: [...prefab.rows].reverse(),
+    entrance: { x: prefab.entrance.x, y: prefab.rows.length - 1 - prefab.entrance.y },
+  };
+}
+
 const KEEP = ' ';
 const CHEST_SLOT = '$';
 const CREATURE_SLOT = '&';
@@ -75,6 +87,11 @@ export class MapBuilder {
 
   isLocked(x: number, y: number): boolean {
     return this.locked[y][x];
+  }
+
+  /** Protects a tile from later painting and stamping, e.g. a road nothing should be built on. */
+  lock(x: number, y: number): void {
+    if (this.inBounds(x, y)) this.locked[y][x] = true;
   }
 
   /** Walkable ground with nothing placed on it. */

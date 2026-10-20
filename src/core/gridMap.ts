@@ -15,7 +15,11 @@ export type TileType =
   | 'logs'
   | 'path'
   | 'planks'
-  | 'woodWall';
+  | 'woodWall'
+  | 'fence'
+  | 'crops'
+  | 'hay'
+  | 'shelf';
 
 /** Map characters for each tile. Letters and digits are taken by markers, so tiles use symbols. */
 export const LEGEND: Readonly<Record<string, TileType>> = {
@@ -32,10 +36,24 @@ export const LEGEND: Readonly<Record<string, TileType>> = {
   ':': 'path',
   '+': 'planks',
   '%': 'woodWall',
+  '|': 'fence',
+  '*': 'crops',
+  '[': 'hay',
+  ']': 'shelf',
 };
 
-const BLOCKING: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'water', 'tree', 'logs', 'woodWall']);
-/** Tiles you can't see (or shoot) through. Water and log piles block walking but not sight. */
+const BLOCKING: ReadonlySet<TileType> = new Set<TileType>([
+  'wall',
+  'rock',
+  'water',
+  'tree',
+  'logs',
+  'woodWall',
+  'fence',
+  'hay',
+  'shelf',
+]);
+/** Tiles you can't see (or shoot) through. Low obstacles (water, logs, fences, hay, shelves) block walking only. */
 const OPAQUE: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'tree', 'woodWall']);
 
 export function isBlockingTile(tile: TileType): boolean {
@@ -252,12 +270,13 @@ export class GridMap {
 
 /**
  * The ground a marker stands on: the first walkable tile among its left, right, upper and
- * lower neighbours, so a chest against a wall still sits on the floor. Falls back to any
- * neighbouring tile, then dirt.
+ * lower neighbours, so a chest against a wall still sits on the floor. If none is walkable
+ * (an exit between edge trees, say) it's dirt: markers are things to stand on or beside, so
+ * their ground must never block.
  */
 function groundUnderMarker(rows: string[], x: number, y: number): TileType {
   const neighbours = [rows[y][x - 1], rows[y][x + 1], rows[y - 1]?.[x], rows[y + 1]?.[x]]
     .map((char) => (char === undefined ? undefined : LEGEND[char]))
     .filter((tile): tile is TileType => tile !== undefined);
-  return neighbours.find((tile) => !BLOCKING.has(tile)) ?? neighbours[0] ?? 'dirt';
+  return neighbours.find((tile) => !BLOCKING.has(tile)) ?? 'dirt';
 }

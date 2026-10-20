@@ -15,8 +15,9 @@ export type MapSource =
  * don't rename them.
  */
 export const WORLD: Record<string, MapSource> = {
-  wasteland: { kind: 'fixed', def: WASTELAND }, // its exit '1' leads to the forest
+  wasteland: { kind: 'fixed', def: WASTELAND }, // exit '1' (east) leads to the forest, '2' (south) to the village
   forest: { kind: 'generated', biome: 'forest', exits: [{ side: 'west', to: 'wasteland' }] },
+  village: { kind: 'generated', biome: 'village', exits: [{ side: 'north', to: 'wasteland' }] },
 };
 
 export const START_MAP = 'wasteland';
