@@ -25,7 +25,8 @@ npm run build      # typecheck + production build into dist/
 | I               | Inventory                        | Inventory (costs 4 AP)        |
 | Q               | Swap primary/secondary weapon    | Same, free                    |
 | Esc             | Close a screen                   |                               |
-| A (loot screen) | Take all                         |                               |
+| Space (loot)    | Take all                         |                               |
+| E / Esc (loot)  | Close the loot screen            |                               |
 
 ## Combat
 

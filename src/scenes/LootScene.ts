@@ -43,13 +43,16 @@ export class LootScene extends Phaser.Scene {
       this.apply(takeItem(player, this.lootable.contents, itemId)),
     );
 
-    addButton(this, RIGHT, 500, 'Take all', () => this.apply(takeAll(player, this.lootable.contents)));
+    addButton(this, RIGHT, 500, 'Take all (Space)', () => this.apply(takeAll(player, this.lootable.contents)));
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
 
     const keyboard = this.input.keyboard!;
     keyboard.on('keydown-ESC', () => this.close());
     keyboard.on('keydown-E', () => this.close());
-    keyboard.on('keydown-A', () => this.apply(takeAll(player, this.lootable.contents)));
+    keyboard.on('keydown-SPACE', (event: KeyboardEvent) => {
+      // Ignore auto-repeat, so holding the Space that opened the chest doesn't also loot it.
+      if (!event.repeat) this.apply(takeAll(player, this.lootable.contents));
+    });
 
     this.refresh();
   }

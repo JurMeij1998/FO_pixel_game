@@ -224,3 +224,23 @@ export const SPRITES: Record<string, PixelSprite> = {
     ],
   },
 };
+
+/** A copy of `sprite` with some rows replaced, for animation frames that differ only in part. */
+function withRows(sprite: PixelSprite, replacements: Record<number, string>): PixelSprite {
+  return { palette: sprite.palette, rows: sprite.rows.map((row, y) => replacements[y] ?? row) };
+}
+
+// Walk frames: one stride per direction, only the legs change. The world scene alternates
+// stride and standing frames, and mirrors the up/down stride every other step so the legs alternate.
+const FRONT_STRIDE = {
+  12: '....kbbkkggk....', // right leg lifted
+  13: '....kggk.kkk....',
+  14: '....kkk.........',
+};
+SPRITES.player_down_walk = withRows(SPRITES.player_down, FRONT_STRIDE);
+SPRITES.player_up_walk = withRows(SPRITES.player_up, FRONT_STRIDE);
+SPRITES.player_side_walk = withRows(SPRITES.player_side, {
+  12: '....kbbkkbbk....', // legs apart
+  13: '...kggk..kggk...',
+  14: '...kkk....kkk...',
+});

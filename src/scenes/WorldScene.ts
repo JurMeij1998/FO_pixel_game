@@ -35,6 +35,8 @@ const toPixel = (tile: number) => tile * TILE_SIZE + TILE_SIZE / 2;
 export class WorldScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Image;
   private facing: Direction = 'down';
+  /** Steps taken so far; picks which leg leads in the walk animation. */
+  private steps = 0;
   /** True while an animation plays; input is ignored until it finishes. */
   private busy = false;
   private readonly chestImages = new Map<string, Phaser.GameObjects.Image>();
@@ -243,15 +245,31 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private tweenTo(image: Phaser.GameObjects.Image, to: GridPos): Promise<void> {
+    const isPlayer = image === this.player;
+    if (isPlayer) this.showStride();
     return new Promise((resolve) => {
       this.tweens.add({
         targets: image,
         x: toPixel(to.x),
         y: toPixel(to.y),
         duration: MOVE_DURATION_MS,
+        // Second half of the step: back to the standing frame.
+        onUpdate: (tween) => {
+          if (isPlayer && tween.progress >= 0.5) this.face(this.facing);
+        },
         onComplete: () => resolve(),
       });
     });
+  }
+
+  /** Shows the walking frame for the first half of a step. */
+  private showStride(): void {
+    this.steps++;
+    const vertical = this.facing === 'up' || this.facing === 'down';
+    const texture = this.facing === 'up' ? 'player_up_walk' : this.facing === 'down' ? 'player_down_walk' : 'player_side_walk';
+    // Mirroring the up/down stride swaps which leg is lifted, so the legs alternate step by step.
+    const flip = vertical ? this.steps % 2 === 1 : this.facing === 'left';
+    this.player.setTexture(texture).setFlipX(flip);
   }
 
   /** A short jab towards the target and back. */
