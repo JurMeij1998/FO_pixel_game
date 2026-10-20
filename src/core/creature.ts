@@ -30,7 +30,7 @@ const DEFINITIONS: CreatureDef[] = [
     critChance: 2,
     sightRange: 4,
     experience: 25,
-    attack: { name: 'bite', damageMin: 1, damageMax: 4, apCost: 3, range: 1, hitChance: 50 },
+    attack: { name: 'bite', damageMin: 1, damageMax: 4, apCost: 3, range: 1, hitChance: 50, sound: 'bite' },
     loot: [],
   },
   {
@@ -43,7 +43,7 @@ const DEFINITIONS: CreatureDef[] = [
     critChance: 3,
     sightRange: 5,
     experience: 40,
-    attack: { name: 'bite', damageMin: 2, damageMax: 6, apCost: 4, range: 1, hitChance: 55 },
+    attack: { name: 'bite', damageMin: 2, damageMax: 6, apCost: 4, range: 1, hitChance: 55, sound: 'bite' },
     loot: [],
   },
   {
@@ -56,7 +56,7 @@ const DEFINITIONS: CreatureDef[] = [
     critChance: 5,
     sightRange: 7,
     experience: 100,
-    attack: { name: 'pistol', damageMin: 3, damageMax: 9, apCost: 5, range: 6, hitChance: 50 },
+    attack: { name: 'pistol', damageMin: 3, damageMax: 9, apCost: 5, range: 6, hitChance: 50, sound: 'pistol' },
     loot: [
       ['bottle_caps', 25],
       ['ammo_10mm', 8],

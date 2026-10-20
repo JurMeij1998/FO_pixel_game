@@ -48,7 +48,7 @@ export class MenuScene extends Phaser.Scene {
     ]);
 
     this.add
-      .text(centerX, GAME_HEIGHT - 40, 'Up/Down to choose, Enter to select. The game saves automatically.', SMALL_TEXT)
+      .text(centerX, GAME_HEIGHT - 40, 'Up/Down to choose, Enter to select, M for sound on/off. The game saves automatically.', SMALL_TEXT)
       .setOrigin(0.5);
   }
 }

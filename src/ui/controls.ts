@@ -11,5 +11,6 @@ export const CONTROL_ROWS: Array<[keys: string, exploring: string, combat: strin
   ['I', 'Inventory', 'Inventory (4 AP)'],
   ['C', 'Character sheet', '-'],
   ['Esc', 'Pause menu / close', 'Pause menu'],
+  ['M', 'Sound on/off', 'Sound on/off'],
   ['Space (loot)', 'Take all', '-'],
 ];

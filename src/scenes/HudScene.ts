@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { isMuted } from '../audio/sfx';
 import { GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM } from '../config';
 import { state } from '../state';
 import { MESSAGE_EVENT } from '../ui/messages';
@@ -54,7 +55,7 @@ export class HudScene extends Phaser.Scene {
     const level = `Lv ${p.level}${p.skillPoints > 0 ? '+' : ''}`;
     this.status.setText(
       `${level}   HP ${p.hitPoints}/${p.maxHitPoints}   AC ${p.armorClass}   AP ${ap}   ` +
-        `Wt ${p.carriedWeight}/${p.carryCapacity}   ${weapon.name}${ammo}`,
+        `Wt ${p.carriedWeight}/${p.carryCapacity}   ${weapon.name}${ammo}${isMuted() ? '   [muted]' : ''}`,
     );
     this.status.setColor(p.hitPoints <= p.maxHitPoints / 4 ? COLORS.warn : COLORS.text);
 

@@ -1,5 +1,8 @@
 import type { GridPos } from './grid';
 
+/** What an attack sounds like; the audio layer turns this into an actual sound. */
+export type AttackSound = 'swing' | 'punch' | 'pistol' | 'rifle' | 'bite';
+
 /** Everything the combat rules need to know about one attack, whatever it comes from. */
 export interface Attack {
   name: string;
@@ -12,6 +15,7 @@ export interface Attack {
   hitChance: number;
   /** Item id used up per attack, if any. */
   ammo?: string;
+  sound: AttackSound;
 }
 
 /** Anything that can take part in combat: the player or a creature. */

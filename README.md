@@ -26,6 +26,7 @@ npm run build      # typecheck + production build into dist/
 | C               | Character sheet, spend skill points |                            |
 | Q               | Swap primary/secondary weapon    | Same, free                    |
 | R               | Reload the gun in hand           | Reload (costs 2 AP)           |
+| M               | Sound on/off                     | Sound on/off                  |
 | Esc             | Pause menu / close a screen      | Pause menu                    |
 | Space (loot)    | Take all                         |                               |
 | E / Esc (loot)  | Close the loot screen            |                               |
@@ -36,6 +37,15 @@ Kills give XP (radroach 25, mole rat 40, raider 100). Level 2 takes 100 XP, leve
 level 4 600, and so on. Each level adds 3 + Endurance/2 max HP and 5 + 2 x Intelligence skill
 points, spent on the character sheet (C). Tagged skills gain 2% per point, others 1%.
 A `+` after your level in the HUD means you have points to spend.
+
+## Sound
+
+All sound effects are synthesised at runtime with the Web Audio API (`audio/sfx.ts`), so,
+like the art, there are no asset files: footsteps (a gravel crunch outdoors, a harder tap on
+floors), weapon swings, layered gunshots (crack, overdriven blast, boom, echo), bites, hits,
+ricochets, deaths, reloads, pickups, a level-up jingle and menu blips. Each attack's `sound`
+field (on weapons and creatures) picks what it sounds like. M toggles sound on any screen,
+and is remembered.
 
 ## Saving
 
@@ -76,6 +86,7 @@ src/
     save.ts       Game state to and from plain JSON
   data/       Maps and other content
   gfx/        Procedurally generated placeholder pixel art
+  audio/      Synthesised sound effects
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting
   scenes/     Phaser scenes: Boot, Menu, World, Hud, Inventory, Loot, Character, Pause,
               GameOver, Controls; flow.ts switches between menus and the game

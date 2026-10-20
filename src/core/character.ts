@@ -10,7 +10,7 @@ export type WeaponSlot = 'primary' | 'secondary';
 export type EquipSlot = WeaponSlot | 'armor';
 export const EQUIP_SLOTS: readonly EquipSlot[] = ['primary', 'secondary', 'armor'];
 
-const UNARMED = { name: 'Fists', damageMin: 1, damageMax: 3, apCost: 3, range: 1 };
+const UNARMED = { name: 'Fists', damageMin: 1, damageMax: 3, apCost: 3, range: 1, sound: 'punch' } as const;
 
 /** Everything needed to rebuild a Character, as plain JSON-friendly data. */
 export interface CharacterData {

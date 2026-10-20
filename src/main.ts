@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { toggleMuted } from './audio/sfx';
 import { GAME_HEIGHT, GAME_WIDTH } from './config';
 import { BootScene } from './scenes/BootScene';
 import { CharacterScene } from './scenes/CharacterScene';
@@ -10,6 +11,11 @@ import { LootScene } from './scenes/LootScene';
 import { MenuScene } from './scenes/MenuScene';
 import { PauseScene } from './scenes/PauseScene';
 import { WorldScene } from './scenes/WorldScene';
+
+// M toggles sound on every screen, so it is handled once here rather than in each scene.
+window.addEventListener('keydown', (event) => {
+  if (event.code === 'KeyM' && !event.repeat) toggleMuted();
+});
 
 new Phaser.Game({
   type: Phaser.AUTO,

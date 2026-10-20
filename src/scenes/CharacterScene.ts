@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playSound } from '../audio/sfx';
 import { SKILL_NAMES, SKILLS, type Special } from '../core/stats';
 import { state } from '../state';
 import { COLORS, DIM_TEXT, HEADER_TEXT, TEXT } from '../ui/theme';
@@ -57,6 +58,7 @@ export class CharacterScene extends Phaser.Scene {
       this.plusButtons.push(
         addButton(this, RIGHT + 300, y, '+', () => {
           const result = player.improveSkill(skill);
+          if (result.ok) playSound('menuSelect');
           this.feedback.setText(result.message).setColor(result.ok ? COLORS.text : COLORS.warn);
           this.refresh();
         }),

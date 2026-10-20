@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playSound } from '../audio/sfx';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { CHAR_WIDTH, COLORS, DIM_TEXT, ROW_HEIGHT, TEXT, TITLE_TEXT } from './theme';
 
@@ -58,7 +59,7 @@ export class MenuList {
         text
           .setInteractive({ useHandCursor: true })
           .on('pointerover', () => this.highlight(i))
-          .on('pointerdown', () => this.options[i].onSelect());
+          .on('pointerdown', () => this.choose(i));
       }
       return text;
     });
@@ -70,7 +71,7 @@ export class MenuList {
     };
     for (const key of ['UP', 'W']) keyboard.on(`keydown-${key}`, fresh(() => this.move(-1)));
     for (const key of ['DOWN', 'S']) keyboard.on(`keydown-${key}`, fresh(() => this.move(1)));
-    for (const key of ['ENTER', 'SPACE']) keyboard.on(`keydown-${key}`, fresh(() => this.options[this.index].onSelect()));
+    for (const key of ['ENTER', 'SPACE']) keyboard.on(`keydown-${key}`, fresh(() => this.choose(this.index)));
     this.render();
   }
 
@@ -88,8 +89,14 @@ export class MenuList {
   }
 
   private highlight(index: number): void {
+    if (index !== this.index) playSound('menuMove');
     this.index = index;
     this.render();
+  }
+
+  private choose(index: number): void {
+    playSound('menuSelect');
+    this.options[index].onSelect();
   }
 
   private render(): void {

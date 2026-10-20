@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playSound } from '../audio/sfx';
 import { HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
 import { Combat, INVENTORY_AP_COST, type CombatEvent } from '../core/combat';
 import type { Creature } from '../core/creature';
@@ -107,6 +108,7 @@ export class WorldScene extends Phaser.Scene {
     keyboard.on('keydown-ESC', () => this.openOverlay('Pause'));
     keyboard.on('keydown-Q', () => {
       postMessage(this, state.player.swapWeapons().message);
+      playSound('equip');
       autosave();
     });
 
@@ -162,6 +164,7 @@ export class WorldScene extends Phaser.Scene {
     state.combat = combat;
     this.input.keyboard!.resetKeys(); // don't keep walking (and spending AP) on a held key
     this.cameras.main.shake(150, 0.004);
+    playSound('combatStart');
   }
 
   /** Attacks a creature; outside combat a successful attack starts a fight. */
@@ -171,6 +174,8 @@ export class WorldScene extends Phaser.Scene {
     const result = combat.attack(creature);
     if (!result.ok) {
       postMessage(this, result.message);
+      const gunIsEmpty = state.player.attack.ammo && state.player.loadedRounds() === 0;
+      if (gunIsEmpty) playSound('dryFire');
       return;
     }
     if (!state.combat) this.enterCombat(combat);
@@ -227,6 +232,7 @@ export class WorldScene extends Phaser.Scene {
     for (const event of events) {
       if (event.type === 'move') {
         const image = this.imageFor(event.fighter);
+        if (event.fighter !== state.player) playSound('creatureStep'); // the player's steps play in showStride
         await this.tweenTo(image, event.to);
       } else {
         await this.showAttack(event);
@@ -237,7 +243,9 @@ export class WorldScene extends Phaser.Scene {
   private async showAttack(event: AttackEvent): Promise<void> {
     const attacker = this.imageFor(event.attacker);
     const target = this.imageFor(event.target);
+    const targetIsPlayer = event.target === state.player;
     if (event.attacker === state.player) this.faceToward(event.target.pos);
+    playSound(event.attacker.attack.sound);
 
     if (event.ranged) {
       const tracer = this.add.graphics().setDepth(DEPTH.effects);
@@ -249,18 +257,24 @@ export class WorldScene extends Phaser.Scene {
     }
 
     postMessage(this, event.message);
-    if (event.newLevel) {
-      postMessage(this, `Level up! You are now level ${event.newLevel}. Press C to spend skill points.`);
-      this.cameras.main.flash(250, 255, 240, 160);
-    }
     if (event.hit) {
+      playSound(targetIsPlayer ? 'hurt' : 'impact');
       this.floatText(target, `-${event.damage}`, event.critical ? '#ffe040' : '#ff5040');
       target.setTintFill(0xff3030);
       await this.wait(120);
       target.clearTint();
-      if (event.killed) this.showCorpse(target);
+      if (event.killed) {
+        playSound(targetIsPlayer ? 'playerDeath' : 'creatureDeath');
+        this.showCorpse(target);
+      }
     } else {
+      if (event.ranged) playSound('ricochet');
       this.floatText(target, 'miss', '#d0d0d0');
+    }
+    if (event.newLevel) {
+      postMessage(this, `Level up! You are now level ${event.newLevel}. Press C to spend skill points.`);
+      this.cameras.main.flash(250, 255, 240, 160);
+      this.time.delayedCall(350, () => playSound('levelUp')); // after the death sound
     }
     await this.wait(250);
   }
@@ -290,6 +304,9 @@ export class WorldScene extends Phaser.Scene {
   /** Shows the walking frame for the first half of a step. */
   private showStride(): void {
     this.steps++;
+    // The position is already updated to the tile being stepped onto.
+    const ground = state.map.tileAt(state.player.pos.x, state.player.pos.y);
+    playSound(ground === 'floor' ? 'stepFloor' : 'stepGravel');
     const vertical = this.facing === 'up' || this.facing === 'down';
     const texture = this.facing === 'up' ? 'player_up_walk' : this.facing === 'down' ? 'player_down_walk' : 'player_side_walk';
     // Mirroring the up/down stride swaps which leg is lifted, so the legs alternate step by step.
@@ -380,6 +397,7 @@ export class WorldScene extends Phaser.Scene {
     const chest = state.map.chestAt(x, y);
     if (chest) {
       chest.opened = true;
+      playSound('chestOpen');
       this.chestImages.get(chest.id)?.setTexture('chest_open');
       this.openLoot(chest);
       return;
@@ -408,6 +426,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.busy) return;
     const result = state.combat ? state.combat.reload() : state.player.reload();
     postMessage(this, result.message);
+    if (result.ok) playSound('reload');
     autosave();
   }
 

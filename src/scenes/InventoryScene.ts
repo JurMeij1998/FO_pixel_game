@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playSound, type SoundName } from '../audio/sfx';
 import { EQUIP_SLOTS, type EquipSlot } from '../core/character';
 import { getItem, type ItemDef } from '../core/items';
 import type { ActionResult } from '../core/result';
@@ -8,7 +9,7 @@ import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
 import { addButton, closeOverlay, drawPanel, ListView, PANEL } from '../ui/widgets';
 
 type Selection = { kind: 'backpack'; itemId: string } | { kind: 'slot'; slot: EquipSlot } | null;
-type Action = { label: string; run: () => ActionResult };
+type Action = { label: string; run: () => ActionResult; sound?: SoundName };
 
 const SLOT_LABELS: Record<EquipSlot, string> = { primary: 'Primary', secondary: 'Secondary', armor: 'Armor' };
 const MAX_ACTIONS = 3;
@@ -75,6 +76,7 @@ export class InventoryScene extends Phaser.Scene {
     const action = this.actions[index];
     if (!action) return;
     const result = action.run();
+    if (result.ok && action.sound) playSound(action.sound);
     this.feedback.setText(result.message).setColor(result.ok ? COLORS.text : COLORS.warn);
     this.refresh();
   }
@@ -135,9 +137,9 @@ export class InventoryScene extends Phaser.Scene {
 
     if (selection.kind === 'slot') {
       if (!player.equippedItem(selection.slot)) return [];
-      const actions: Action[] = [{ label: 'Unequip', run: () => player.unequip(selection.slot) }];
+      const actions: Action[] = [{ label: 'Unequip', run: () => player.unequip(selection.slot), sound: 'equip' }];
       if (selection.slot !== 'armor' && selection.slot !== player.activeWeaponSlot) {
-        actions.push({ label: 'Take in hand', run: () => player.swapWeapons() });
+        actions.push({ label: 'Take in hand', run: () => player.swapWeapons(), sound: 'equip' });
       }
       return actions;
     }
@@ -146,12 +148,12 @@ export class InventoryScene extends Phaser.Scene {
     const item = getItem(itemId);
     const actions: Action[] = [];
     if (item.category === 'weapon') {
-      actions.push({ label: 'Equip as primary', run: () => player.equip(itemId, 'primary') });
-      actions.push({ label: 'Equip as secondary', run: () => player.equip(itemId, 'secondary') });
+      actions.push({ label: 'Equip as primary', run: () => player.equip(itemId, 'primary'), sound: 'equip' });
+      actions.push({ label: 'Equip as secondary', run: () => player.equip(itemId, 'secondary'), sound: 'equip' });
     } else if (item.category === 'armor') {
-      actions.push({ label: 'Wear', run: () => player.equip(itemId, 'armor') });
+      actions.push({ label: 'Wear', run: () => player.equip(itemId, 'armor'), sound: 'equip' });
     } else if (item.consumable) {
-      actions.push({ label: 'Use', run: () => player.use(itemId) });
+      actions.push({ label: 'Use', run: () => player.use(itemId), sound: 'stimpak' });
     }
     actions.push({ label: 'Drop one', run: () => player.drop(itemId) });
     return actions;

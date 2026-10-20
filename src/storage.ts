@@ -21,6 +21,23 @@ export function writeSave(data: unknown): void {
   }
 }
 
+/** A small preference, such as whether sound is muted. */
+export function readSetting(key: string): string | null {
+  try {
+    return localStorage.getItem(`wasteland.${key}`);
+  } catch {
+    return null;
+  }
+}
+
+export function writeSetting(key: string, value: string): void {
+  try {
+    localStorage.setItem(`wasteland.${key}`, value);
+  } catch {
+    // Not remembered, but still applies for this session.
+  }
+}
+
 export function clearSave(): void {
   try {
     localStorage.removeItem(SAVE_KEY);

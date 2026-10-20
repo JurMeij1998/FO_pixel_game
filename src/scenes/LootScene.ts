@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playSound } from '../audio/sfx';
 import { storeItem, takeAll, takeItem, type Lootable } from '../core/loot';
 import type { ActionResult } from '../core/result';
 import { state } from '../state';
@@ -58,6 +59,7 @@ export class LootScene extends Phaser.Scene {
   }
 
   private apply(result: ActionResult): void {
+    if (result.ok) playSound('pickup');
     this.feedback.setText(result.message).setColor(result.ok ? COLORS.text : COLORS.warn);
     this.refresh();
   }
