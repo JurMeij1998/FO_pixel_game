@@ -10,8 +10,6 @@ import { loadSavedGame, startNewGame, startTestArena } from '../state';
 export function startPlaying(from: Phaser.Scene): void {
   from.scene.stop('Hud');
   from.scene.launch('Hud');
-  from.scene.stop('Card');
-  from.scene.launch('Card');
   from.scene.start('World'); // restarts it if it was running or paused
 }
 
@@ -19,7 +17,6 @@ export function startPlaying(from: Phaser.Scene): void {
 export function quitToMenu(from: Phaser.Scene): void {
   if (!loadSavedGame()) startNewGame();
   from.scene.stop('Hud');
-  from.scene.stop('Card');
   from.scene.stop('World');
   from.scene.start('Menu');
 }
