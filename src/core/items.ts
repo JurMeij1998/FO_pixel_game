@@ -1,3 +1,5 @@
+import type { Skill } from './stats';
+
 /**
  * Static item definitions. Everything else refers to items by their string id;
  * containers only store (id, quantity) pairs.
@@ -5,6 +7,9 @@
 export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'ammo' | 'misc';
 
 export interface WeaponStats {
+  skill: Skill;
+  /** Item id used up per shot; melee weapons have none. */
+  ammo?: string;
   damageMin: number;
   damageMax: number;
   /** Action points one attack costs. */
@@ -46,7 +51,7 @@ const DEFINITIONS: ItemDef[] = [
     weight: 1,
     value: 40,
     description: 'A short, sharp blade. Better than your fists.',
-    weapon: { damageMin: 1, damageMax: 6, apCost: 3, range: 1 },
+    weapon: { skill: 'meleeWeapons', damageMin: 1, damageMax: 6, apCost: 3, range: 1 },
   },
   {
     id: 'spear',
@@ -55,7 +60,7 @@ const DEFINITIONS: ItemDef[] = [
     weight: 4,
     value: 80,
     description: 'A sharpened pole with a crude metal tip. Long reach.',
-    weapon: { damageMin: 3, damageMax: 10, apCost: 4, range: 2 },
+    weapon: { skill: 'meleeWeapons', damageMin: 3, damageMax: 10, apCost: 4, range: 2 },
   },
   {
     id: '10mm_pistol',
@@ -64,7 +69,7 @@ const DEFINITIONS: ItemDef[] = [
     weight: 3,
     value: 250,
     description: 'A reliable semi-automatic sidearm. Chambered for 10mm.',
-    weapon: { damageMin: 5, damageMax: 12, apCost: 5, range: 6 },
+    weapon: { skill: 'smallGuns', ammo: 'ammo_10mm', damageMin: 5, damageMax: 12, apCost: 5, range: 6 },
   },
   {
     id: 'hunting_rifle',
@@ -72,8 +77,8 @@ const DEFINITIONS: ItemDef[] = [
     category: 'weapon',
     weight: 9,
     value: 1000,
-    description: 'A bolt-action rifle. Slow, heavy, and very accurate.',
-    weapon: { damageMin: 8, damageMax: 20, apCost: 6, range: 10 },
+    description: 'A bolt-action rifle chambered for .223. Slow, heavy and hard-hitting.',
+    weapon: { skill: 'smallGuns', ammo: 'ammo_223', damageMin: 8, damageMax: 20, apCost: 6, range: 10 },
   },
   {
     id: 'leather_jacket',
@@ -109,6 +114,14 @@ const DEFINITIONS: ItemDef[] = [
     weight: 0,
     value: 2,
     description: 'Jacketed hollow-point rounds for 10mm weapons.',
+  },
+  {
+    id: 'ammo_223',
+    name: '.223 Rounds',
+    category: 'ammo',
+    weight: 0,
+    value: 4,
+    description: 'Rifle cartridges. Hit hard, travel far.',
   },
   {
     id: 'bottle_caps',

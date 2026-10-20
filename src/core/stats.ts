@@ -22,3 +22,20 @@ export function maxHitPoints(special: Special): number {
 export function maxActionPoints(special: Special): number {
   return 5 + Math.floor(special.agility / 2);
 }
+
+export type Skill = 'smallGuns' | 'meleeWeapons' | 'unarmed';
+
+/** Tagged skills start 20 points higher, as in Fallout 2. */
+export const TAG_BONUS = 20;
+
+/** Starting skill value in percent, before tagging. */
+export function baseSkill(special: Special, skill: Skill): number {
+  switch (skill) {
+    case 'smallGuns':
+      return 5 + 4 * special.agility;
+    case 'meleeWeapons':
+      return 20 + 2 * (special.agility + special.strength);
+    case 'unarmed':
+      return 30 + 2 * (special.agility + special.strength);
+  }
+}

@@ -19,6 +19,7 @@ export function describeItem(item: ItemDef): string {
   if (item.weapon) {
     const w = item.weapon;
     lines.push(`Damage ${w.damageMin}-${w.damageMax}   AP ${w.apCost}   Range ${w.range}`);
+    if (w.ammo) lines.push(`Ammo: ${getItem(w.ammo).name}`);
   }
   if (item.armor) lines.push(`AC +${item.armor.armorClass}   DR ${item.armor.damageResist}%`);
   if (item.consumable) lines.push(`Heals ${item.consumable.heal} HP`);

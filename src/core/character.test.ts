@@ -90,6 +90,16 @@ describe('Character', () => {
     expect(c.backpack.count('stimpak')).toBe(1);
   });
 
+  it('attacks with fists when the hand is empty, using tagged skills', () => {
+    const c = makeCharacter();
+    expect(c.attack).toMatchObject({ name: 'Fists', hitChance: 30 + 2 * (5 + 5) });
+
+    c.backpack.add('10mm_pistol');
+    c.equip('10mm_pistol', 'primary');
+    c.taggedSkills.add('smallGuns');
+    expect(c.attack).toMatchObject({ name: '10mm Pistol', ammo: 'ammo_10mm', apCost: 5, hitChance: 5 + 4 * 5 + 20 });
+  });
+
   it('computes how many more items fit', () => {
     const c = makeCharacter({ strength: 1 }); // 50 lb capacity
     c.backpack.add('scrap_metal', 5); // 30 lb

@@ -27,7 +27,96 @@ const PLAYER_PALETTE = {
   g: '#3a3a3a', // boots
 };
 
+const RADROACH_PALETTE = {
+  k: '#1a120a', // outline
+  r: '#7a3b1a', // shell
+  R: '#a0522d', // shell highlight
+  l: '#3a2410', // legs and antennae
+};
+
+const MOLE_RAT_PALETTE = {
+  k: '#1a1414', // outline and eyes
+  m: '#b08a80', // skin
+  M: '#8a6a62', // skin shade
+  t: '#f0e8d0', // teeth
+  p: '#d0a090', // tail
+};
+
+const RAIDER_PALETTE = {
+  k: '#1a1a1a', // outline
+  h: '#b02020', // mohawk
+  s: '#c89070', // skin
+  j: '#3a2a1a', // leather
+  J: '#5a4028', // leather highlight
+  g: '#3a3a3a', // boots
+  x: '#888888', // pistol
+};
+
+// Creature sprites are keyed by creature id (see core/creature.ts).
 export const SPRITES: Record<string, PixelSprite> = {
+  radroach: {
+    palette: RADROACH_PALETTE,
+    rows: [
+      '................',
+      '................',
+      '....l......l....',
+      '.....l....l.....',
+      '......kkkk......',
+      '.l...krrrrk...l.',
+      '..l.kRrrrrRk.l..',
+      '...kRrrrrrrRk...',
+      '.llkrrrrrrrrkll.',
+      '...krrrrrrrrk...',
+      '..lkrRrrrrRrkl..',
+      '.l..krrrrrrk..l.',
+      '.....krrrrk.....',
+      '......kkkk......',
+      '................',
+      '................',
+    ],
+  },
+  mole_rat: {
+    palette: MOLE_RAT_PALETTE,
+    rows: [
+      '................',
+      '................',
+      '................',
+      '.....kkkkkk.....',
+      '....kmmmmmmk....',
+      '...kmmmmmmmmk...',
+      '...kmkmmmmkmk...',
+      '...kmmmmmmmmk...',
+      '..kmmmmttmmmmk..',
+      '..kmMmmttmmMmk..',
+      '..kmMMmmmmMMmk..',
+      '...kmMMMMMMmk...',
+      '....kkmmmmkk....',
+      '......kppk......',
+      '.......pp.......',
+      '................',
+    ],
+  },
+  raider: {
+    palette: RAIDER_PALETTE,
+    rows: [
+      '................',
+      '.......hh.......',
+      '....kkhhhhkk....',
+      '....kssssssk....',
+      '....kssssssk....',
+      '....kskssksk....',
+      '....kssssssk....',
+      '...kkjjJJjjkk...',
+      '..kjkjjJJjjkjk..',
+      '..kskjjJJjjksx..',
+      '...kkjjjjjjkkx..',
+      '....kjjkkjjk....',
+      '....kjjkkjjk....',
+      '....kggkkggk....',
+      '....kkk..kkk....',
+      '................',
+    ],
+  },
   chest_closed: {
     palette: CHEST_PALETTE,
     rows: [

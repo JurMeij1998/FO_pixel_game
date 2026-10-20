@@ -1,16 +1,22 @@
 import { ItemContainer } from './container';
+import type { Attack, Fighter } from './fighter';
+import type { GridPos } from './grid';
 import { getItem, type ItemDef } from './items';
 import { failure, success, type ActionResult } from './result';
 import * as derived from './stats';
-import type { Special } from './stats';
+import type { Skill, Special } from './stats';
 
 export type WeaponSlot = 'primary' | 'secondary';
 export type EquipSlot = WeaponSlot | 'armor';
 export const EQUIP_SLOTS: readonly EquipSlot[] = ['primary', 'secondary', 'armor'];
 
-export class Character {
+const UNARMED = { name: 'Fists', damageMin: 1, damageMax: 3, apCost: 3, range: 1 };
+
+export class Character implements Fighter {
   readonly backpack = new ItemContainer();
+  readonly taggedSkills = new Set<Skill>();
   hitPoints: number;
+  pos: GridPos = { x: 0, y: 0 };
   /** The weapon slot currently in hand, like Fallout's two hand slots. */
   activeWeaponSlot: WeaponSlot = 'primary';
 
@@ -42,6 +48,27 @@ export class Character {
   /** Base AC is Agility, plus whatever armor is worn. */
   get armorClass(): number {
     return this.special.agility + (this.equippedItem('armor')?.armor?.armorClass ?? 0);
+  }
+
+  get damageResist(): number {
+    return this.equippedItem('armor')?.armor?.damageResist ?? 0;
+  }
+
+  /** In Fallout, Luck is the base critical chance. */
+  get critChance(): number {
+    return this.special.luck;
+  }
+
+  skill(skill: Skill): number {
+    return derived.baseSkill(this.special, skill) + (this.taggedSkills.has(skill) ? derived.TAG_BONUS : 0);
+  }
+
+  /** The attack made with the weapon in hand, or with fists if that hand is empty. */
+  get attack(): Attack {
+    const weapon = this.activeWeapon;
+    if (!weapon?.weapon) return { ...UNARMED, hitChance: this.skill('unarmed') };
+    const { skill, ...stats } = weapon.weapon;
+    return { name: weapon.name, ...stats, hitChance: this.skill(skill) };
   }
 
   /** Equipped items count towards the carry weight too. */

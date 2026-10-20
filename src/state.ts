@@ -1,4 +1,5 @@
 import { Character } from './core/character';
+import type { Combat } from './core/combat';
 import { GridMap } from './core/gridMap';
 import { WASTELAND } from './data/wasteland';
 
@@ -17,9 +18,13 @@ function newGame() {
   player.backpack.add('canteen');
   player.backpack.add('bottle_caps', 20);
   player.equip('knife', 'primary');
+  player.taggedSkills.add('smallGuns');
+  player.taggedSkills.add('meleeWeapons');
   player.hitPoints = 18; // start a bit beaten up, so the stimpaks are useful
 
-  return { player, map: GridMap.parse(WASTELAND) };
+  const map = GridMap.parse(WASTELAND);
+  player.pos = { ...map.playerStart };
+  return { player, map, combat: null as Combat | null };
 }
 
 /** The one running game. Scenes read and change this; the core classes know nothing about Phaser. */

@@ -3,6 +3,12 @@ import type { ItemContainer } from './container';
 import { getItem } from './items';
 import { failure, success, type ActionResult } from './result';
 
+/** Anything the loot screen can open: a chest, a corpse. */
+export interface Lootable {
+  readonly name: string;
+  readonly contents: ItemContainer;
+}
+
 /** Moves up to `quantity` items from `source` into the player's backpack, as far as the carry limit allows. */
 export function takeItem(
   player: Character,

@@ -1,4 +1,6 @@
 import { ItemContainer } from './container';
+import { Creature, getCreatureDef } from './creature';
+import type { GridPos } from './grid';
 
 export type TileType = 'dirt' | 'grass' | 'floor' | 'wall' | 'rock' | 'water';
 
@@ -15,23 +17,23 @@ const BLOCKING: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'wate
 
 const PLAYER_MARKER = 'P';
 const CHEST_MARKER = /^[a-z]$/;
-
-export interface GridPos {
-  x: number;
-  y: number;
-}
+const CREATURE_MARKER = /^[A-Z]$/;
 
 /**
  * A map written as ASCII art. Each character is one tile (see LEGEND), and
- * there are two kinds of markers:
+ * there are three kinds of markers:
  *   P    the player start
  *   a-z  a chest, whose contents are listed under that letter in `chests`
+ *   A-Z  a creature (except P), whose type is given under that letter in `creatures`;
+ *        the same letter can be used many times
  * A marker stands on the same kind of ground as the tile to its left.
  */
 export interface MapDef {
   name: string;
   rows: string[];
   chests: Record<string, { name: string; contents: Array<[itemId: string, quantity: number]> }>;
+  /** Marker letter to creature id. */
+  creatures?: Record<string, string>;
 }
 
 export interface Chest {
@@ -49,6 +51,7 @@ export class GridMap {
     /** Indexed as tiles[y][x]. */
     readonly tiles: TileType[][],
     readonly chests: Chest[],
+    readonly creatures: Creature[],
     readonly playerStart: GridPos,
   ) {}
 
@@ -66,6 +69,7 @@ export class GridMap {
 
     const tiles: TileType[][] = [];
     const chests: Chest[] = [];
+    const creatures: Creature[] = [];
     let playerStart: GridPos | null = null;
 
     for (let y = 0; y < def.rows.length; y++) {
@@ -90,6 +94,10 @@ export class GridMap {
           const chest = def.chests[char];
           if (!chest) throw new Error(`Map '${def.name}': no chest defined for '${char}'`);
           chests.push({ id: char, name: chest.name, x, y, contents: new ItemContainer(chest.contents), opened: false });
+        } else if (CREATURE_MARKER.test(char)) {
+          const creatureId = def.creatures?.[char];
+          if (!creatureId) throw new Error(`Map '${def.name}': no creature defined for '${char}'`);
+          creatures.push(new Creature(`${creatureId}_${creatures.length}`, getCreatureDef(creatureId), { x, y }));
         } else {
           throw new Error(`Map '${def.name}': unknown character '${char}' at (${x}, ${y})`);
         }
@@ -101,7 +109,7 @@ export class GridMap {
     for (const id of Object.keys(def.chests)) {
       if (!chests.some((c) => c.id === id)) throw new Error(`Map '${def.name}': chest '${id}' is not placed`);
     }
-    return new GridMap(def.name, tiles, chests, playerStart);
+    return new GridMap(def.name, tiles, chests, creatures, playerStart);
   }
 
   tileAt(x: number, y: number): TileType | null {
@@ -112,8 +120,17 @@ export class GridMap {
     return this.chests.find((c) => c.x === x && c.y === y);
   }
 
+  livingCreatureAt(x: number, y: number): Creature | undefined {
+    return this.creatures.find((c) => !c.isDead && c.pos.x === x && c.pos.y === y);
+  }
+
+  corpseAt(x: number, y: number): Creature | undefined {
+    return this.creatures.find((c) => c.isDead && c.pos.x === x && c.pos.y === y);
+  }
+
+  /** Corpses don't block; living creatures do. The player's own tile is not checked here. */
   isWalkable(x: number, y: number): boolean {
     const tile = this.tileAt(x, y);
-    return tile !== null && !BLOCKING.has(tile) && !this.chestAt(x, y);
+    return tile !== null && !BLOCKING.has(tile) && !this.chestAt(x, y) && !this.livingCreatureAt(x, y);
   }
 }

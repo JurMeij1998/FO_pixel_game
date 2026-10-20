@@ -12,7 +12,7 @@ export const COLORS = {
   border: 0x3cd070,
 };
 
-const FONT = '"Courier New", Courier, monospace';
+export const FONT ='"Courier New", Courier, monospace';
 
 export const TEXT: TextStyle = { fontFamily: FONT, fontSize: '18px', color: COLORS.text };
 export const DIM_TEXT: TextStyle = { ...TEXT, color: COLORS.dim };
