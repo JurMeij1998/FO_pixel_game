@@ -2,6 +2,7 @@ import { generateMap, type ExitRequest } from '../core/generation/biome';
 import { GridMap, type MapDef } from '../core/gridMap';
 import { hashSeed } from '../core/random';
 import { BIOMES, type BiomeId } from './biomes';
+import { TEST_ARENA } from './testArena';
 import { WASTELAND } from './wasteland';
 
 /** A map in the world: drawn by hand, or generated from a biome with the given exits. */
@@ -18,7 +19,11 @@ export const WORLD: Record<string, MapSource> = {
   wasteland: { kind: 'fixed', def: WASTELAND }, // exit '1' (east) leads to the forest, '2' (south) to the village
   forest: { kind: 'generated', biome: 'forest', exits: [{ side: 'west', to: 'wasteland' }] },
   village: { kind: 'generated', biome: 'village', exits: [{ side: 'north', to: 'wasteland' }] },
+  /** For trying out combat UI; development only, see startTestArena() in state.ts. */
+  test_arena: { kind: 'fixed', def: TEST_ARENA },
 };
+
+export const TEST_ARENA_MAP = 'test_arena';
 
 export const START_MAP = 'wasteland';
 

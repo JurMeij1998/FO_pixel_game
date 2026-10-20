@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { autosave, loadSavedGame, savedGameSummary, startNewGame, state, travelTo } from './state';
+import { Combat } from './core/combat';
+import { autosave, loadSavedGame, savedGameSummary, startNewGame, startTestArena, state, travelTo } from './state';
 
 // Tests run in Node, which has no localStorage: give it a minimal in-memory one.
 const store = new Map<string, string>();
@@ -91,6 +92,33 @@ describe('game state', () => {
     expect(state.map.id).toBe('forest');
     expect(JSON.stringify(state.map.tiles)).toBe(tiles);
     expect(state.map.creatures[0].isDead).toBe(true);
+  });
+
+  describe('test arena', () => {
+    it('starts in sight of an enemy, so a fight begins on arrival', () => {
+      startTestArena();
+      expect(state.map.id).toBe('test_arena');
+      expect(state.sandbox).toBe(true);
+      expect(Combat.spotters(state.map, state.player).length).toBeGreaterThan(0);
+      expect(state.player.maxActionPoints).toBe(10);
+      expect(state.player.loadedRounds('secondary')).toBe(12); // the pistol comes loaded
+    });
+
+    it('never touches the real save', () => {
+      state.player.pos = { x: 10, y: 8 };
+      autosave();
+      const before = localStorage.getItem('wasteland.save');
+
+      startTestArena();
+      state.player.pos = { x: 3, y: 3 };
+      autosave();
+      travelTo('wasteland'); // travel autosaves too
+      expect(localStorage.getItem('wasteland.save')).toBe(before);
+
+      expect(loadSavedGame()).toBe(true); // leaving the arena goes back to the real game
+      expect(state.sandbox).toBe(false);
+      expect(state.player.pos).toEqual({ x: 10, y: 8 });
+    });
   });
 
   it('starts a new game with a fresh map', () => {

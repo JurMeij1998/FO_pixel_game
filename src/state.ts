@@ -2,7 +2,8 @@ import { Character } from './core/character';
 import type { Combat } from './core/combat';
 import type { GridMap } from './core/gridMap';
 import { loadGame, saveGame, type GameData } from './core/save';
-import { buildMap, START_MAP } from './data/world';
+import { testCharacter } from './data/testArena';
+import { buildMap, START_MAP, TEST_ARENA_MAP } from './data/world';
 import { clearSave, readSave, writeSave } from './storage';
 
 function newGame() {
@@ -52,7 +53,7 @@ function readSavedGame() {
  * `map` is the map the player is on; `maps` holds every map visited so far.
  * Starting or loading a game replaces its contents in place, so every importer sees the new game.
  */
-export const state = { ...newGame(), combat: null as Combat | null, loadedFromSave: false };
+export const state = { ...newGame(), combat: null as Combat | null, loadedFromSave: false, sandbox: false };
 
 /** A one-line description of the saved game for the main menu, or null if there is none. */
 export function savedGameSummary(): string | null {
@@ -64,14 +65,31 @@ export function savedGameSummary(): string | null {
 export function loadSavedGame(): boolean {
   const saved = readSavedGame();
   if (!saved) return false;
-  Object.assign(state, { ...saved, combat: null, loadedFromSave: true });
+  Object.assign(state, { ...saved, combat: null, loadedFromSave: true, sandbox: false });
   return true;
 }
 
 /** Throws away the save and starts over. */
 export function startNewGame(): void {
   clearSave();
-  Object.assign(state, { ...newGame(), combat: null, loadedFromSave: false });
+  Object.assign(state, { ...newGame(), combat: null, loadedFromSave: false, sandbox: false });
+}
+
+/**
+ * Drops a sturdy test character into the test arena, where a fight starts straight away.
+ * A sandbox: nothing is autosaved, so the real save is never touched.
+ */
+export function startTestArena(): void {
+  const player = testCharacter();
+  const worldSeed = Math.floor(Math.random() * 2 ** 31);
+  const map = buildMap(TEST_ARENA_MAP, worldSeed);
+  player.pos = { ...map.playerStart };
+  Object.assign(state, {
+    ...toState({ player, worldSeed, maps: { [TEST_ARENA_MAP]: map }, currentMap: TEST_ARENA_MAP }),
+    combat: null,
+    loadedFromSave: false,
+    sandbox: true,
+  });
 }
 
 /**
@@ -89,7 +107,7 @@ export function travelTo(mapId: string): GridMap {
 
 /** Autosaves. Never during combat, so dying sends you back to just before the fight. */
 export function autosave(): void {
-  if (state.combat) return;
+  if (state.combat || state.sandbox) return;
   writeSave(
     saveGame({ player: state.player, worldSeed: state.worldSeed, maps: state.maps, currentMap: state.map.id }),
   );

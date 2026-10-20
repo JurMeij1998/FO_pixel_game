@@ -131,6 +131,9 @@ export class WorldScene extends Phaser.Scene {
     this.events.on(Phaser.Scenes.Events.RESUME, onResume);
     // Scene events outlive a restart, unlike the keyboard and input listeners, so remove this one ourselves.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.RESUME, onResume));
+
+    // The test arena is for trying out combat, so the fight starts without taking a step first.
+    if (state.sandbox) this.checkForCombat();
   }
 
   update(_time: number, delta: number): void {

@@ -54,9 +54,21 @@ export function scheduleSound(ctx: BaseAudioContext, out: AudioNode, name: Sound
   SOUNDS[name](new Voice(ctx, out, volume));
 }
 
+/**
+ * Browsers won't start audio until the player has clicked or pressed a key, and warn each time
+ * a page tries. So until then, sounds are skipped (e.g. a fight that starts the moment the
+ * test arena loads).
+ */
+let interacted = false;
+if (typeof window !== 'undefined') {
+  for (const type of ['pointerdown', 'keydown']) {
+    window.addEventListener(type, () => (interacted = true), { once: true, capture: true });
+  }
+}
+
 /** The shared context, created on first use. Returns null where Web Audio isn't available (e.g. tests). */
 function audioOutput(): { context: AudioContext; master: GainNode } | null {
-  if (typeof AudioContext === 'undefined') return null;
+  if (typeof AudioContext === 'undefined' || !interacted) return null;
   if (!context || !master) {
     context = new AudioContext();
     master = context.createGain();
@@ -65,7 +77,7 @@ function audioOutput(): { context: AudioContext; master: GainNode } | null {
     // squashes the rest of it. Instead the sounds are levelled so even a gunshot stays below clipping.
     master.connect(context.destination);
   }
-  // Browsers keep audio suspended until the player has clicked or pressed a key.
+  // A context can still start out suspended (some browsers); resuming is allowed after interaction.
   if (context.state === 'suspended') void context.resume();
   return { context, master };
 }

@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { loadSavedGame, startNewGame } from '../state';
+import { loadSavedGame, startNewGame, state } from '../state';
 import { COLORS, TEXT, TITLE_TEXT } from '../ui/theme';
 import { MenuList } from '../ui/widgets';
-import { quitToMenu, startPlaying } from './flow';
+import { playTestArena, quitToMenu, startPlaying } from './flow';
 
 /** Shown when the player dies. The last save was made just before the fight. */
 export class GameOverScene extends Phaser.Scene {
@@ -21,6 +21,7 @@ export class GameOverScene extends Phaser.Scene {
     this.add.text(centerX, centerY - 55, 'The wasteland claims another soul.', TEXT).setOrigin(0.5);
 
     new MenuList(this, centerX, centerY - 5, [
+      ...(state.sandbox ? [{ label: 'Restart test arena', onSelect: () => playTestArena(this) }] : []),
       {
         label: 'Load last save',
         onSelect: () => {

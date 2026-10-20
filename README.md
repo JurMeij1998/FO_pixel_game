@@ -15,6 +15,16 @@ npm test           # unit tests for the game rules (src/core)
 npm run build      # typecheck + production build into dist/
 ```
 
+### Test arena (development only)
+
+With `npm run dev`, the main menu has a **Test arena (dev)** entry, and
+http://localhost:5173/?arena skips the menu and goes straight there. It's a small room
+(`data/testArena.ts`) where a fight starts the moment you arrive, with chests above and
+below the start, creatures nearby and an exit, so combat UI such as the AP gauge has to work
+around things. You play a sturdy test character with 10 AP and plenty of stimpaks and ammo.
+Nothing in the arena is saved, so your real save is never touched; quitting to the menu
+goes back to it. Production builds leave the arena out entirely.
+
 ## Controls
 
 | Key             | Exploring                        | In combat                     |
