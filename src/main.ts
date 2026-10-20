@@ -2,10 +2,13 @@ import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from './config';
 import { BootScene } from './scenes/BootScene';
 import { CharacterScene } from './scenes/CharacterScene';
+import { ControlsScene } from './scenes/ControlsScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
 import { InventoryScene } from './scenes/InventoryScene';
 import { LootScene } from './scenes/LootScene';
+import { MenuScene } from './scenes/MenuScene';
+import { PauseScene } from './scenes/PauseScene';
 import { WorldScene } from './scenes/WorldScene';
 
 new Phaser.Game({
@@ -20,6 +23,18 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  // Later scenes draw on top of earlier ones: world, then HUD, then the overlays.
-  scene: [BootScene, WorldScene, HudScene, InventoryScene, LootScene, CharacterScene, GameOverScene],
+  // Later scenes draw on top of earlier ones: world, then HUD, then the overlays, then Controls
+  // (which can open over the pause menu).
+  scene: [
+    BootScene,
+    MenuScene,
+    WorldScene,
+    HudScene,
+    InventoryScene,
+    LootScene,
+    CharacterScene,
+    PauseScene,
+    GameOverScene,
+    ControlsScene,
+  ],
 });

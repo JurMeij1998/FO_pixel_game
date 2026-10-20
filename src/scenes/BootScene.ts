@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { createTextures } from '../gfx/textures';
 
-/** Generates the textures, then starts the world with the HUD on top. */
+/** Generates the textures, then shows the main menu. */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('Boot');
@@ -9,7 +9,6 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     createTextures(this);
-    this.scene.start('World');
-    this.scene.launch('Hud');
+    this.scene.start('Menu');
   }
 }

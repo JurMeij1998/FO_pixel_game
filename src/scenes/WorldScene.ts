@@ -49,6 +49,13 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create(): void {
+    // The scene object is reused when a game is loaded or started, so reset what create() fills in.
+    this.busy = false;
+    this.steps = 0;
+    this.facing = 'down';
+    this.chestImages.clear();
+    this.creatureImages.clear();
+
     const map = state.map;
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
@@ -97,16 +104,20 @@ export class WorldScene extends Phaser.Scene {
     keyboard.on('keydown-I', () => this.openInventory());
     keyboard.on('keydown-C', () => this.openCharacterSheet());
     keyboard.on('keydown-R', () => this.reload());
+    keyboard.on('keydown-ESC', () => this.openOverlay('Pause'));
     keyboard.on('keydown-Q', () => {
       postMessage(this, state.player.swapWeapons().message);
       autosave();
     });
 
-    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+    const onResume = () => {
       // Keys released while an overlay was open would otherwise still count as held.
       keyboard.resetKeys();
       autosave(); // the overlay may have changed the inventory
-    });
+    };
+    this.events.on(Phaser.Scenes.Events.RESUME, onResume);
+    // Scene events outlive a restart, unlike the keyboard and input listeners, so remove this one ourselves.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.RESUME, onResume));
   }
 
   update(): void {
@@ -382,8 +393,14 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private openLoot(lootable: Lootable): void {
+    this.openOverlay('Loot', { lootable });
+  }
+
+  /** Pauses the world and shows a screen on top of it; the screen resumes the world when it closes. */
+  private openOverlay(key: string, data?: object): void {
+    if (this.busy) return;
     this.scene.pause();
-    this.scene.launch('Loot', { lootable });
+    this.scene.launch(key, data);
   }
 
   /** Free outside combat, 2 AP during it. */
@@ -400,8 +417,7 @@ export class WorldScene extends Phaser.Scene {
       postMessage(this, "There's no time for that now.");
       return;
     }
-    this.scene.pause();
-    this.scene.launch('Character');
+    this.openOverlay('Character');
   }
 
   private openInventory(): void {
@@ -411,7 +427,6 @@ export class WorldScene extends Phaser.Scene {
       postMessage(this, `Opening your pack takes ${INVENTORY_AP_COST} AP.`);
       return;
     }
-    this.scene.pause();
-    this.scene.launch('Inventory');
+    this.openOverlay('Inventory');
   }
 }

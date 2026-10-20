@@ -5,7 +5,7 @@ import { MESSAGE_EVENT } from '../ui/messages';
 import { COLORS, SMALL_TEXT, TEXT } from '../ui/theme';
 
 const LOG_LINES = 3;
-const CONTROLS = 'Arrows/WASD move   E/Space interact   I inventory   C character   Q swap weapon   R reload   Click enemy: attack';
+const CONTROLS = 'Arrows/WASD move  E/Space interact  I inventory  C character  Q swap  R reload  Click enemy: attack  Esc menu';
 const COMBAT_CONTROLS =
   'Arrows move (1 AP)  F/click attack  Tab target  R reload (2 AP)  I inventory (4 AP)  Q swap  Space end turn';
 
@@ -23,6 +23,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.messages.length = 0; // the scene object is reused when a game is loaded or started
     this.add.rectangle(0, 0, GAME_WIDTH, 36, 0x000000, 0.7).setOrigin(0);
     this.status = this.add.text(12, 9, '', TEXT);
     this.combatBar = this.add.rectangle(0, 36, GAME_WIDTH, 30, 0x400c08, 0.85).setOrigin(0);

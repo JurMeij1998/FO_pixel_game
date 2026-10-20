@@ -26,7 +26,7 @@ npm run build      # typecheck + production build into dist/
 | C               | Character sheet, spend skill points |                            |
 | Q               | Swap primary/secondary weapon    | Same, free                    |
 | R               | Reload the gun in hand           | Reload (costs 2 AP)           |
-| Esc             | Close a screen                   |                               |
+| Esc             | Pause menu / close a screen      | Pause menu                    |
 | Space (loot)    | Take all                         |                               |
 | E / Esc (loot)  | Close the loot screen            |                               |
 
@@ -39,9 +39,13 @@ A `+` after your level in the HUD means you have points to spend.
 
 ## Saving
 
+The game opens on a main menu: Continue (if there is a save), New game (asks before
+overwriting a save) and Controls. Esc in the game opens the pause menu, which can go back to
+the main menu.
+
 The game autosaves to the browser's localStorage after every step, every closed screen and
 every finished fight, but never during combat. Dying lets you load that save (so you go back
-to just before the fight) or start a new game. `core/save.ts` turns the game into plain
+to just before the fight), start a new game, or return to the main menu. `core/save.ts` turns the game into plain
 JSON; `storage.ts` is the only code that touches localStorage.
 
 ## Combat
@@ -73,7 +77,8 @@ src/
   data/       Maps and other content
   gfx/        Procedurally generated placeholder pixel art
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting
-  scenes/     Phaser scenes: Boot, World, Hud, Inventory, Loot, GameOver
+  scenes/     Phaser scenes: Boot, Menu, World, Hud, Inventory, Loot, Character, Pause,
+              GameOver, Controls; flow.ts switches between menus and the game
   state.ts    The running game (player + map), loaded from the save if there is one
   storage.ts  localStorage access for the save
   main.ts     Phaser game config

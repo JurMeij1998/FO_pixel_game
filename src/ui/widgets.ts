@@ -29,6 +29,80 @@ export function addButton(scene: Phaser.Scene, x: number, y: number, label: stri
   return button;
 }
 
+export interface MenuOption {
+  label: string;
+  onSelect: () => void;
+  disabled?: boolean;
+}
+
+const MENU_TEXT = { ...TEXT, fontSize: '26px' };
+const MENU_SPACING = 46;
+
+/**
+ * A centred vertical menu: Up/Down (or W/S) to move, Enter/Space or a click to choose.
+ * Key auto-repeat is ignored, so a key still held from the previous screen can't pick an option.
+ */
+export class MenuList {
+  private index: number;
+  private readonly texts: Phaser.GameObjects.Text[];
+
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    private readonly options: MenuOption[],
+  ) {
+    this.texts = options.map((option, i) => {
+      const text = scene.add.text(x, y + i * MENU_SPACING, '', MENU_TEXT).setOrigin(0.5, 0);
+      if (!option.disabled) {
+        text
+          .setInteractive({ useHandCursor: true })
+          .on('pointerover', () => this.highlight(i))
+          .on('pointerdown', () => this.options[i].onSelect());
+      }
+      return text;
+    });
+    this.index = Math.max(0, options.findIndex((o) => !o.disabled));
+
+    const keyboard = scene.input.keyboard!;
+    const fresh = (action: () => void) => (event: KeyboardEvent) => {
+      if (!event.repeat) action();
+    };
+    for (const key of ['UP', 'W']) keyboard.on(`keydown-${key}`, fresh(() => this.move(-1)));
+    for (const key of ['DOWN', 'S']) keyboard.on(`keydown-${key}`, fresh(() => this.move(1)));
+    for (const key of ['ENTER', 'SPACE']) keyboard.on(`keydown-${key}`, fresh(() => this.options[this.index].onSelect()));
+    this.render();
+  }
+
+  setLabel(index: number, label: string): void {
+    this.options[index].label = label;
+    this.render();
+  }
+
+  private move(delta: number): void {
+    const count = this.options.length;
+    let next = this.index;
+    do next = (next + delta + count) % count;
+    while (this.options[next].disabled && next !== this.index);
+    this.highlight(next);
+  }
+
+  private highlight(index: number): void {
+    this.index = index;
+    this.render();
+  }
+
+  private render(): void {
+    this.texts.forEach((text, i) => {
+      const option = this.options[i];
+      const selected = i === this.index;
+      text
+        .setText(selected ? `> ${option.label} <` : option.label)
+        .setColor(option.disabled ? COLORS.dim : selected ? COLORS.bright : COLORS.text);
+    });
+  }
+}
+
 export interface ListRow {
   key: string;
   label: string;

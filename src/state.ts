@@ -3,7 +3,7 @@ import type { Combat } from './core/combat';
 import { GridMap } from './core/gridMap';
 import { loadGame, saveGame } from './core/save';
 import { WASTELAND } from './data/wasteland';
-import { readSave, writeSave } from './storage';
+import { clearSave, readSave, writeSave } from './storage';
 
 function newGame() {
   const player = new Character('Wanderer', {
@@ -29,21 +29,43 @@ function newGame() {
   return { player, map };
 }
 
-/** Continues from the saved game if there is a readable one, otherwise starts fresh. */
-function startGame() {
+/** The saved game, or null if there is none or it can't be read. */
+function readSavedGame() {
   const saved = readSave();
-  if (saved) {
-    try {
-      return { ...loadGame(saved, WASTELAND), combat: null as Combat | null, loadedFromSave: true };
-    } catch (error) {
-      console.warn('Ignoring a save that could not be loaded:', error);
-    }
+  if (!saved) return null;
+  try {
+    return loadGame(saved, WASTELAND);
+  } catch (error) {
+    console.warn('Ignoring a save that could not be loaded:', error);
+    return null;
   }
-  return { ...newGame(), combat: null as Combat | null, loadedFromSave: false };
 }
 
-/** The one running game. Scenes read and change this; the core classes know nothing about Phaser. */
-export const state = startGame();
+/**
+ * The one running game. Scenes read and change this; the core classes know nothing about Phaser.
+ * Starting or loading a game replaces its contents in place, so every importer sees the new game.
+ */
+export const state = { ...newGame(), combat: null as Combat | null, loadedFromSave: false };
+
+/** A one-line description of the saved game for the main menu, or null if there is none. */
+export function savedGameSummary(): string | null {
+  const saved = readSavedGame();
+  return saved ? `${saved.player.name}, level ${saved.player.level}` : null;
+}
+
+/** Replaces the running game with the saved one. Returns false if there is no usable save. */
+export function loadSavedGame(): boolean {
+  const saved = readSavedGame();
+  if (!saved) return false;
+  Object.assign(state, { ...saved, combat: null, loadedFromSave: true });
+  return true;
+}
+
+/** Throws away the save and starts over. */
+export function startNewGame(): void {
+  clearSave();
+  Object.assign(state, { ...newGame(), combat: null, loadedFromSave: false });
+}
 
 /** Autosaves. Never during combat, so dying sends you back to just before the fight. */
 export function autosave(): void {
