@@ -130,7 +130,7 @@ font (`gfx/pixelFont.ts`) inside a round seal, with a bar of pips sweeping out o
 light green border pulses and a glint sweeps across it every few seconds. Spending AP counts the number down, flashes the
 spent pips and pops a superscript "-3"; a new turn refills it with a "+N". It bobs gently,
 dims during the enemy turn, and picks whichever spot around you covers no chest, creature,
-lootable corpse or exit (`ui/gaugePlacement.ts`). Hit chance is your weapon skill minus the target's Armor Class (minus a
+lootable corpse or exit (`ui/gaugePlacement.ts`), always somewhere above you. Hit chance is your weapon skill minus the target's Armor Class (minus a
 range penalty for guns; the spear's reach of 2 is still melee), damage is reduced by Damage Resistance, and Luck is your critical
 chance. Guns fire from their magazine (10mm pistol 12, hunting rifle 5) and are reloaded
 from the backpack with R: free while exploring, 2 AP in combat. A gun you unequip puts its

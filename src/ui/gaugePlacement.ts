@@ -12,21 +12,25 @@ export interface Offset {
 }
 
 /**
- * Spots around the player for a floating gauge of the given size, as offsets of the gauge's
- * centre from the player's centre. Listed in order of preference: above first.
+ * Spots for a floating gauge of the given size, as offsets of the gauge's centre from the
+ * player's centre. Every spot is above the player, never level with or below them: the
+ * gauge's bottom edge stays at least `gap` above the player's top. Listed in order of
+ * preference: straight above first, then shifted sideways, then one tile higher.
  */
 export function placementOffsets(width: number, height: number, playerSize: number, gap = 2): Offset[] {
-  const dx = playerSize / 2 + gap + width / 2;
-  const dy = playerSize / 2 + gap + height / 2;
+  const above = playerSize / 2 + gap + height / 2;
+  const higher = above + playerSize;
+  const half = width / 2; // the gauge's edge at the player's centre
+  const beside = playerSize / 2 + gap + width / 2; // the gauge clear of the player's column
   return [
-    { x: 0, y: -dy }, // above
-    { x: dx, y: 0 }, // right
-    { x: -dx, y: 0 }, // left
-    { x: 0, y: dy }, // below
-    { x: dx, y: -dy }, // above right
-    { x: -dx, y: -dy }, // above left
-    { x: dx, y: dy }, // below right
-    { x: -dx, y: dy }, // below left
+    { x: 0, y: -above },
+    { x: half, y: -above },
+    { x: -half, y: -above },
+    { x: beside, y: -above },
+    { x: -beside, y: -above },
+    { x: 0, y: -higher },
+    { x: half, y: -higher },
+    { x: -half, y: -higher },
   ];
 }
 
