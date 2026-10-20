@@ -5,9 +5,10 @@ import { Combat, INVENTORY_AP_COST, type CombatEvent } from '../core/combat';
 import type { Creature } from '../core/creature';
 import type { Fighter } from '../core/fighter';
 import { addPos, type GridPos } from '../core/grid';
+import type { Exit } from '../core/gridMap';
 import type { Lootable } from '../core/loot';
 import { tileTextureKey } from '../gfx/textures';
-import { autosave, state } from '../state';
+import { autosave, state, travelTo } from '../state';
 import { postMessage } from '../ui/messages';
 import { FONT } from '../ui/theme';
 
@@ -23,7 +24,8 @@ const STEP: Record<Direction, GridPos> = {
 
 const MOVE_DURATION_MS = 140;
 
-const DEPTH = { corpse: 1, creature: 2, player: 3, marker: 4, effects: 10 };
+const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, effects: 10 };
+const FADE_MS = 250;
 
 /** Pixel position of a tile's centre. */
 const toPixel = (tile: number) => tile * TILE_SIZE + TILE_SIZE / 2;
@@ -67,6 +69,7 @@ export class WorldScene extends Phaser.Scene {
       const image = this.add.image(toPixel(chest.x), toPixel(chest.y), chest.opened ? 'chest_open' : 'chest_closed');
       this.chestImages.set(chest.id, image);
     }
+    for (const exit of map.exits) this.add.image(toPixel(exit.x), toPixel(exit.y), 'signpost').setDepth(DEPTH.prop);
     for (const creature of map.creatures) {
       const image = this.add
         .image(toPixel(creature.pos.x), toPixel(creature.pos.y), creature.def.id)
@@ -87,6 +90,7 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main
       .setBounds(0, -top, map.width * TILE_SIZE, map.height * TILE_SIZE + top + bottom)
       .setZoom(WORLD_ZOOM)
+      .fadeIn(FADE_MS)
       .startFollow(this.player, true);
 
     const keyboard = this.input.keyboard!;
@@ -140,16 +144,36 @@ export class WorldScene extends Phaser.Scene {
     state.player.pos = target;
     void this.run(async () => {
       await this.tweenTo(this.player, target);
+      const exit = state.map.exitAt(target.x, target.y);
+      if (exit) {
+        await this.travel(exit);
+        return;
+      }
       this.checkForCombat();
       autosave();
     });
+  }
+
+  /** Fades out, moves the player to the exit's map and rebuilds the scene for it. */
+  private async travel(exit: Exit): Promise<void> {
+    await new Promise<void>((resolve) => {
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => resolve());
+      this.cameras.main.fadeOut(FADE_MS);
+    });
+    const map = travelTo(exit.to);
+    postMessage(this, `You make your way to ${map.name}.`);
+    this.scene.restart(); // create() draws the new map and fades back in
   }
 
   private stepInCombat(direction: Direction): void {
     const combat = state.combat!;
     if (!combat.isPlayerTurn) return;
     const result = combat.movePlayer(STEP[direction]);
-    if (result.ok) void this.run(() => this.play(result.events));
+    if (!result.ok) return;
+    if (state.map.exitAt(state.player.pos.x, state.player.pos.y)) {
+      postMessage(this, "You can't leave in the middle of a fight.");
+    }
+    void this.run(() => this.play(result.events));
   }
 
   /** Starts a fight if any creature can see the player. */
@@ -311,7 +335,7 @@ export class WorldScene extends Phaser.Scene {
     this.steps++;
     // The position is already updated to the tile being stepped onto.
     const ground = state.map.tileAt(state.player.pos.x, state.player.pos.y);
-    playSound(ground === 'floor' ? 'stepFloor' : 'stepGravel');
+    playSound(ground === 'floor' || ground === 'planks' ? 'stepFloor' : 'stepGravel');
     const vertical = this.facing === 'up' || this.facing === 'down';
     const texture = this.facing === 'up' ? 'player_up_walk' : this.facing === 'down' ? 'player_down_walk' : 'player_side_walk';
     // Mirroring the up/down stride swaps which leg is lifted, so the legs alternate step by step.

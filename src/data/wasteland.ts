@@ -1,7 +1,7 @@
 import type { MapDef } from '../core/gridMap';
 
 // Legend: . dirt   , dry grass   _ floor   # wall   o rock   ~ water
-//         P player start   a-z chests   A-Z creatures (both defined below)
+//         P player start   a-z chests   A-Z creatures   1-9 exits (all defined below)
 export const WASTELAND: MapDef = {
   name: 'Wasteland',
   rows: [
@@ -12,7 +12,7 @@ export const WASTELAND: MapDef = {
     'o.#_______#....,.M..........~~~o',
     'o.#_______#..........oo......~~o',
     'o.####_####..,.......oo.......~o',
-    'o.....P.......................,o',
+    'o.....P.......................,1',
     'o..,..........,......,.........o',
     'o.........oo..........#######..o',
     'o...,.....oo..........#__b__#..o',
@@ -63,5 +63,8 @@ export const WASTELAND: MapDef = {
     R: 'radroach',
     M: 'mole_rat',
     X: 'raider',
+  },
+  exits: {
+    '1': { to: 'forest' },
   },
 };

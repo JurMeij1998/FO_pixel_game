@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { autosave, loadSavedGame, savedGameSummary, startNewGame, state } from './state';
+import { autosave, loadSavedGame, savedGameSummary, startNewGame, state, travelTo } from './state';
 
 // Tests run in Node, which has no localStorage: give it a minimal in-memory one.
 const store = new Map<string, string>();
@@ -27,7 +27,7 @@ describe('game state', () => {
     state.player.gainExperience(100);
     state.player.pos = { x: 10, y: 8 };
     autosave();
-    expect(savedGameSummary()).toBe('Wanderer, level 2');
+    expect(savedGameSummary()).toBe('Wanderer, level 2, Wasteland');
 
     state.player.pos = { x: 1, y: 1 }; // unsaved change
     expect(loadSavedGame()).toBe(true);
@@ -49,6 +49,48 @@ describe('game state', () => {
     state.combat = null;
     loadSavedGame();
     expect(state.player.pos).not.toEqual({ x: 3, y: 3 });
+  });
+
+  it('travels to the forest and back, keeping each map as it was left', () => {
+    const wasteland = state.map;
+    const forest = travelTo('forest');
+    expect(state.map).toBe(forest);
+    expect(state.map.id).toBe('forest');
+    // Arrived beside the exit that leads back.
+    const back = forest.exits.find((e) => e.to === 'wasteland')!;
+    expect(Math.abs(back.x - state.player.pos.x) + Math.abs(back.y - state.player.pos.y)).toBe(1);
+
+    forest.chests[0].contents.clear();
+    travelTo('wasteland');
+    expect(state.map).toBe(wasteland);
+    const returned = travelTo('forest');
+    expect(returned).toBe(forest); // not regenerated
+    expect(returned.chests[0].contents.isEmpty).toBe(true);
+  });
+
+  it('names the map the player is on in the save summary', () => {
+    const forest = travelTo('forest');
+    expect(savedGameSummary()).toBe(`Wanderer, level 1, ${forest.name}`);
+  });
+
+  it('forgets the old world on a new game', () => {
+    travelTo('forest');
+    const seed = state.worldSeed;
+    startNewGame();
+    expect(Object.keys(state.maps)).toEqual(['wasteland']);
+    expect(state.worldSeed).not.toBe(seed);
+  });
+
+  it('restores the same generated forest on load', () => {
+    const forest = travelTo('forest');
+    forest.creatures[0].hitPoints = 0;
+    const tiles = JSON.stringify(forest.tiles);
+    autosave();
+    state.player.pos = { x: 1, y: 1 };
+    loadSavedGame();
+    expect(state.map.id).toBe('forest');
+    expect(JSON.stringify(state.map.tiles)).toBe(tiles);
+    expect(state.map.creatures[0].isDead).toBe(true);
   });
 
   it('starts a new game with a fresh map', () => {

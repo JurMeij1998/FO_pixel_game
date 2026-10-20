@@ -1,0 +1,318 @@
+import { addPos, DIRECTIONS, type GridPos } from '../grid';
+import { isBlockingTile, LEGEND, type MapDef, type TileType } from '../gridMap';
+import type { Random } from '../random';
+import { rollCreature, rollLoot, type LootTable, type SpawnTable } from './tables';
+
+export type Side = 'north' | 'south' | 'east' | 'west';
+
+/**
+ * A hand-drawn structure that generators stamp onto a map, written in the map legend plus:
+ *   ' '  keep whatever terrain is underneath
+ *   '$'  the prefab's chest
+ *   '&'  a creature, picked from the prefab's spawn table
+ */
+export interface Prefab {
+  name: string;
+  rows: string[];
+  /** The tile a path should lead to, relative to the top-left corner. */
+  entrance: GridPos;
+  chest?: { name: string; loot: LootTable };
+  creatures?: SpawnTable;
+}
+
+const KEEP = ' ';
+const CHEST_SLOT = '$';
+const CREATURE_SLOT = '&';
+/** Cost of carving through a tree, bush or rock when connecting places, versus 1 for open ground. */
+const CARVE_COST = 8;
+
+/**
+ * Builds a map tile by tile, then turns it into an ordinary MapDef, so a generated map is
+ * parsed, saved and drawn exactly like a hand-made one.
+ *
+ * Tiles that belong to a stamped structure (or an exit) are locked: later terrain painting
+ * leaves them alone, and `connect()` never carves through them.
+ */
+export class MapBuilder {
+  /** Where the player arrives if there is no exit back to where they came from. */
+  start: GridPos | null = null;
+
+  private readonly tiles: string[][];
+  private readonly locked: boolean[][];
+  private readonly chests: Array<{ pos: GridPos; name: string; contents: Array<[string, number]> }> = [];
+  private readonly creatures: Array<{ pos: GridPos; creatureId: string }> = [];
+  private readonly exits: Array<{ pos: GridPos; to: string }> = [];
+  /** Places that must be reachable from the start once the map is finished. */
+  private readonly landmarks: GridPos[] = [];
+
+  constructor(
+    readonly width: number,
+    readonly height: number,
+    fill: string,
+  ) {
+    tileOf(fill); // throws on a character that isn't a tile
+    this.tiles = Array.from({ length: height }, () => Array<string>(width).fill(fill));
+    this.locked = Array.from({ length: height }, () => Array<boolean>(width).fill(false));
+  }
+
+  inBounds(x: number, y: number): boolean {
+    return x >= 0 && y >= 0 && x < this.width && y < this.height;
+  }
+
+  get(x: number, y: number): string {
+    return this.tiles[y][x];
+  }
+
+  tileAt(x: number, y: number): TileType {
+    return tileOf(this.tiles[y][x]);
+  }
+
+  /** Paints a tile, unless it is locked by a structure or exit. */
+  set(x: number, y: number, char: string): void {
+    tileOf(char);
+    if (this.inBounds(x, y) && !this.locked[y][x]) this.tiles[y][x] = char;
+  }
+
+  isLocked(x: number, y: number): boolean {
+    return this.locked[y][x];
+  }
+
+  /** Walkable ground with nothing placed on it. */
+  isOpen(x: number, y: number): boolean {
+    if (!this.inBounds(x, y) || isBlockingTile(this.tileAt(x, y))) return false;
+    const here = (p: GridPos) => p.x === x && p.y === y;
+    return (
+      !this.chests.some((c) => here(c.pos)) &&
+      !this.creatures.some((c) => here(c.pos)) &&
+      !this.exits.some((e) => here(e.pos)) &&
+      !(this.start && here(this.start))
+    );
+  }
+
+  /** Paints every unlocked tile for which `where` is true. */
+  paint(char: string, where: (x: number, y: number) => boolean): void {
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) if (where(x, y)) this.set(x, y, char);
+    }
+  }
+
+  /** True if the prefab fits at (x, y) inside the map, at least `margin` from the edge, on unlocked tiles. */
+  canStamp(prefab: Prefab, x: number, y: number, margin = 2): boolean {
+    const height = prefab.rows.length;
+    const width = prefab.rows[0].length;
+    if (x < margin || y < margin || x + width > this.width - margin || y + height > this.height - margin) return false;
+    for (let dy = 0; dy < height; dy++) {
+      for (let dx = 0; dx < width; dx++) {
+        if (prefab.rows[dy][dx] !== KEEP && this.locked[y + dy][x + dx]) return false;
+      }
+    }
+    return true;
+  }
+
+  /** Stamps a prefab with its top-left corner at (x, y), fills its chest and creatures, and returns its entrance. */
+  stamp(prefab: Prefab, x: number, y: number, rng: Random): GridPos {
+    if (!this.canStamp(prefab, x, y, 0)) throw new Error(`Prefab '${prefab.name}' doesn't fit at (${x}, ${y})`);
+    prefab.rows.forEach((row, dy) => {
+      [...row].forEach((char, dx) => {
+        if (char === KEEP) return;
+        const pos = { x: x + dx, y: y + dy };
+        if (char === CHEST_SLOT || char === CREATURE_SLOT) {
+          // The slot itself stands on the prefab's floor, taken from its left neighbour.
+          this.tiles[pos.y][pos.x] = floorBeside(row, dx);
+          if (char === CHEST_SLOT) {
+            if (!prefab.chest) throw new Error(`Prefab '${prefab.name}' has a chest slot but no chest`);
+            this.addChest(pos, prefab.chest.name, rollLoot(prefab.chest.loot, rng));
+          } else {
+            if (!prefab.creatures) throw new Error(`Prefab '${prefab.name}' has a creature slot but no creatures`);
+            this.addCreature(pos, rollCreature(prefab.creatures, rng));
+          }
+        } else {
+          tileOf(char);
+          this.tiles[pos.y][pos.x] = char;
+        }
+        this.locked[pos.y][pos.x] = true;
+      });
+    });
+    const entrance = addPos({ x, y }, prefab.entrance);
+    this.landmarks.push(entrance);
+    return entrance;
+  }
+
+  addChest(pos: GridPos, name: string, contents: Array<[string, number]>): void {
+    if (!this.isOpen(pos.x, pos.y)) throw new Error(`Can't place a chest at (${pos.x}, ${pos.y})`);
+    this.chests.push({ pos, name, contents });
+  }
+
+  addCreature(pos: GridPos, creatureId: string): void {
+    if (!this.isOpen(pos.x, pos.y)) throw new Error(`Can't place a creature at (${pos.x}, ${pos.y})`);
+    this.creatures.push({ pos, creatureId });
+  }
+
+  /**
+   * Puts an exit somewhere along one edge, with a path tile just inside it, and returns that
+   * inside tile. The first exit's inside tile also becomes the start if none is set.
+   */
+  addExit(side: Side, to: string, rng: Random, pathChar: string): GridPos {
+    const along = side === 'north' || side === 'south' ? this.width : this.height;
+    const offset = rng.int(Math.floor(along * 0.25), Math.floor(along * 0.75));
+    const pos =
+      side === 'north' ? { x: offset, y: 0 }
+      : side === 'south' ? { x: offset, y: this.height - 1 }
+      : side === 'west' ? { x: 0, y: offset }
+      : { x: this.width - 1, y: offset };
+    const inward = side === 'north' ? { x: 0, y: 1 } : side === 'south' ? { x: 0, y: -1 } : side === 'west' ? { x: 1, y: 0 } : { x: -1, y: 0 };
+    const inside = addPos(pos, inward);
+
+    for (const p of [pos, inside]) {
+      this.set(p.x, p.y, pathChar);
+      this.locked[p.y][p.x] = true;
+    }
+    this.exits.push({ pos, to });
+    this.start ??= inside;
+    return inside;
+  }
+
+  /**
+   * Makes sure every exit, structure entrance, chest and creature can be reached from the
+   * start, by carving the cheapest path through trees, bushes and rocks where needed.
+   * Locked structure walls are never carved.
+   */
+  connect(pathChar: string): void {
+    if (!this.start) throw new Error('The map has no start; add an exit first');
+    const targets: GridPos[] = [...this.exits.map((e) => e.pos), ...this.landmarks, ...this.creatures.map((c) => c.pos)];
+    for (const target of targets) this.connectTo(target, pathChar);
+    for (const chest of this.chests) this.connectTo(this.chestAccess(chest.pos), pathChar);
+  }
+
+  toMapDef(name: string): MapDef {
+    if (!this.start) throw new Error('The map has no start; add an exit first');
+    const rows = this.tiles.map((row) => [...row]);
+    const def: MapDef = { name, rows: [], chests: {}, creatures: {}, exits: {} };
+
+    rows[this.start.y][this.start.x] = 'P';
+    this.chests.forEach((chest, i) => {
+      if (i >= 26) throw new Error('A map can hold at most 26 chests');
+      const letter = String.fromCharCode(97 + i);
+      rows[chest.pos.y][chest.pos.x] = letter;
+      def.chests[letter] = { name: chest.name, contents: chest.contents };
+    });
+    // One letter per creature type, skipping P (the player start).
+    const letters = 'ABCDEFGHIJKLMNOQRSTUVWXYZ';
+    const letterFor = new Map<string, string>();
+    for (const creature of this.creatures) {
+      if (!letterFor.has(creature.creatureId)) {
+        const letter = letters[letterFor.size];
+        if (!letter) throw new Error('Too many creature types on one map');
+        letterFor.set(creature.creatureId, letter);
+        def.creatures![letter] = creature.creatureId;
+      }
+      rows[creature.pos.y][creature.pos.x] = letterFor.get(creature.creatureId)!;
+    }
+    this.exits.forEach((exit, i) => {
+      if (i >= 9) throw new Error('A map can have at most 9 exits');
+      const digit = String(i + 1);
+      rows[exit.pos.y][exit.pos.x] = digit;
+      def.exits![digit] = { to: exit.to };
+    });
+
+    def.rows = rows.map((row) => row.join(''));
+    return def;
+  }
+
+  /** Every tile reachable on foot from the start, as `y * width + x` keys. */
+  reachable(): Set<number> {
+    const seen = new Set<number>();
+    if (!this.start) return seen;
+    const queue = [this.start];
+    seen.add(this.key(this.start));
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      for (const direction of DIRECTIONS) {
+        const next = addPos(current, direction);
+        if (!this.passable(next) || seen.has(this.key(next))) continue;
+        seen.add(this.key(next));
+        queue.push(next);
+      }
+    }
+    return seen;
+  }
+
+  private key(p: GridPos): number {
+    return p.y * this.width + p.x;
+  }
+
+  /** Can be walked over, ignoring creatures (they move, or die). */
+  private passable(p: GridPos): boolean {
+    return (
+      this.inBounds(p.x, p.y) &&
+      !isBlockingTile(this.tileAt(p.x, p.y)) &&
+      !this.chests.some((c) => c.pos.x === p.x && c.pos.y === p.y)
+    );
+  }
+
+  /** The cost of a path stepping onto this tile; Infinity where a path can't go. */
+  private stepCost(p: GridPos): number {
+    if (!this.inBounds(p.x, p.y) || this.chests.some((c) => c.pos.x === p.x && c.pos.y === p.y)) return Infinity;
+    if (!isBlockingTile(this.tileAt(p.x, p.y))) return 1;
+    return this.locked[p.y][p.x] ? Infinity : CARVE_COST;
+  }
+
+  /** The neighbour of a chest the player will stand on to open it: the cheapest one to reach. */
+  private chestAccess(chest: GridPos): GridPos {
+    const options = DIRECTIONS.map((d) => addPos(chest, d)).filter((p) => this.stepCost(p) < Infinity);
+    if (options.length === 0) throw new Error(`Chest at (${chest.x}, ${chest.y}) is walled in`);
+    return options.reduce((best, p) => (this.stepCost(p) < this.stepCost(best) ? p : best));
+  }
+
+  /**
+   * Finds the cheapest path from `target` to anywhere already reachable (Dial's algorithm:
+   * Dijkstra with a bucket per distance, since step costs are small whole numbers) and carves
+   * the obstacles along it.
+   */
+  private connectTo(target: GridPos, pathChar: string): void {
+    const reachable = this.reachable();
+    if (reachable.has(this.key(target))) return;
+
+    const distance = new Map<number, number>([[this.key(target), 0]]);
+    const previous = new Map<number, GridPos>();
+    const buckets: GridPos[][] = [[target]];
+    for (let d = 0; d < buckets.length; d++) {
+      for (const current of buckets[d] ?? []) {
+        if (distance.get(this.key(current)) !== d) continue; // a cheaper way here was found later
+        if (reachable.has(this.key(current))) {
+          // Walk back to the target, opening up every obstacle on the way.
+          let step: GridPos | undefined = current;
+          while (step) {
+            if (isBlockingTile(this.tileAt(step.x, step.y))) this.set(step.x, step.y, pathChar);
+            step = previous.get(this.key(step));
+          }
+          return;
+        }
+        for (const direction of DIRECTIONS) {
+          const next = addPos(current, direction);
+          const cost = this.stepCost(next);
+          if (cost === Infinity) continue;
+          const nextDistance = d + cost;
+          if (nextDistance < (distance.get(this.key(next)) ?? Infinity)) {
+            distance.set(this.key(next), nextDistance);
+            previous.set(this.key(next), current);
+            (buckets[nextDistance] ??= []).push(next);
+          }
+        }
+      }
+    }
+    throw new Error(`Can't connect (${target.x}, ${target.y}) to the start`);
+  }
+}
+
+function tileOf(char: string): TileType {
+  const tile = LEGEND[char];
+  if (!tile) throw new Error(`'${char}' is not a map tile`);
+  return tile;
+}
+
+/** The floor a prefab's chest or creature slot stands on: its left neighbour, or dirt. */
+function floorBeside(row: string, dx: number): string {
+  const left = row[dx - 1];
+  return left && LEGEND[left] && !isBlockingTile(LEGEND[left]) ? left : '.';
+}

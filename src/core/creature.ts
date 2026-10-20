@@ -47,6 +47,19 @@ const DEFINITIONS: CreatureDef[] = [
     loot: [],
   },
   {
+    id: 'wild_dog',
+    name: 'Wild Dog',
+    maxHitPoints: 12,
+    actionPoints: 8, // fast: closes in and bites in the same turn
+    armorClass: 6,
+    damageResist: 0,
+    critChance: 4,
+    sightRange: 6,
+    experience: 35,
+    attack: { name: 'bite', damageMin: 2, damageMax: 5, apCost: 3, range: 1, ranged: false, hitChance: 55, sound: 'bite' },
+    loot: [],
+  },
+  {
     id: 'raider',
     name: 'Raider',
     maxHitPoints: 24,

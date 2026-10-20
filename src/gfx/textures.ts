@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TILE_SIZE } from '../config';
 import type { TileType } from '../core/gridMap';
+import { hashSeed, Random } from '../core/random';
 import { SPRITES, type PixelSprite } from './sprites';
 
 /**
@@ -92,7 +93,94 @@ const TILE_PAINTERS: Record<TileType, Painter> = {
       ctx.fillRect(Math.floor(rand() * 13), Math.floor(rand() * 16), 3, 1);
     }
   },
+
+  forestFloor: (ctx, rand) => {
+    paintForestFloor(ctx, rand);
+  },
+
+  // A tree seen from above: a round canopy, darker at the edge, lit from the top left.
+  tree: (ctx, rand) => {
+    paintForestFloor(ctx, rand);
+    pixel(ctx, 7, 14, '#3a2818'); // trunk peeking out below the canopy
+    pixel(ctx, 8, 14, '#4a3420');
+    disc(ctx, 7.5 + (rand() - 0.5), 7 + (rand() - 0.5), 7.2, (d, x, y) =>
+      d > 0.82 ? '#1c3319' : x + y < 11 ? '#3f6a34' : rand() < 0.15 ? '#24421f' : '#2e5228',
+    );
+  },
+
+  bush: (ctx, rand) => {
+    paintForestFloor(ctx, rand);
+    disc(ctx, 8, 9, 4.6, (d, x, y) => (d > 0.75 ? '#25451f' : x + y < 15 ? '#4a7a3a' : '#33602b'));
+  },
+
+  // Two cut logs on the ground with one stacked on top, end grain showing on the left.
+  logs: (ctx, rand) => {
+    paintForestFloor(ctx, rand);
+    for (const [y, x0] of [
+      [10, 2],
+      [6, 4],
+    ] as const) {
+      ctx.fillStyle = '#5e3c1c';
+      ctx.fillRect(x0, y, 12, 4);
+      ctx.fillStyle = '#7a5530';
+      ctx.fillRect(x0, y + 1, 12, 1);
+      ctx.fillStyle = '#c09a64'; // end grain
+      ctx.fillRect(x0, y, 2, 4);
+      pixel(ctx, x0, y + 1, '#8a6a40');
+    }
+  },
+
+  path: (ctx, rand) => {
+    fill(ctx, '#7d6a48');
+    speckle(ctx, rand, ['#6c5a3c', '#8c7854', '#73613f'], 30);
+  },
+
+  // Floorboards running left to right.
+  planks: (ctx, rand) => {
+    fill(ctx, '#7a5530');
+    ctx.fillStyle = '#5a3c20';
+    for (let y = 3; y < TILE_SIZE; y += 4) ctx.fillRect(0, y, TILE_SIZE, 1);
+    speckle(ctx, rand, ['#8a6238', '#6e4a28'], 14);
+  },
+
+  // A wall of upright logs, each lit on its left side.
+  woodWall: (ctx) => {
+    for (let x = 0; x < TILE_SIZE; x += 4) {
+      ctx.fillStyle = '#6a4626';
+      ctx.fillRect(x, 0, 4, TILE_SIZE);
+      ctx.fillStyle = '#86603a';
+      ctx.fillRect(x, 0, 1, TILE_SIZE);
+      ctx.fillStyle = '#4a3018';
+      ctx.fillRect(x + 3, 0, 1, TILE_SIZE);
+    }
+    ctx.fillStyle = '#3a2414';
+    ctx.fillRect(0, 0, TILE_SIZE, 2);
+  },
 };
+
+function paintForestFloor(ctx: CanvasRenderingContext2D, rand: () => number): void {
+  fill(ctx, '#4a5a2e');
+  speckle(ctx, rand, ['#3e4d26', '#56683a', '#5e5232', '#6e5a32'], 45); // moss and fallen leaves
+}
+
+/**
+ * Fills a pixelated disc. `color` gets the distance from the centre as a fraction of the
+ * radius (0 to 1) and the pixel position, so it can shade the edge or one side.
+ */
+function disc(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  color: (d: number, x: number, y: number) => string,
+): void {
+  for (let y = 0; y < TILE_SIZE; y++) {
+    for (let x = 0; x < TILE_SIZE; x++) {
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / radius;
+      if (d <= 1) pixel(ctx, x, y, color(d, x, y));
+    }
+  }
+}
 
 function paintDirt(ctx: CanvasRenderingContext2D, rand: () => number): void {
   fill(ctx, '#8b7451');
@@ -131,22 +219,8 @@ function createSpriteTexture(scene: Phaser.Scene, key: string, sprite: PixelSpri
 function createTexture(scene: Phaser.Scene, key: string, width: number, height: number, draw: Painter): void {
   const texture = scene.textures.createCanvas(key, width, height);
   if (!texture) throw new Error(`Could not create texture '${key}'`);
-  draw(texture.getContext(), seededRandom(hashString(key)));
+  // Seeded by the texture key, so procedural tiles look the same every run.
+  const rng = new Random(hashSeed(key));
+  draw(texture.getContext(), () => rng.next());
   texture.refresh();
-}
-
-/** mulberry32: a tiny deterministic PRNG returning values in [0, 1). */
-function seededRandom(seed: number): () => number {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function hashString(text: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
-  return hash;
 }

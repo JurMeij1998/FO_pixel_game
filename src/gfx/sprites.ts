@@ -52,8 +52,64 @@ const RAIDER_PALETTE = {
   x: '#888888', // pistol
 };
 
+const DOG_PALETTE = {
+  k: '#1a120a', // outline and eye
+  d: '#8a6a40', // fur
+  D: '#6a4e2e', // belly
+};
+
+const SIGNPOST_PALETTE = {
+  k: '#2a1a0a', // outline and lettering
+  w: '#a0784a', // board
+  p: '#5e3c1c', // post
+};
+
 // Creature sprites are keyed by creature id (see core/creature.ts).
 export const SPRITES: Record<string, PixelSprite> = {
+  // Side view, facing right.
+  wild_dog: {
+    palette: DOG_PALETTE,
+    rows: [
+      '................',
+      '................',
+      '................',
+      '............kk..',
+      '...........kddk.',
+      '.k.........kdddk',
+      '..kkkkkkkkdkddkk',
+      '..kddddddddddddk',
+      '..kdDdddddddddk.',
+      '...kDDDDDDDDDk..',
+      '...kdk.kdk.kdk..',
+      '...kdk.kdk.kdk..',
+      '...kkk.kkk.kkk..',
+      '................',
+      '................',
+      '................',
+    ],
+  },
+  // Marks an exit to another map.
+  signpost: {
+    palette: SIGNPOST_PALETTE,
+    rows: [
+      '................',
+      '................',
+      '...kkkkkkkkk....',
+      '...kwwwwwwwkk...',
+      '...kwkkkkkwwwk..',
+      '...kwwwwwwwkk...',
+      '...kkkkkkkkk....',
+      '.......pp.......',
+      '.......pp.......',
+      '.......pp.......',
+      '.......pp.......',
+      '.......pp.......',
+      '.......pp.......',
+      '.......pp.......',
+      '......pppp......',
+      '................',
+    ],
+  },
   radroach: {
     palette: RADROACH_PALETTE,
     rows: [

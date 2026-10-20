@@ -2,7 +2,7 @@
 
 A small top-down pixel-art RPG inspired by Fallout 1/2: grid movement, lootable chests and
 corpses, a weight-limited inventory, turn-based combat with Action Points and line of sight,
-XP and levelling, autosave, and synthesised sound effects.
+XP and levelling, randomly generated maps, autosave, and synthesised sound effects.
 
 Built with TypeScript, [Phaser 3](https://phaser.io) and Vite.
 
@@ -31,6 +31,43 @@ npm run build      # typecheck + production build into dist/
 | Esc             | Pause menu / close a screen      | Pause menu                    |
 | Space (loot)    | Take all                         |                               |
 | E / Esc (loot)  | Close the loot screen            |                               |
+
+## Maps and biomes
+
+The world is a set of maps joined by exits (signposts on the map edge); walking onto one
+takes you to the linked map, next to its exit back. `data/world.ts` lists the maps and how
+they connect. A map is either drawn by hand as ASCII art (`data/wasteland.ts`) or generated
+from a **biome**: the wasteland's east exit leads to a randomly generated forest.
+
+Generated maps are rebuilt from a seed (the world seed, which is new for every game, plus the
+map id), so the same game always gets the same forest and saves only store what changed:
+looted chests and dead creatures.
+
+A biome's generator draws onto a `MapBuilder` (`core/generation/`), which turns it into an
+ordinary ASCII `MapDef`, so generated maps are parsed, saved and drawn like hand-made ones.
+Afterwards it carves paths so every exit, chest and creature can be reached. The toolkit:
+
+- `MapBuilder`: paint tiles, stamp prefabs, place chests, creatures and exits.
+- `Prefab`: a hand-drawn structure in the map legend, with `$` for its chest and `&` for its
+  creatures (a logging camp, a hunter's cabin, ...).
+- `LootTable` / `SpawnTable`: what a chest can contain, which creatures can appear.
+- `terrain.ts`: scatter, cellular smoothing (for groves and caves), blobs, borders, winding
+  paths, finding free spots.
+
+The forest (`data/biomes/forest.ts`) has smoothed groves of trees, dirt and grass patches,
+sometimes a pond, a raider-held logging camp, a hunter's cabin, campsites and hidden
+stashes, and mole rats, radroaches and wild dogs kept out of sight of where you arrive.
+
+**Adding a biome** (village, plains, caves...):
+
+1. Write `data/biomes/<name>.ts` exporting a `Biome`: size, names, base and path tiles, and
+   a `generate(builder, { rng, exits })` that paints terrain, stamps prefabs and places
+   loot and creatures. Use only `rng` for randomness so maps can be rebuilt from their seed.
+2. If it needs new tiles, add them to `TileType` and `LEGEND` in `core/gridMap.ts` (and the
+   blocking/opaque sets), and a painter in `gfx/textures.ts`; TypeScript flags any you miss.
+3. Register it in `data/biomes/index.ts` and give it a place in `data/world.ts`, with an exit
+   on a neighbouring map leading to it.
+4. Copy `data/biomes/forest.test.ts`: it checks determinism and reachability over many seeds.
 
 ## Levelling
 
@@ -89,10 +126,12 @@ src/
     combat.ts     Turn-based combat rules and enemy AI; emits events for the scene
     loot.ts       Moving items between containers, honouring carry weight
     grid.ts       Grid positions, directions and distance
-    gridMap.ts    Parses ASCII maps into tiles, chests and creatures; line of sight
+    gridMap.ts    Parses ASCII maps into tiles, chests, creatures and exits; line of sight
+    random.ts     Seeded random numbers, so generated maps can be rebuilt from a seed
     result.ts     ActionResult: success or failure plus a message for the log
-    save.ts       Game state to and from plain JSON
-  data/       Maps and other content
+    save.ts       Game state (all visited maps) to and from plain JSON
+    generation/   Map generation: Biome, MapBuilder, prefabs, loot/spawn tables, terrain
+  data/       Content: the wasteland map, biomes/, and world.ts (which maps exist)
   gfx/        Procedurally generated placeholder pixel art
   audio/      Synthesised sound effects
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting

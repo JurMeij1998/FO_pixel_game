@@ -1,34 +1,62 @@
 import { ItemContainer } from './container';
 import { Creature, getCreatureDef } from './creature';
-import type { GridPos } from './grid';
+import { addPos, DIRECTIONS, type GridPos } from './grid';
 
-export type TileType = 'dirt' | 'grass' | 'floor' | 'wall' | 'rock' | 'water';
+export type TileType =
+  | 'dirt'
+  | 'grass'
+  | 'floor'
+  | 'wall'
+  | 'rock'
+  | 'water'
+  | 'forestFloor'
+  | 'tree'
+  | 'bush'
+  | 'logs'
+  | 'path'
+  | 'planks'
+  | 'woodWall';
 
-const LEGEND: Record<string, TileType> = {
+/** Map characters for each tile. Letters and digits are taken by markers, so tiles use symbols. */
+export const LEGEND: Readonly<Record<string, TileType>> = {
   '.': 'dirt',
   ',': 'grass',
   _: 'floor',
   '#': 'wall',
   o: 'rock',
   '~': 'water',
+  ';': 'forestFloor',
+  '^': 'tree',
+  '"': 'bush',
+  '=': 'logs',
+  ':': 'path',
+  '+': 'planks',
+  '%': 'woodWall',
 };
 
-const BLOCKING: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'water']);
-/** Tiles you can't see (or shoot) through. Water blocks walking but not sight. */
-const OPAQUE: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock']);
+const BLOCKING: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'water', 'tree', 'logs', 'woodWall']);
+/** Tiles you can't see (or shoot) through. Water and log piles block walking but not sight. */
+const OPAQUE: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'tree', 'woodWall']);
+
+export function isBlockingTile(tile: TileType): boolean {
+  return BLOCKING.has(tile);
+}
 
 const PLAYER_MARKER = 'P';
 const CHEST_MARKER = /^[a-z]$/;
 const CREATURE_MARKER = /^[A-Z]$/;
+const EXIT_MARKER = /^[1-9]$/;
 
 /**
  * A map written as ASCII art. Each character is one tile (see LEGEND), and
- * there are three kinds of markers:
+ * there are four kinds of markers:
  *   P    the player start
  *   a-z  a chest, whose contents are listed under that letter in `chests`
  *   A-Z  a creature (except P), whose type is given under that letter in `creatures`;
  *        the same letter can be used many times
- * A marker stands on the same kind of ground as the tile to its left.
+ *   1-9  an exit to another map, given under that digit in `exits`
+ * A marker stands on the ground of a neighbouring tile: the first walkable one of left,
+ * right, above and below.
  */
 export interface MapDef {
   name: string;
@@ -36,6 +64,8 @@ export interface MapDef {
   chests: Record<string, { name: string; contents: Array<[itemId: string, quantity: number]> }>;
   /** Marker letter to creature id. */
   creatures?: Record<string, string>;
+  /** Marker digit to the id of the map it leads to. */
+  exits?: Record<string, { to: string }>;
 }
 
 export interface Chest {
@@ -47,13 +77,24 @@ export interface Chest {
   opened: boolean;
 }
 
+/** A walkable tile that takes the player to another map. */
+export interface Exit {
+  x: number;
+  y: number;
+  /** Id of the map it leads to. */
+  to: string;
+}
+
 export class GridMap {
   private constructor(
+    /** Identifies the map in the world and in saves; see data/world.ts. */
+    readonly id: string,
     readonly name: string,
     /** Indexed as tiles[y][x]. */
     readonly tiles: TileType[][],
     readonly chests: Chest[],
     readonly creatures: Creature[],
+    readonly exits: Exit[],
     readonly playerStart: GridPos,
   ) {}
 
@@ -65,13 +106,14 @@ export class GridMap {
     return this.tiles.length;
   }
 
-  static parse(def: MapDef): GridMap {
+  static parse(def: MapDef, id = def.name): GridMap {
     const width = def.rows[0]?.length ?? 0;
     if (width === 0) throw new Error(`Map '${def.name}' is empty`);
 
     const tiles: TileType[][] = [];
     const chests: Chest[] = [];
     const creatures: Creature[] = [];
+    const exits: Exit[] = [];
     let playerStart: GridPos | null = null;
 
     for (let y = 0; y < def.rows.length; y++) {
@@ -88,7 +130,7 @@ export class GridMap {
           continue;
         }
 
-        tileRow.push(x > 0 ? tileRow[x - 1] : 'dirt');
+        tileRow.push(groundUnderMarker(def.rows, x, y));
         if (char === PLAYER_MARKER) {
           if (playerStart) throw new Error(`Map '${def.name}' has more than one player start`);
           playerStart = { x, y };
@@ -101,6 +143,10 @@ export class GridMap {
           if (!creatureId) throw new Error(`Map '${def.name}': no creature defined for '${char}'`);
           // Keyed by spawn position, so adding a creature elsewhere on the map doesn't shift every id.
           creatures.push(new Creature(`${creatureId}@${x},${y}`, getCreatureDef(creatureId), { x, y }));
+        } else if (EXIT_MARKER.test(char)) {
+          const exit = def.exits?.[char];
+          if (!exit) throw new Error(`Map '${def.name}': no exit defined for '${char}'`);
+          exits.push({ x, y, to: exit.to });
         } else {
           throw new Error(`Map '${def.name}': unknown character '${char}' at (${x}, ${y})`);
         }
@@ -112,7 +158,7 @@ export class GridMap {
     for (const id of Object.keys(def.chests)) {
       if (!chests.some((c) => c.id === id)) throw new Error(`Map '${def.name}': chest '${id}' is not placed`);
     }
-    return new GridMap(def.name, tiles, chests, creatures, playerStart);
+    return new GridMap(id, def.name, tiles, chests, creatures, exits, playerStart);
   }
 
   tileAt(x: number, y: number): TileType | null {
@@ -121,6 +167,27 @@ export class GridMap {
 
   chestAt(x: number, y: number): Chest | undefined {
     return this.chests.find((c) => c.x === x && c.y === y);
+  }
+
+  exitAt(x: number, y: number): Exit | undefined {
+    return this.exits.find((e) => e.x === x && e.y === y);
+  }
+
+  /**
+   * Where the player appears when arriving from another map: on the tile just inside the exit
+   * that leads back there, so stepping back onto it returns them. Exits sit on the map's edge,
+   * so of the exit's walkable neighbours this picks the one furthest from the edge.
+   * Falls back to the map's player start.
+   */
+  arrivalFrom(fromMapId: string): GridPos {
+    const exit = this.exits.find((e) => e.to === fromMapId);
+    if (!exit) return { ...this.playerStart };
+    const fromEdge = (p: GridPos) => Math.min(p.x, p.y, this.width - 1 - p.x, this.height - 1 - p.y);
+    const options = DIRECTIONS.map((d) => addPos(exit, d)).filter(
+      (p) => this.isWalkable(p.x, p.y) && !this.exitAt(p.x, p.y),
+    );
+    if (options.length === 0) return { ...this.playerStart };
+    return options.reduce((best, p) => (fromEdge(p) > fromEdge(best) ? p : best));
   }
 
   livingCreatureAt(x: number, y: number): Creature | undefined {
@@ -139,7 +206,7 @@ export class GridMap {
   }
 
   /**
-   * True if no wall or rock lies on the line between two tiles (the end tiles themselves
+   * True if no wall, rock or tree lies on the line between two tiles (the end tiles themselves
    * don't count). A Bresenham line from a to b can differ from one from b to a, so both are
    * tried and either being clear is enough; that keeps sight symmetric.
    */
@@ -181,4 +248,16 @@ export class GridMap {
     const tile = this.tileAt(x, y);
     return tile !== null && !BLOCKING.has(tile) && !this.chestAt(x, y) && !this.livingCreatureAt(x, y);
   }
+}
+
+/**
+ * The ground a marker stands on: the first walkable tile among its left, right, upper and
+ * lower neighbours, so a chest against a wall still sits on the floor. Falls back to any
+ * neighbouring tile, then dirt.
+ */
+function groundUnderMarker(rows: string[], x: number, y: number): TileType {
+  const neighbours = [rows[y][x - 1], rows[y][x + 1], rows[y - 1]?.[x], rows[y + 1]?.[x]]
+    .map((char) => (char === undefined ? undefined : LEGEND[char]))
+    .filter((tile): tile is TileType => tile !== undefined);
+  return neighbours.find((tile) => !BLOCKING.has(tile)) ?? neighbours[0] ?? 'dirt';
 }
