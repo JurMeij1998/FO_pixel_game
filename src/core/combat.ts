@@ -1,6 +1,6 @@
 import type { Character } from './character';
 import type { Creature } from './creature';
-import type { Fighter } from './fighter';
+import type { AttackSound, Fighter } from './fighter';
 import { addPos, DIRECTIONS, distance, samePos, type GridPos } from './grid';
 import type { GridMap } from './gridMap';
 import { failure, type ActionResult } from './result';
@@ -23,6 +23,8 @@ export type CombatEvent =
       attacker: Fighter;
       target: Fighter;
       ranged: boolean;
+      /** Captured when the attack happens, so swapping weapons mid-animation can't change it. */
+      sound: AttackSound;
       hit: boolean;
       critical: boolean;
       damage: number;
@@ -32,17 +34,28 @@ export type CombatEvent =
       newLevel: number | null;
     };
 
+export type AttackProblemCode = 'notYourTurn' | 'targetDead' | 'noAP' | 'outOfRange' | 'noLineOfSight' | 'empty';
+export interface AttackProblem {
+  code: AttackProblemCode;
+  message: string;
+}
+
 /** Either the events that happened, for the scene to animate, or why nothing happened. */
-export type CombatAction = { ok: true; events: CombatEvent[] } | { ok: false; message: string };
+export type CombatAction =
+  | { ok: true; events: CombatEvent[] }
+  | { ok: false; message: string; problem?: AttackProblemCode };
 
 const done = (events: CombatEvent[]): CombatAction => ({ ok: true, events });
-const refused = (message: string): CombatAction => ({ ok: false, message });
+const refused = (message: string, problem?: AttackProblemCode): CombatAction => ({ ok: false, message, problem });
+const problem = (code: AttackProblemCode, message: string): AttackProblem => ({ code, message });
 
 /**
  * One fight, from start to outcome. The rules resolve instantly and mutate the
  * fighters; every action returns CombatEvents so the scene can replay them as animations.
  *
- * Turn order is simple: the player, then every participating creature in turn.
+ * Turn order is simple: the player, then every participating creature in turn. endTurn()
+ * resolves the enemies' turns; the scene calls startPlayerTurn() once it has animated them,
+ * so the HUD doesn't show "your turn" (and full AP) while enemies are still moving on screen.
  */
 export class Combat {
   readonly participants: Creature[] = [];
@@ -80,9 +93,9 @@ export class Combat {
   }
 
   hitChance(attacker: Fighter, target: Fighter): number {
-    const { hitChance, range } = attacker.attack;
+    const { hitChance, ranged } = attacker.attack;
     let chance = hitChance - target.armorClass;
-    if (range > 1) chance -= RANGE_PENALTY_PER_TILE * Math.max(0, distance(attacker.pos, target.pos) - 1);
+    if (ranged) chance -= RANGE_PENALTY_PER_TILE * Math.max(0, distance(attacker.pos, target.pos) - 1);
     return Math.max(5, Math.min(95, chance));
   }
 
@@ -91,15 +104,17 @@ export class Combat {
   }
 
   /** Why the player can't attack this target right now, or null if they can. */
-  attackProblem(target: Creature): string | null {
-    if (!this.isPlayerTurn) return "It isn't your turn.";
-    if (target.isDead) return `The ${target.name} is already dead.`;
+  attackProblem(target: Creature): AttackProblem | null {
+    if (!this.isPlayerTurn) return problem('notYourTurn', "It isn't your turn.");
+    if (target.isDead) return problem('targetDead', `The ${target.name} is already dead.`);
     const attack = this.player.attack;
     // Kept short: the HUD shows these next to the target.
-    if (this.actionPoints < attack.apCost) return `Not enough AP (attack costs ${attack.apCost}).`;
-    if (distance(this.player.pos, target.pos) > attack.range) return `The ${target.name} is out of range.`;
-    if (!this.canSee(this.player, target)) return `You can't see the ${target.name} from here.`;
-    if (attack.ammo && this.player.loadedRounds() === 0) return 'Empty! Press R to reload.';
+    if (this.actionPoints < attack.apCost) return problem('noAP', `Not enough AP (attack costs ${attack.apCost}).`);
+    if (distance(this.player.pos, target.pos) > attack.range) {
+      return problem('outOfRange', `The ${target.name} is out of range.`);
+    }
+    if (!this.canSee(this.player, target)) return problem('noLineOfSight', `You can't see the ${target.name} from here.`);
+    if (attack.ammo && this.player.loadedRounds() === 0) return problem('empty', 'Empty! Press R to reload.');
     return null;
   }
 
@@ -115,17 +130,16 @@ export class Combat {
   }
 
   attack(target: Creature): CombatAction {
-    const problem = this.attackProblem(target);
-    if (problem) return refused(problem);
+    const blocked = this.attackProblem(target);
+    if (blocked) return refused(blocked.message, blocked.code);
     const attack = this.player.attack;
     if (attack.ammo) this.player.spendRound();
 
     this.actionPoints -= attack.apCost;
     if (!this.participants.includes(target)) this.participants.push(target);
     this.target = target;
-    const event = this.resolveAttack(this.player, target);
-    if (target.isDead) this.target = this.nearestEnemy();
-    return done([event]);
+    // A killed target stays selected until the scene has shown the kill; see ensureTarget().
+    return done([this.resolveAttack(this.player, target)]);
   }
 
   reload(): ActionResult {
@@ -143,6 +157,11 @@ export class Combat {
     return true;
   }
 
+  /** Selects the nearest living enemy if the current target is dead or no longer in the fight. */
+  ensureTarget(): void {
+    if (!this.target || !this.livingEnemies.includes(this.target)) this.target = this.nearestEnemy();
+  }
+
   /** Selects the next living enemy, nearest first. */
   cycleTarget(): void {
     const enemies = this.enemiesByDistance();
@@ -151,7 +170,7 @@ export class Combat {
     this.target = enemies[(index + 1) % enemies.length];
   }
 
-  /** Ends the player's turn and plays out every enemy's turn. */
+  /** Ends the player's turn and resolves every enemy's turn. Call startPlayerTurn() afterwards. */
   endTurn(): CombatEvent[] {
     if (!this.isPlayerTurn) return [];
     this.playerTurn = false;
@@ -164,15 +183,16 @@ export class Combat {
 
     this.dropLostEnemies();
     this.recruitSpotters();
-    if (this.livingEnemies.length === 0) {
-      this.outcome = 'escaped';
-      return events;
-    }
+    if (this.livingEnemies.length === 0) this.outcome = 'escaped';
+    return events;
+  }
 
+  /** Gives the player their turn and a fresh set of AP, once the enemies' turns have been shown. */
+  startPlayerTurn(): void {
+    if (this.playerTurn || this.outcome) return;
     this.playerTurn = true;
     this.actionPoints = this.player.maxActionPoints;
-    if (!this.target || !this.livingEnemies.includes(this.target)) this.target = this.nearestEnemy();
-    return events;
+    this.ensureTarget();
   }
 
   /** Simple AI: attack while it can and has the AP, otherwise walk towards a spot it can attack from. */
@@ -197,7 +217,7 @@ export class Combat {
 
   private resolveAttack(attacker: Fighter, target: Fighter): CombatEvent {
     const attack = attacker.attack;
-    const ranged = attack.range > 1;
+    const { ranged, sound } = attack;
     const subject = attacker === this.player ? 'You' : `The ${attacker.name}`;
     const object = target === this.player ? 'you' : `the ${target.name}`;
 
@@ -208,6 +228,7 @@ export class Combat {
         attacker,
         target,
         ranged,
+        sound,
         hit: false,
         critical: false,
         damage: 0,
@@ -238,7 +259,7 @@ export class Combat {
 
     if (this.player.hitPoints === 0) this.outcome = 'defeat';
     else if (this.livingEnemies.length === 0) this.outcome = 'victory';
-    return { type: 'attack', attacker, target, ranged, hit: true, critical, damage, killed, message, newLevel };
+    return { type: 'attack', attacker, target, ranged, sound, hit: true, critical, damage, killed, message, newLevel };
   }
 
   /** In range and with a clear line of sight. */
@@ -288,14 +309,20 @@ export class Combat {
     }
   }
 
-  /** Creatures give up when you are well out of sight range, or out of range and hidden behind cover. */
+  /**
+   * Creatures give up when you are well out of reach, or out of reach and hidden behind cover.
+   * "Reach" is the larger of their sight range and your weapon's range, so you can't snipe a
+   * creature from just outside its sight and have it forget you every turn.
+   */
   private dropLostEnemies(): void {
+    const playerReach = this.player.attack.range;
     for (let i = this.participants.length - 1; i >= 0; i--) {
       const c = this.participants[i];
       if (c.isDead) continue;
+      const reach = Math.max(c.def.sightRange, playerReach);
       const d = distance(c.pos, this.player.pos);
-      const hidden = d > c.def.sightRange && !this.map.hasLineOfSight(c.pos, this.player.pos);
-      if (d > c.def.sightRange + GIVE_UP_MARGIN || hidden) this.participants.splice(i, 1);
+      const hidden = d > reach && !this.map.hasLineOfSight(c.pos, this.player.pos);
+      if (d > reach + GIVE_UP_MARGIN || hidden) this.participants.splice(i, 1);
     }
   }
 

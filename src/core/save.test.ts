@@ -82,6 +82,46 @@ describe('save and load', () => {
     expect(loadedRaider.contents.count('bottle_caps')).toBe(20);
   });
 
+  it('reads creatures from saves that keyed them by map order', () => {
+    const { map, player } = freshGame();
+    const save = JSON.parse(JSON.stringify(saveGame(player, map)));
+    // Rewrite the ids the way older saves stored them: "<type>_<index>".
+    const legacy: Record<string, unknown> = {};
+    map.creatures.forEach((c, i) => (legacy[`${c.def.id}_${i}`] = { ...save.creatures[c.id], hitPoints: 0 }));
+    save.creatures = legacy;
+
+    const loaded = loadGame(save, WASTELAND);
+    expect(loaded.map.creatures.every((c) => c.isDead)).toBe(true);
+  });
+
+  it('keeps chests and creatures the save does not know about (added to the map later)', () => {
+    const { map, player } = freshGame();
+    const save = JSON.parse(JSON.stringify(saveGame(player, map)));
+    save.chests = {};
+    save.creatures = {};
+    const loaded = loadGame(save, WASTELAND);
+    expect(loaded.map.chests[0].contents.isEmpty).toBe(false);
+    expect(loaded.map.creatures.every((c) => !c.isDead)).toBe(true);
+  });
+
+  it('rejects corrupt player data and clamps out-of-range numbers', () => {
+    const { map, player } = freshGame();
+    player.backpack.add('10mm_pistol');
+    player.equip('10mm_pistol', 'primary');
+    const save = JSON.parse(JSON.stringify(saveGame(player, map)));
+
+    expect(() => loadGame({ ...save, player: { ...save.player, special: undefined } }, WASTELAND)).toThrow(/strength/);
+    expect(() => loadGame({ ...save, player: { ...save.player, activeWeaponSlot: 'tail' } }, WASTELAND)).toThrow(
+      /weapon slot/,
+    );
+
+    const tooMuch = { ...save.player, hitPoints: 999, loadedRounds: { primary: 50, secondary: 3 } };
+    const loaded = loadGame({ ...save, player: tooMuch }, WASTELAND).player;
+    expect(loaded.hitPoints).toBe(loaded.maxHitPoints);
+    expect(loaded.loadedRounds('primary')).toBe(12); // the pistol's magazine
+    expect(loaded.loadedRounds('secondary')).toBe(0); // nothing equipped there
+  });
+
   it('rejects saves from another version or with unknown items', () => {
     const { map, player } = freshGame();
     const save = saveGame(player, map);

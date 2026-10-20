@@ -1,4 +1,14 @@
 /** Fallout's S.P.E.C.I.A.L. attributes, each from 1 to 10. */
+export const SPECIAL_KEYS = [
+  'strength',
+  'perception',
+  'endurance',
+  'charisma',
+  'intelligence',
+  'agility',
+  'luck',
+] as const;
+
 export interface Special {
   strength: number;
   perception: number;

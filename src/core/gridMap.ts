@@ -99,7 +99,8 @@ export class GridMap {
         } else if (CREATURE_MARKER.test(char)) {
           const creatureId = def.creatures?.[char];
           if (!creatureId) throw new Error(`Map '${def.name}': no creature defined for '${char}'`);
-          creatures.push(new Creature(`${creatureId}_${creatures.length}`, getCreatureDef(creatureId), { x, y }));
+          // Keyed by spawn position, so adding a creature elsewhere on the map doesn't shift every id.
+          creatures.push(new Creature(`${creatureId}@${x},${y}`, getCreatureDef(creatureId), { x, y }));
         } else {
           throw new Error(`Map '${def.name}': unknown character '${char}' at (${x}, ${y})`);
         }
@@ -126,8 +127,10 @@ export class GridMap {
     return this.creatures.find((c) => !c.isDead && c.pos.x === x && c.pos.y === y);
   }
 
+  /** Corpses don't block, so several can share a tile; the one that still holds loot comes first. */
   corpseAt(x: number, y: number): Creature | undefined {
-    return this.creatures.find((c) => c.isDead && c.pos.x === x && c.pos.y === y);
+    const corpses = this.creatures.filter((c) => c.isDead && c.pos.x === x && c.pos.y === y);
+    return corpses.find((c) => !c.contents.isEmpty) ?? corpses[0];
   }
 
   blocksSight(x: number, y: number): boolean {
@@ -153,6 +156,8 @@ export class GridMap {
     let x = from.x;
     let y = from.y;
     while (x !== to.x || y !== to.y) {
+      const previousX = x;
+      const previousY = y;
       const doubled = 2 * error;
       if (doubled >= dy) {
         error += dy;
@@ -162,6 +167,9 @@ export class GridMap {
         error += dx;
         y += stepY;
       }
+      // A diagonal step squeezes between two tiles; if both block sight, so does the gap.
+      const diagonal = x !== previousX && y !== previousY;
+      if (diagonal && this.blocksSight(previousX, y) && this.blocksSight(x, previousY)) return false;
       const reachedEnd = x === to.x && y === to.y;
       if (!reachedEnd && this.blocksSight(x, y)) return false;
     }

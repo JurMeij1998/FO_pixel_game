@@ -45,6 +45,35 @@ describe('GridMap', () => {
     expect(map.hasLineOfSight({ x: 2, y: 1 }, { x: 3, y: 1 })).toBe(true); // the end tiles don't count
   });
 
+  it('blocks sight through the gap where two walls meet at a corner', () => {
+    const map = GridMap.parse({ name: 'corner', rows: ['P#', '#.'], chests: {} });
+    expect(map.hasLineOfSight({ x: 0, y: 0 }, { x: 1, y: 1 })).toBe(false);
+
+    const open = GridMap.parse({ name: 'half-open', rows: ['P#', '..'], chests: {} });
+    expect(open.hasLineOfSight({ x: 0, y: 0 }, { x: 1, y: 1 })).toBe(true); // one side is open
+  });
+
+  it('prefers the corpse that still has loot when several share a tile', () => {
+    const map = GridMap.parse({
+      name: 'pile',
+      rows: ['PRX'],
+      chests: {},
+      creatures: { R: 'radroach', X: 'raider' },
+    });
+    const [roach, raider] = map.creatures;
+    roach.hitPoints = 0;
+    raider.hitPoints = 0;
+    raider.pos = { ...roach.pos }; // the raider died on top of the radroach
+    expect(map.corpseAt(1, 0)).toBe(raider);
+    raider.contents.clear();
+    expect(map.corpseAt(1, 0)).toBe(roach);
+  });
+
+  it('identifies creatures by where they spawn', () => {
+    const map = GridMap.parse({ name: 'ids', rows: ['PR.R'], chests: {}, creatures: { R: 'radroach' } });
+    expect(map.creatures.map((c) => c.id)).toEqual(['radroach@1,0', 'radroach@3,0']);
+  });
+
   it('rejects malformed maps', () => {
     expect(() => GridMap.parse({ name: 'ragged', rows: ['P..', '..'], chests: {} })).toThrow(/row 1/);
     expect(() => GridMap.parse({ name: 'nostart', rows: ['...'], chests: {} })).toThrow(/player start/);

@@ -1,16 +1,16 @@
 import { ItemContainer } from './container';
 import type { Attack, Fighter } from './fighter';
-import type { GridPos } from './grid';
+import { isGridPos, type GridPos } from './grid';
 import { getItem, type ItemDef } from './items';
 import { failure, success, type ActionResult } from './result';
 import * as derived from './stats';
-import { SKILL_NAMES, type Skill, type Special } from './stats';
+import { SKILL_NAMES, SKILLS, SPECIAL_KEYS, type Skill, type Special } from './stats';
 
 export type WeaponSlot = 'primary' | 'secondary';
 export type EquipSlot = WeaponSlot | 'armor';
 export const EQUIP_SLOTS: readonly EquipSlot[] = ['primary', 'secondary', 'armor'];
 
-const UNARMED = { name: 'Fists', damageMin: 1, damageMax: 3, apCost: 3, range: 1, sound: 'punch' } as const;
+const UNARMED = { name: 'Fists', damageMin: 1, damageMax: 3, apCost: 3, range: 1, ranged: false, sound: 'punch' } as const;
 
 /** Everything needed to rebuild a Character, as plain JSON-friendly data. */
 export interface CharacterData {
@@ -86,11 +86,26 @@ export class Character implements Fighter {
     };
   }
 
-  /** Rebuilds a character from toData() output. Throws on unknown item ids. */
+  /**
+   * Rebuilds a character from toData() output. The data may come from a corrupt or hand-edited
+   * save, so it is checked: invalid data throws, and numbers that are merely out of range are clamped.
+   */
   static fromData(data: CharacterData): Character {
+    const invalid = (what: string) => new Error(`Invalid ${what} in saved character`);
+    if (typeof data?.name !== 'string') throw invalid('name');
+    for (const key of SPECIAL_KEYS) {
+      const value = data.special?.[key];
+      if (!Number.isInteger(value) || value < 1 || value > 10) throw invalid(key);
+    }
+    if (!Number.isInteger(data.hitPoints)) throw invalid('hit points');
+    if (!isGridPos(data.pos)) throw invalid('position');
+    if (data.activeWeaponSlot !== 'primary' && data.activeWeaponSlot !== 'secondary') throw invalid('weapon slot');
+    if (!Array.isArray(data.taggedSkills) || !data.taggedSkills.every((s) => SKILLS.includes(s))) {
+      throw invalid('tagged skills');
+    }
+
     const c = new Character(data.name, { ...data.special });
     for (const skill of data.taggedSkills) c.taggedSkills.add(skill);
-    c.hitPoints = data.hitPoints;
     c.pos = { ...data.pos };
     c.activeWeaponSlot = data.activeWeaponSlot;
     for (const slot of EQUIP_SLOTS) {
@@ -99,12 +114,18 @@ export class Character implements Fighter {
       c.equipment[slot] = id;
     }
     c.backpack.setData(data.backpack);
-    Object.assign(c.loaded, data.loadedRounds);
-    c.level = data.level ?? 1;
-    c.experience = data.experience ?? 0;
-    c.skillPoints = data.skillPoints ?? 0;
-    Object.assign(c.skillBonus, data.skillBonus);
-    c.bonusHitPoints = data.bonusHitPoints ?? 0;
+    c.level = nonNegativeInteger(data.level, 1) || 1;
+    c.experience = nonNegativeInteger(data.experience, 0);
+    c.skillPoints = nonNegativeInteger(data.skillPoints, 0);
+    for (const skill of SKILLS) c.skillBonus[skill] = nonNegativeInteger(data.skillBonus?.[skill], 0);
+    c.bonusHitPoints = nonNegativeInteger(data.bonusHitPoints, 0);
+    // A saved player is alive (saves never happen at 0 HP), and can't hold more than its maximum.
+    c.hitPoints = Math.max(1, Math.min(c.maxHitPoints, data.hitPoints));
+    // Never more rounds in a magazine than it holds, and none in a slot without a gun.
+    for (const slot of ['primary', 'secondary'] as const) {
+      const magazine = c.equippedItem(slot)?.weapon?.magazineSize ?? 0;
+      c.loaded[slot] = Math.min(magazine, nonNegativeInteger(data.loadedRounds?.[slot], 0));
+    }
     return c;
   }
 
@@ -173,7 +194,7 @@ export class Character implements Fighter {
     const weapon = this.activeWeapon;
     if (!weapon?.weapon) return { ...UNARMED, hitChance: this.skill('unarmed') };
     const { skill, ...stats } = weapon.weapon;
-    return { name: weapon.name, ...stats, hitChance: this.skill(skill) };
+    return { name: weapon.name, ...stats, ranged: skill === 'smallGuns', hitChance: this.skill(skill) };
   }
 
   /** Equipped items count towards the carry weight too. */
@@ -286,6 +307,11 @@ export class Character implements Fighter {
     if (!this.backpack.remove(itemId)) return failure(`You don't have a ${item.name}.`);
     return success(`Dropped the ${item.name}.`);
   }
+}
+
+/** A whole number of at least 0 from untrusted data, or the fallback if it isn't one. */
+function nonNegativeInteger(value: unknown, fallback: number): number {
+  return Number.isInteger(value) && (value as number) >= 0 ? (value as number) : fallback;
 }
 
 function fitsSlot(item: ItemDef, slot: EquipSlot): boolean {

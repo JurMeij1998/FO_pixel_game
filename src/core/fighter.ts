@@ -9,8 +9,10 @@ export interface Attack {
   damageMin: number;
   damageMax: number;
   apCost: number;
-  /** Reach in tiles; 1 means melee. */
+  /** Reach in tiles. More than 1 doesn't make it ranged: a spear reaches 2 tiles. */
   range: number;
+  /** Guns and other projectiles: a range penalty to hit, a tracer and a ricochet on a miss. */
+  ranged: boolean;
   /** Base chance to hit in percent, before the target's Armor Class is subtracted. */
   hitChance: number;
   /** Item id used up per attack, if any. */

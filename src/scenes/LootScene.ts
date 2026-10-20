@@ -14,6 +14,8 @@ const RIGHT = PANEL.x + 470;
 /** Two-column transfer screen between the backpack and a chest or corpse. Click an item to move its whole stack. */
 export class LootScene extends Phaser.Scene {
   private lootable!: Lootable;
+  /** Whether it was already empty when opened, so closing doesn't claim you emptied it. */
+  private wasEmpty = false;
   private yourItems!: ListView;
   private containerItems!: ListView;
   private yourHeader!: Phaser.GameObjects.Text;
@@ -25,13 +27,14 @@ export class LootScene extends Phaser.Scene {
 
   init(data: { lootable: Lootable }): void {
     this.lootable = data.lootable;
+    this.wasEmpty = data.lootable.contents.isEmpty;
   }
 
   create(): void {
     const player = state.player;
 
     drawPanel(this, this.lootable.name.toUpperCase());
-    addButton(this, PANEL.x + PANEL.width - 130, PANEL.y + 18, 'Close', () => closeOverlay(this));
+    addButton(this, PANEL.x + PANEL.width - 130, PANEL.y + 18, 'Close', () => this.close());
 
     this.yourHeader = this.add.text(LEFT, 90, '', HEADER_TEXT);
     this.add.text(RIGHT, 90, 'CONTENTS', HEADER_TEXT);
@@ -72,7 +75,7 @@ export class LootScene extends Phaser.Scene {
   }
 
   private close(): void {
-    if (this.lootable.contents.isEmpty) postMessage(this, `You empty the ${this.lootable.name}.`);
+    if (!this.wasEmpty && this.lootable.contents.isEmpty) postMessage(this, `You empty the ${this.lootable.name}.`);
     closeOverlay(this);
   }
 }

@@ -57,7 +57,13 @@ describe('Combat', () => {
     expect(events.map((e) => e.type)).toEqual(['move', 'move', 'attack']);
     expect(roach.pos).toEqual({ x: 2, y: 1 });
     expect(player.hitPoints).toBeLessThan(player.maxHitPoints);
+
+    // The player's turn only starts once the scene has shown the enemy turn.
+    expect(combat.isPlayerTurn).toBe(false);
+    combat.actionPoints = 0;
+    combat.startPlayerTurn();
     expect(combat.isPlayerTurn).toBe(true);
+    expect(combat.actionPoints).toBe(player.maxActionPoints);
   });
 
   it('ends in victory when the last enemy dies, leaving a corpse', () => {
@@ -171,6 +177,7 @@ describe('Combat', () => {
       expect(firstTurn.every((e) => e.type === 'move')).toBe(true); // no shots through the wall
       expect(player.hitPoints).toBe(player.maxHitPoints);
 
+      combat.startPlayerTurn();
       const secondTurn = combat.endTurn();
       expect(secondTurn.some((e) => e.type === 'attack')).toBe(true);
       expect(map.hasLineOfSight(raider.pos, player.pos)).toBe(true);
@@ -183,6 +190,72 @@ describe('Combat', () => {
       combat.endTurn();
       expect(combat.outcome).toBe('escaped');
     });
+  });
+
+  it('treats a reach weapon like the spear as melee, not ranged', () => {
+    const { roach, player, combat } = setup(ARENA, ALWAYS);
+    player.backpack.add('spear'); // reach 2
+    player.equip('spear', 'primary');
+    roach.pos = { x: 3, y: 1 }; // 2 tiles away
+    const atTwo = combat.hitChance(player, roach);
+    roach.pos = { x: 2, y: 1 };
+    expect(combat.hitChance(player, roach)).toBe(atTwo); // no range penalty
+
+    roach.pos = { x: 3, y: 1 };
+    const result = combat.attack(roach);
+    expect(result.ok && result.events[0]).toMatchObject({ ranged: false, sound: 'swing' });
+  });
+
+  it('says why an attack is refused', () => {
+    const { roach, player, combat } = setup(ARENA);
+    player.backpack.add('10mm_pistol');
+    player.equip('10mm_pistol', 'primary'); // empty magazine
+    expect(combat.attack(roach)).toMatchObject({ ok: false, problem: 'empty' });
+
+    roach.pos = { x: 5, y: 2 };
+    player.backpack.add('knife');
+    player.equip('knife', 'primary');
+    expect(combat.attack(roach)).toMatchObject({ ok: false, problem: 'outOfRange' });
+  });
+
+  it('keeps a killed target selected until the scene asks for a new one', () => {
+    const map = GridMap.parse({
+      name: 'two',
+      rows: ['#######', '#.RPR.#', '#######'],
+      chests: {},
+      creatures: { R: 'radroach' },
+    });
+    const player = new Character('Tester', {
+      strength: 5,
+      perception: 5,
+      endurance: 5,
+      charisma: 5,
+      intelligence: 5,
+      agility: 5,
+      luck: 5,
+    });
+    player.pos = { ...map.playerStart };
+    const combat = new Combat(map, player, ALWAYS);
+    const first = combat.target!;
+    first.hitPoints = 1;
+    combat.attack(first);
+    expect(combat.target).toBe(first); // still marked while its death is shown
+    combat.ensureTarget();
+    expect(combat.target).not.toBe(first);
+    expect(combat.target?.isDead).toBe(false);
+  });
+
+  it("doesn't let a creature forget you while you can still shoot it", () => {
+    // Water keeps the radroach (sight 4) from reaching the player, 9 tiles away with a rifle.
+    const { roach, player, combat } = setup(['#P~~~~~~~~R#'], NEVER);
+    player.backpack.add('hunting_rifle'); // range 10
+    player.backpack.add('ammo_223', 5);
+    player.equip('hunting_rifle', 'primary');
+    player.reload();
+    expect(combat.attack(roach).ok).toBe(true);
+    combat.endTurn();
+    expect(combat.outcome).toBeNull(); // before the fix: "escaped" every turn
+    expect(combat.participants).toContain(roach);
   });
 
   it('clamps hit chance and penalises long shots', () => {

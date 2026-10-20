@@ -107,6 +107,7 @@ export class WorldScene extends Phaser.Scene {
     keyboard.on('keydown-R', () => this.reload());
     keyboard.on('keydown-ESC', () => this.openOverlay('Pause'));
     keyboard.on('keydown-Q', () => {
+      if (this.busy) return; // a swap mid-animation would autosave or play the wrong weapon's sound
       postMessage(this, state.player.swapWeapons().message);
       playSound('equip');
       autosave();
@@ -174,14 +175,16 @@ export class WorldScene extends Phaser.Scene {
     const result = combat.attack(creature);
     if (!result.ok) {
       postMessage(this, result.message);
-      const gunIsEmpty = state.player.attack.ammo && state.player.loadedRounds() === 0;
-      if (gunIsEmpty) playSound('dryFire');
+      if (result.problem === 'empty') playSound('dryFire');
       return;
     }
-    if (!state.combat) this.enterCombat(combat);
+    // A one-hit kill from outside combat is over before it starts: no combat sting or shake.
+    const startsFight = !state.combat && !combat.outcome;
+    if (startsFight) this.enterCombat(combat);
     void this.run(async () => {
       await this.play(result.events);
-      this.afterAction();
+      if (state.combat) this.afterAction();
+      else autosave();
     });
   }
 
@@ -191,6 +194,7 @@ export class WorldScene extends Phaser.Scene {
     const events = combat.endTurn();
     void this.run(async () => {
       await this.play(events);
+      combat.startPlayerTurn(); // only now, so the HUD shows the enemy turn while it plays
       this.afterAction();
       if (state.combat?.isPlayerTurn) postMessage(this, 'Your turn.');
     });
@@ -199,6 +203,7 @@ export class WorldScene extends Phaser.Scene {
   /** Called after every combat action has been animated. */
   private afterAction(): void {
     const combat = state.combat;
+    combat?.ensureTarget(); // a killed target stays marked until its death has been shown
     if (!combat?.outcome) return;
     state.combat = null;
     switch (combat.outcome) {
@@ -245,7 +250,7 @@ export class WorldScene extends Phaser.Scene {
     const target = this.imageFor(event.target);
     const targetIsPlayer = event.target === state.player;
     if (event.attacker === state.player) this.faceToward(event.target.pos);
-    playSound(event.attacker.attack.sound);
+    playSound(event.sound);
 
     if (event.ranged) {
       const tracer = this.add.graphics().setDepth(DEPTH.effects);

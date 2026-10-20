@@ -11,6 +11,12 @@ export const DIRECTIONS: readonly GridPos[] = [
   { x: -1, y: 0 },
 ];
 
+/** Checks untrusted data, such as a loaded save, for the shape of a GridPos. */
+export function isGridPos(value: unknown): value is GridPos {
+  const pos = value as GridPos;
+  return typeof pos === 'object' && pos !== null && Number.isInteger(pos.x) && Number.isInteger(pos.y);
+}
+
 export function addPos(a: GridPos, b: GridPos): GridPos {
   return { x: a.x + b.x, y: a.y + b.y };
 }

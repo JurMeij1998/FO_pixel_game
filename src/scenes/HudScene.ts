@@ -69,7 +69,7 @@ export class HudScene extends Phaser.Scene {
     let targetInfo = 'No target';
     if (target) {
       const problem = combat.isPlayerTurn ? combat.attackProblem(target) : null;
-      const odds = problem ?? `${combat.hitChance(p, target)}% to hit`;
+      const odds = problem?.message ?? `${combat.hitChance(p, target)}% to hit`;
       targetInfo = `Target: ${target.name} ${target.hitPoints}/${target.maxHitPoints} HP, ${odds}`;
     }
     this.combatText.setText(`COMBAT - ${turn}   ${targetInfo}`);

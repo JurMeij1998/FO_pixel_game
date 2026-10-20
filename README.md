@@ -1,7 +1,8 @@
 # Wasteland (working title)
 
-A small top-down pixel-art RPG inspired by Fallout 1/2: grid movement, lootable chests,
-a weight-limited inventory and, next up, turn-based combat with Action Points.
+A small top-down pixel-art RPG inspired by Fallout 1/2: grid movement, lootable chests and
+corpses, a weight-limited inventory, turn-based combat with Action Points and line of sight,
+XP and levelling, autosave, and synthesised sound effects.
 
 Built with TypeScript, [Phaser 3](https://phaser.io) and Vite.
 
@@ -55,15 +56,18 @@ the main menu.
 
 The game autosaves to the browser's localStorage after every step, every closed screen and
 every finished fight, but never during combat. Dying lets you load that save (so you go back
-to just before the fight), start a new game, or return to the main menu. `core/save.ts` turns the game into plain
-JSON; `storage.ts` is the only code that touches localStorage.
+to just before the fight), start a new game, or return to the main menu. `core/save.ts` turns
+the game into plain JSON; `storage.ts` is the only code that touches localStorage. Loading
+checks the save's player data and falls back to a new game if it is corrupt. Creatures are
+saved by their spawn tile, so adding creatures or chests to the map doesn't break old saves:
+the new ones just start fresh.
 
 ## Combat
 
 Fallout-style and turn-based, on the same grid you explore. Combat starts when a creature
 sees you (or you attack one). You act first with your Action Points, then each enemy
 takes its turn. Hit chance is your weapon skill minus the target's Armor Class (minus a
-range penalty for guns), damage is reduced by Damage Resistance, and Luck is your critical
+range penalty for guns; the spear's reach of 2 is still melee), damage is reduced by Damage Resistance, and Luck is your critical
 chance. Guns fire from their magazine (10mm pistol 12, hunting rifle 5) and are reloaded
 from the backpack with R: free while exploring, 2 AP in combat. A gun you unequip puts its
 rounds back in the backpack. Walls and rocks block line of sight (water
@@ -76,13 +80,17 @@ lose track of you; kill them and their corpses can be looted.
 ```
 src/
   core/       Game rules in plain TypeScript, no Phaser imports. Unit tested.
+    stats.ts      S.P.E.C.I.A.L., skills and the Fallout formulas derived from them
     items.ts      Item definitions (weight, value, weapon/armor stats)
     container.ts  ItemContainer: stacks of items (backpack, chest)
-    character.ts  Character: S.P.E.C.I.A.L., skills, derived stats, equipment slots
+    character.ts  Character: skills, levels, equipment slots, magazines
     creature.ts   Creature definitions and instances
+    fighter.ts    The Attack and Fighter interfaces shared by player and creatures
     combat.ts     Turn-based combat rules and enemy AI; emits events for the scene
     loot.ts       Moving items between containers, honouring carry weight
-    gridMap.ts    Parses ASCII maps into tiles, chests and creatures
+    grid.ts       Grid positions, directions and distance
+    gridMap.ts    Parses ASCII maps into tiles, chests and creatures; line of sight
+    result.ts     ActionResult: success or failure plus a message for the log
     save.ts       Game state to and from plain JSON
   data/       Maps and other content
   gfx/        Procedurally generated placeholder pixel art
