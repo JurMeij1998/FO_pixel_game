@@ -1,17 +1,23 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
-import { storeItem, takeAll, takeItem, type Lootable } from '../core/loot';
+import { storeItem, takeAll, takeItem, transferQuantity, type Lootable, type TransferAmount } from '../core/loot';
 import type { ActionResult } from '../core/result';
 import { state } from '../state';
 import { stackRows } from '../ui/format';
 import { postMessage } from '../ui/messages';
 import { COLORS, HEADER_TEXT, SMALL_TEXT, TEXT } from '../ui/theme';
-import { addButton, closeOverlay, drawPanel, ListView, PANEL } from '../ui/widgets';
+import { addButton, closeOverlay, drawPanel, ListView, PANEL, type ClickModifiers } from '../ui/widgets';
+
+/** Shift moves the whole stack, Ctrl half of it (Shift wins if both are held), a plain click one item. */
+function amountFor(modifiers: ClickModifiers): TransferAmount {
+  if (modifiers.shift) return 'all';
+  return modifiers.ctrl ? 'half' : 'one';
+}
 
 const LEFT = PANEL.x + 30;
 const RIGHT = PANEL.x + 470;
 
-/** Two-column transfer screen between the backpack and a chest or corpse. Click an item to move its whole stack. */
+/** Two-column transfer screen between the backpack and a chest or corpse; see amountFor() for what a click moves. */
 export class LootScene extends Phaser.Scene {
   private lootable!: Lootable;
   /** Whether it was already empty when opened, so closing doesn't claim you emptied it. */
@@ -38,14 +44,16 @@ export class LootScene extends Phaser.Scene {
 
     this.yourHeader = this.add.text(LEFT, 90, '', HEADER_TEXT);
     this.add.text(RIGHT, 90, 'CONTENTS', HEADER_TEXT);
-    this.add.text(LEFT, 500, 'Click an item to move the whole stack.', SMALL_TEXT);
+    this.add.text(LEFT, 500, 'Click: move 1   Ctrl+click: half   Shift+click: all', SMALL_TEXT);
 
-    this.yourItems = new ListView(this, LEFT, 122, 36, 15, (itemId) =>
-      this.apply(storeItem(player, this.lootable.contents, itemId)),
-    );
-    this.containerItems = new ListView(this, RIGHT, 122, 36, 15, (itemId) =>
-      this.apply(takeItem(player, this.lootable.contents, itemId)),
-    );
+    this.yourItems = new ListView(this, LEFT, 122, 36, 15, (itemId, modifiers) => {
+      const quantity = transferQuantity(player.backpack.count(itemId), amountFor(modifiers));
+      this.apply(storeItem(player, this.lootable.contents, itemId, quantity));
+    });
+    this.containerItems = new ListView(this, RIGHT, 122, 36, 15, (itemId, modifiers) => {
+      const quantity = transferQuantity(this.lootable.contents.count(itemId), amountFor(modifiers));
+      this.apply(takeItem(player, this.lootable.contents, itemId, quantity));
+    });
 
     addButton(this, RIGHT, 500, 'Take all (Space)', () => this.apply(takeAll(player, this.lootable.contents)));
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);

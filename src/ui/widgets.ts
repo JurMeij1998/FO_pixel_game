@@ -117,6 +117,17 @@ export interface ListRow {
   detail?: string;
 }
 
+/** Modifier keys held during a click. Ctrl also covers Cmd, for Macs. */
+export interface ClickModifiers {
+  shift: boolean;
+  ctrl: boolean;
+}
+
+function modifiersOf(pointer: Phaser.Input.Pointer): ClickModifiers {
+  const event = pointer.event as MouseEvent | TouchEvent;
+  return { shift: event.shiftKey, ctrl: event.ctrlKey || event.metaKey };
+}
+
 /**
  * A clickable, scrollable column of text rows. The text objects are created once
  * and reused, so it is safe to call setRows() from a row's own click handler.
@@ -136,7 +147,7 @@ export class ListView {
     y: number,
     private readonly columns: number,
     private readonly visibleRows: number,
-    onClick: (key: string) => void,
+    onClick: (key: string, modifiers: ClickModifiers) => void,
   ) {
     const width = columns * CHAR_WIDTH;
     for (let i = 0; i < visibleRows; i++) {
@@ -146,9 +157,9 @@ export class ListView {
       line.input!.cursor = 'pointer';
       line.on('pointerover', () => line.setColor(COLORS.bright));
       line.on('pointerout', () => this.render());
-      line.on('pointerdown', () => {
+      line.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
         const row = this.rows[this.scroll + i];
-        if (row) onClick(row.key);
+        if (row) onClick(row.key, modifiersOf(pointer));
       });
       this.lines.push(line);
     }

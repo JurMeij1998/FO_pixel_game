@@ -9,6 +9,20 @@ export interface Lootable {
   readonly contents: ItemContainer;
 }
 
+/** How much of a stack one transfer moves: a single item, half the stack (rounded up), or all of it. */
+export type TransferAmount = 'one' | 'half' | 'all';
+
+export function transferQuantity(stackSize: number, amount: TransferAmount): number {
+  switch (amount) {
+    case 'one':
+      return Math.min(1, stackSize);
+    case 'half':
+      return Math.ceil(stackSize / 2);
+    case 'all':
+      return stackSize;
+  }
+}
+
 /** Moves up to `quantity` items from `source` into the player's backpack, as far as the carry limit allows. */
 export function takeItem(
   player: Character,

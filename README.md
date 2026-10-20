@@ -29,6 +29,7 @@ npm run build      # typecheck + production build into dist/
 | R               | Reload the gun in hand           | Reload (costs 2 AP)           |
 | M               | Sound on/off                     | Sound on/off                  |
 | Esc             | Pause menu / close a screen      | Pause menu                    |
+| Click (loot)    | Move 1 of a stack; Ctrl+click half (rounded up), Shift+click all |   |
 | Space (loot)    | Take all                         |                               |
 | E / Esc (loot)  | Close the loot screen            |                               |
 
