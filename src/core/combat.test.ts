@@ -72,6 +72,17 @@ describe('Combat', () => {
     expect(map.isWalkable(4, 1)).toBe(true);
   });
 
+  it('gives XP for kills and reports a level-up', () => {
+    const { roach, player, combat } = setup(ARENA);
+    player.pos = { x: 3, y: 1 };
+    player.experience = 90;
+    roach.hitPoints = 1;
+    const result = combat.attack(roach);
+    expect(player.experience).toBe(90 + roach.def.experience);
+    expect(result.ok && result.events[0]).toMatchObject({ newLevel: 2 });
+    if (result.ok) expect(result.events[0].type === 'attack' && result.events[0].message).toMatch(/25 XP/);
+  });
+
   it('deals no damage on a miss but still spends the AP', () => {
     const { roach, player, combat } = setup(ARENA, NEVER);
     player.pos = { x: 3, y: 1 };

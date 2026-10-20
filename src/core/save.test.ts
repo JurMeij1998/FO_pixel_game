@@ -35,6 +35,8 @@ describe('save and load', () => {
     player.equip('10mm_pistol', 'secondary');
     player.swapWeapons();
     player.taggedSkills.add('unarmed');
+    player.gainExperience(350);
+    player.improveSkill('unarmed');
     player.hitPoints = 7;
     player.pos = { x: 10, y: 8 };
 
@@ -42,6 +44,17 @@ describe('save and load', () => {
     expect(loaded.toData()).toEqual(player.toData());
     expect(loaded.activeWeapon?.id).toBe('10mm_pistol');
     expect(loaded.skill('unarmed')).toBe(player.skill('unarmed'));
+    expect(loaded.level).toBe(3);
+    expect(loaded.maxHitPoints).toBe(player.maxHitPoints);
+  });
+
+  it('loads saves from before levelling existed', () => {
+    const { map, player } = freshGame();
+    const save = JSON.parse(JSON.stringify(saveGame(player, map)));
+    for (const key of ['level', 'experience', 'skillPoints', 'skillBonus', 'bonusHitPoints']) delete save.player[key];
+    const loaded = loadGame(save, WASTELAND).player;
+    expect(loaded.level).toBe(1);
+    expect(loaded.skill('smallGuns')).toBe(player.skill('smallGuns'));
   });
 
   it('restores looted chests and dead creatures', () => {

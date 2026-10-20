@@ -4,7 +4,7 @@ import type { GridPos } from './grid';
 import { getItem, type ItemDef } from './items';
 import { failure, success, type ActionResult } from './result';
 import * as derived from './stats';
-import type { Skill, Special } from './stats';
+import { SKILL_NAMES, type Skill, type Special } from './stats';
 
 export type WeaponSlot = 'primary' | 'secondary';
 export type EquipSlot = WeaponSlot | 'armor';
@@ -22,6 +22,12 @@ export interface CharacterData {
   activeWeaponSlot: WeaponSlot;
   equipment: Record<EquipSlot, string | null>;
   backpack: Array<[itemId: string, quantity: number]>;
+  // Optional so saves from before levelling still load.
+  level?: number;
+  experience?: number;
+  skillPoints?: number;
+  skillBonus?: Record<Skill, number>;
+  bonusHitPoints?: number;
 }
 
 export class Character implements Fighter {
@@ -31,6 +37,15 @@ export class Character implements Fighter {
   pos: GridPos = { x: 0, y: 0 };
   /** The weapon slot currently in hand, like Fallout's two hand slots. */
   activeWeaponSlot: WeaponSlot = 'primary';
+
+  level = 1;
+  experience = 0;
+  /** Unspent points from levelling up. */
+  skillPoints = 0;
+  /** Points spent on each skill, added on top of the base value. */
+  readonly skillBonus: Record<Skill, number> = { smallGuns: 0, meleeWeapons: 0, unarmed: 0 };
+  /** Max HP gained from levelling up. */
+  private bonusHitPoints = 0;
 
   private readonly equipment: Record<EquipSlot, string | null> = {
     primary: null,
@@ -55,6 +70,11 @@ export class Character implements Fighter {
       activeWeaponSlot: this.activeWeaponSlot,
       equipment: { ...this.equipment },
       backpack: this.backpack.toData(),
+      level: this.level,
+      experience: this.experience,
+      skillPoints: this.skillPoints,
+      skillBonus: { ...this.skillBonus },
+      bonusHitPoints: this.bonusHitPoints,
     };
   }
 
@@ -71,11 +91,45 @@ export class Character implements Fighter {
       c.equipment[slot] = id;
     }
     c.backpack.setData(data.backpack);
+    c.level = data.level ?? 1;
+    c.experience = data.experience ?? 0;
+    c.skillPoints = data.skillPoints ?? 0;
+    Object.assign(c.skillBonus, data.skillBonus);
+    c.bonusHitPoints = data.bonusHitPoints ?? 0;
     return c;
   }
 
   get maxHitPoints(): number {
-    return derived.maxHitPoints(this.special);
+    return derived.maxHitPoints(this.special) + this.bonusHitPoints;
+  }
+
+  /** Total XP at which the next level is reached. */
+  get experienceForNextLevel(): number {
+    return derived.experienceForLevel(this.level + 1);
+  }
+
+  /** Adds XP and levels up as often as it allows. Returns the number of levels gained. */
+  gainExperience(amount: number): number {
+    this.experience += amount;
+    let gained = 0;
+    while (this.experience >= this.experienceForNextLevel) {
+      this.level++;
+      gained++;
+      const hitPoints = derived.hitPointsPerLevel(this.special);
+      this.bonusHitPoints += hitPoints;
+      this.hitPoints += hitPoints;
+      this.skillPoints += derived.skillPointsPerLevel(this.special);
+    }
+    return gained;
+  }
+
+  /** Spends one skill point. Tagged skills improve twice as fast, as in Fallout. */
+  improveSkill(skill: Skill): ActionResult {
+    if (this.skillPoints === 0) return failure('You have no skill points to spend.');
+    const gain = this.taggedSkills.has(skill) ? 2 : 1;
+    this.skillPoints--;
+    this.skillBonus[skill] += gain;
+    return success(`${SKILL_NAMES[skill]} +${gain}%.`);
   }
 
   get maxActionPoints(): number {
@@ -101,7 +155,8 @@ export class Character implements Fighter {
   }
 
   skill(skill: Skill): number {
-    return derived.baseSkill(this.special, skill) + (this.taggedSkills.has(skill) ? derived.TAG_BONUS : 0);
+    const tag = this.taggedSkills.has(skill) ? derived.TAG_BONUS : 0;
+    return derived.baseSkill(this.special, skill) + tag + this.skillBonus[skill];
   }
 
   /** The attack made with the weapon in hand, or with fists if that hand is empty. */

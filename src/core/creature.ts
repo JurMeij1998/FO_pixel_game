@@ -12,6 +12,8 @@ export interface CreatureDef {
   critChance: number;
   /** Notices the player within this many tiles and starts combat. */
   sightRange: number;
+  /** XP the player gets for killing it. */
+  experience: number;
   attack: Attack;
   /** What its corpse holds. */
   loot: Array<[itemId: string, quantity: number]>;
@@ -27,6 +29,7 @@ const DEFINITIONS: CreatureDef[] = [
     damageResist: 0,
     critChance: 2,
     sightRange: 4,
+    experience: 25,
     attack: { name: 'bite', damageMin: 1, damageMax: 4, apCost: 3, range: 1, hitChance: 50 },
     loot: [],
   },
@@ -39,6 +42,7 @@ const DEFINITIONS: CreatureDef[] = [
     damageResist: 0,
     critChance: 3,
     sightRange: 5,
+    experience: 40,
     attack: { name: 'bite', damageMin: 2, damageMax: 6, apCost: 4, range: 1, hitChance: 55 },
     loot: [],
   },
@@ -51,6 +55,7 @@ const DEFINITIONS: CreatureDef[] = [
     damageResist: 10,
     critChance: 5,
     sightRange: 7,
+    experience: 100,
     attack: { name: 'pistol', damageMin: 3, damageMax: 9, apCost: 5, range: 6, hitChance: 50 },
     loot: [
       ['bottle_caps', 25],

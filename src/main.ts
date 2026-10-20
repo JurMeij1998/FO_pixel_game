@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from './config';
 import { BootScene } from './scenes/BootScene';
+import { CharacterScene } from './scenes/CharacterScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
 import { InventoryScene } from './scenes/InventoryScene';
@@ -20,5 +21,5 @@ new Phaser.Game({
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   // Later scenes draw on top of earlier ones: world, then HUD, then the overlays.
-  scene: [BootScene, WorldScene, HudScene, InventoryScene, LootScene, GameOverScene],
+  scene: [BootScene, WorldScene, HudScene, InventoryScene, LootScene, CharacterScene, GameOverScene],
 });

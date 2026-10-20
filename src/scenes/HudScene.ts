@@ -5,7 +5,7 @@ import { MESSAGE_EVENT } from '../ui/messages';
 import { COLORS, SMALL_TEXT, TEXT } from '../ui/theme';
 
 const LOG_LINES = 3;
-const CONTROLS = 'Arrows/WASD move   E/Space interact   I inventory   Q swap weapon   Click enemy: attack';
+const CONTROLS = 'Arrows/WASD move   E/Space interact   I inventory   C character   Q swap weapon   Click enemy: attack';
 const COMBAT_CONTROLS =
   'Arrows move (1 AP)   F/click attack   Tab next target   Space end turn   I inventory (4 AP)   Q swap';
 
@@ -49,9 +49,10 @@ export class HudScene extends Phaser.Scene {
     const ap = combat ? `${combat.actionPoints}/${p.maxActionPoints}` : `${p.maxActionPoints}`;
     const weapon = p.attack;
     const ammo = weapon.ammo ? ` (${p.backpack.count(weapon.ammo)})` : '';
+    const level = `Lv ${p.level}${p.skillPoints > 0 ? '+' : ''}`;
     this.status.setText(
-      `HP ${p.hitPoints}/${p.maxHitPoints}   AC ${p.armorClass}   AP ${ap}   ` +
-        `Weight ${p.carriedWeight}/${p.carryCapacity} lb   ${weapon.name}${ammo}`,
+      `${level}   HP ${p.hitPoints}/${p.maxHitPoints}   AC ${p.armorClass}   AP ${ap}   ` +
+        `Wt ${p.carriedWeight}/${p.carryCapacity}   ${weapon.name}${ammo}`,
     );
     this.status.setColor(p.hitPoints <= p.maxHitPoints / 4 ? COLORS.warn : COLORS.text);
 

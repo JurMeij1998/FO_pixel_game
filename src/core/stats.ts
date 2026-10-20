@@ -23,7 +23,29 @@ export function maxActionPoints(special: Special): number {
   return 5 + Math.floor(special.agility / 2);
 }
 
+/**
+ * Total XP needed to reach a level: 100 for level 2, 300 for 3, 600 for 4, ...
+ * Fallout's curve (1000 x level x (level - 1) / 2), scaled down for a small map.
+ */
+export function experienceForLevel(level: number): number {
+  return 50 * level * (level - 1);
+}
+
+export function hitPointsPerLevel(special: Special): number {
+  return 3 + Math.floor(special.endurance / 2);
+}
+
+export function skillPointsPerLevel(special: Special): number {
+  return 5 + 2 * special.intelligence;
+}
+
 export type Skill = 'smallGuns' | 'meleeWeapons' | 'unarmed';
+export const SKILLS: readonly Skill[] = ['smallGuns', 'meleeWeapons', 'unarmed'];
+export const SKILL_NAMES: Record<Skill, string> = {
+  smallGuns: 'Small Guns',
+  meleeWeapons: 'Melee Weapons',
+  unarmed: 'Unarmed',
+};
 
 /** Tagged skills start 20 points higher, as in Fallout 2. */
 export const TAG_BONUS = 20;

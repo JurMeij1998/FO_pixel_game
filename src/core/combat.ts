@@ -26,6 +26,8 @@ export type CombatEvent =
       damage: number;
       killed: boolean;
       message: string;
+      /** The level the player reached with this kill, if they levelled up. */
+      newLevel: number | null;
     };
 
 /** Either the events that happened, for the scene to animate, or why nothing happened. */
@@ -176,7 +178,18 @@ export class Combat {
 
     if (this.rng() * 100 >= this.hitChance(attacker, target)) {
       const message = `${subject} ${attacker === this.player ? 'miss' : 'misses'} ${object}.`;
-      return { type: 'attack', attacker, target, ranged, hit: false, critical: false, damage: 0, killed: false, message };
+      return {
+        type: 'attack',
+        attacker,
+        target,
+        ranged,
+        hit: false,
+        critical: false,
+        damage: 0,
+        killed: false,
+        message,
+        newLevel: null,
+      };
     }
 
     const critical = this.rng() * 100 < attacker.critChance;
@@ -190,9 +203,17 @@ export class Combat {
     let message = `${subject} ${critical ? `critically ${verb}` : verb} ${object} for ${damage}.`;
     if (killed) message += target === this.player ? ' You die.' : ` The ${target.name} dies.`;
 
+    let newLevel: number | null = null;
+    if (killed && attacker === this.player) {
+      // The player only ever attacks creatures.
+      const experience = (target as Creature).def.experience;
+      message += ` You gain ${experience} XP.`;
+      if (this.player.gainExperience(experience) > 0) newLevel = this.player.level;
+    }
+
     if (this.player.hitPoints === 0) this.outcome = 'defeat';
     else if (this.livingEnemies.length === 0) this.outcome = 'victory';
-    return { type: 'attack', attacker, target, ranged, hit: true, critical, damage, killed, message };
+    return { type: 'attack', attacker, target, ranged, hit: true, critical, damage, killed, message, newLevel };
   }
 
   /**

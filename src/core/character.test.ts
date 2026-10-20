@@ -100,6 +100,40 @@ describe('Character', () => {
     expect(c.attack).toMatchObject({ name: '10mm Pistol', ammo: 'ammo_10mm', apCost: 5, hitChance: 5 + 4 * 5 + 20 });
   });
 
+  it('levels up with enough XP, gaining HP and skill points', () => {
+    const c = makeCharacter({ endurance: 6, intelligence: 7 });
+    const maxBefore = c.maxHitPoints;
+    c.hitPoints = 10;
+
+    expect(c.gainExperience(99)).toBe(0);
+    expect(c.level).toBe(1);
+    expect(c.gainExperience(1)).toBe(1); // 100 XP reaches level 2
+    expect(c.level).toBe(2);
+    expect(c.maxHitPoints).toBe(maxBefore + 6); // 3 + END/2
+    expect(c.hitPoints).toBe(16);
+    expect(c.skillPoints).toBe(19); // 5 + 2 * INT
+    expect(c.experienceForNextLevel).toBe(300);
+  });
+
+  it('can gain several levels at once', () => {
+    const c = makeCharacter();
+    expect(c.gainExperience(650)).toBe(3);
+    expect(c.level).toBe(4);
+  });
+
+  it('spends skill points, tagged skills twice as fast', () => {
+    const c = makeCharacter();
+    c.taggedSkills.add('smallGuns');
+    c.skillPoints = 2;
+    const guns = c.skill('smallGuns');
+    const melee = c.skill('meleeWeapons');
+    c.improveSkill('smallGuns');
+    c.improveSkill('meleeWeapons');
+    expect(c.skill('smallGuns')).toBe(guns + 2);
+    expect(c.skill('meleeWeapons')).toBe(melee + 1);
+    expect(c.improveSkill('unarmed').ok).toBe(false);
+  });
+
   it('computes how many more items fit', () => {
     const c = makeCharacter({ strength: 1 }); // 50 lb capacity
     c.backpack.add('scrap_metal', 5); // 30 lb

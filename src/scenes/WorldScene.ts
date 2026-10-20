@@ -95,6 +95,7 @@ export class WorldScene extends Phaser.Scene {
     keyboard.on('keydown-F', () => state.combat?.target && this.attack(state.combat.target));
     keyboard.on('keydown-TAB', () => state.combat?.cycleTarget());
     keyboard.on('keydown-I', () => this.openInventory());
+    keyboard.on('keydown-C', () => this.openCharacterSheet());
     keyboard.on('keydown-Q', () => {
       postMessage(this, state.player.swapWeapons().message);
       autosave();
@@ -236,6 +237,10 @@ export class WorldScene extends Phaser.Scene {
     }
 
     postMessage(this, event.message);
+    if (event.newLevel) {
+      postMessage(this, `Level up! You are now level ${event.newLevel}. Press C to spend skill points.`);
+      this.cameras.main.flash(250, 255, 240, 160);
+    }
     if (event.hit) {
       this.floatText(target, `-${event.damage}`, event.critical ? '#ffe040' : '#ff5040');
       target.setTintFill(0xff3030);
@@ -378,6 +383,16 @@ export class WorldScene extends Phaser.Scene {
   private openLoot(lootable: Lootable): void {
     this.scene.pause();
     this.scene.launch('Loot', { lootable });
+  }
+
+  private openCharacterSheet(): void {
+    if (this.busy) return;
+    if (state.combat) {
+      postMessage(this, "There's no time for that now.");
+      return;
+    }
+    this.scene.pause();
+    this.scene.launch('Character');
   }
 
   private openInventory(): void {

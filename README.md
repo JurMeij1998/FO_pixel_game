@@ -23,10 +23,18 @@ npm run build      # typecheck + production build into dist/
 | F / click enemy | Click: attack (starts combat)    | Attack the target             |
 | Tab             |                                  | Next target                   |
 | I               | Inventory                        | Inventory (costs 4 AP)        |
+| C               | Character sheet, spend skill points |                            |
 | Q               | Swap primary/secondary weapon    | Same, free                    |
 | Esc             | Close a screen                   |                               |
 | Space (loot)    | Take all                         |                               |
 | E / Esc (loot)  | Close the loot screen            |                               |
+
+## Levelling
+
+Kills give XP (radroach 25, mole rat 40, raider 100). Level 2 takes 100 XP, level 3 300,
+level 4 600, and so on. Each level adds 3 + Endurance/2 max HP and 5 + 2 x Intelligence skill
+points, spent on the character sheet (C). Tagged skills gain 2% per point, others 1%.
+A `+` after your level in the HUD means you have points to spend.
 
 ## Saving
 
