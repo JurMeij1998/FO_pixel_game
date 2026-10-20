@@ -12,6 +12,18 @@ export const EQUIP_SLOTS: readonly EquipSlot[] = ['primary', 'secondary', 'armor
 
 const UNARMED = { name: 'Fists', damageMin: 1, damageMax: 3, apCost: 3, range: 1 };
 
+/** Everything needed to rebuild a Character, as plain JSON-friendly data. */
+export interface CharacterData {
+  name: string;
+  special: Special;
+  taggedSkills: Skill[];
+  hitPoints: number;
+  pos: GridPos;
+  activeWeaponSlot: WeaponSlot;
+  equipment: Record<EquipSlot, string | null>;
+  backpack: Array<[itemId: string, quantity: number]>;
+}
+
 export class Character implements Fighter {
   readonly backpack = new ItemContainer();
   readonly taggedSkills = new Set<Skill>();
@@ -31,6 +43,35 @@ export class Character implements Fighter {
     readonly special: Special,
   ) {
     this.hitPoints = this.maxHitPoints;
+  }
+
+  toData(): CharacterData {
+    return {
+      name: this.name,
+      special: { ...this.special },
+      taggedSkills: [...this.taggedSkills],
+      hitPoints: this.hitPoints,
+      pos: { ...this.pos },
+      activeWeaponSlot: this.activeWeaponSlot,
+      equipment: { ...this.equipment },
+      backpack: this.backpack.toData(),
+    };
+  }
+
+  /** Rebuilds a character from toData() output. Throws on unknown item ids. */
+  static fromData(data: CharacterData): Character {
+    const c = new Character(data.name, { ...data.special });
+    for (const skill of data.taggedSkills) c.taggedSkills.add(skill);
+    c.hitPoints = data.hitPoints;
+    c.pos = { ...data.pos };
+    c.activeWeaponSlot = data.activeWeaponSlot;
+    for (const slot of EQUIP_SLOTS) {
+      const id = data.equipment[slot];
+      if (id) getItem(id); // throws on unknown ids
+      c.equipment[slot] = id;
+    }
+    c.backpack.setData(data.backpack);
+    return c;
   }
 
   get maxHitPoints(): number {

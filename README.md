@@ -28,6 +28,13 @@ npm run build      # typecheck + production build into dist/
 | Space (loot)    | Take all                         |                               |
 | E / Esc (loot)  | Close the loot screen            |                               |
 
+## Saving
+
+The game autosaves to the browser's localStorage after every step, every closed screen and
+every finished fight, but never during combat. Dying lets you load that save (so you go back
+to just before the fight) or start a new game. `core/save.ts` turns the game into plain
+JSON; `storage.ts` is the only code that touches localStorage.
+
 ## Combat
 
 Fallout-style and turn-based, on the same grid you explore. Combat starts when a creature
@@ -49,11 +56,13 @@ src/
     combat.ts     Turn-based combat rules and enemy AI; emits events for the scene
     loot.ts       Moving items between containers, honouring carry weight
     gridMap.ts    Parses ASCII maps into tiles, chests and creatures
+    save.ts       Game state to and from plain JSON
   data/       Maps and other content
   gfx/        Procedurally generated placeholder pixel art
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting
   scenes/     Phaser scenes: Boot, World, Hud, Inventory, Loot, GameOver
-  state.ts    The running game (player + map)
+  state.ts    The running game (player + map), loaded from the save if there is one
+  storage.ts  localStorage access for the save
   main.ts     Phaser game config
 ```
 

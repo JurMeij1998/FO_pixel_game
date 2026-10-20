@@ -36,7 +36,11 @@ export class HudScene extends Phaser.Scene {
     this.game.events.on(MESSAGE_EVENT, this.addMessage, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(MESSAGE_EVENT, this.addMessage, this));
 
-    this.addMessage('You leave the shelter behind and step into the wasteland.');
+    this.addMessage(
+      state.loadedFromSave
+        ? 'Welcome back to the wasteland. (Your game saves automatically.)'
+        : 'You leave the shelter behind and step into the wasteland.',
+    );
   }
 
   update(): void {

@@ -47,6 +47,21 @@ export class ItemContainer {
     return true;
   }
 
+  clear(): void {
+    this.stacks.length = 0;
+  }
+
+  /** Plain (id, quantity) pairs, the same shape the constructor takes. */
+  toData(): Array<[itemId: string, quantity: number]> {
+    return this.stacks.map((s) => [s.itemId, s.quantity]);
+  }
+
+  /** Replaces the contents with the given pairs. */
+  setData(entries: ReadonlyArray<readonly [itemId: string, quantity: number]>): void {
+    this.clear();
+    for (const [itemId, quantity] of entries) this.add(itemId, quantity);
+  }
+
   totalWeight(): number {
     return this.stacks.reduce((sum, s) => sum + getItem(s.itemId).weight * s.quantity, 0);
   }

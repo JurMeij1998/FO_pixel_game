@@ -6,7 +6,7 @@ import type { Fighter } from '../core/fighter';
 import { addPos, type GridPos } from '../core/grid';
 import type { Lootable } from '../core/loot';
 import { tileTextureKey } from '../gfx/textures';
-import { state } from '../state';
+import { autosave, state } from '../state';
 import { postMessage } from '../ui/messages';
 import { FONT } from '../ui/theme';
 
@@ -95,10 +95,16 @@ export class WorldScene extends Phaser.Scene {
     keyboard.on('keydown-F', () => state.combat?.target && this.attack(state.combat.target));
     keyboard.on('keydown-TAB', () => state.combat?.cycleTarget());
     keyboard.on('keydown-I', () => this.openInventory());
-    keyboard.on('keydown-Q', () => postMessage(this, state.player.swapWeapons().message));
+    keyboard.on('keydown-Q', () => {
+      postMessage(this, state.player.swapWeapons().message);
+      autosave();
+    });
 
-    // Keys released while an overlay was open would otherwise still count as held.
-    this.events.on(Phaser.Scenes.Events.RESUME, () => keyboard.resetKeys());
+    this.events.on(Phaser.Scenes.Events.RESUME, () => {
+      // Keys released while an overlay was open would otherwise still count as held.
+      keyboard.resetKeys();
+      autosave(); // the overlay may have changed the inventory
+    });
   }
 
   update(): void {
@@ -119,6 +125,7 @@ export class WorldScene extends Phaser.Scene {
     void this.run(async () => {
       await this.tweenTo(this.player, target);
       this.checkForCombat();
+      autosave();
     });
   }
 
@@ -186,8 +193,9 @@ export class WorldScene extends Phaser.Scene {
       case 'defeat':
         this.scene.pause();
         this.scene.launch('GameOver');
-        break;
+        return; // don't autosave a dead player
     }
+    autosave();
   }
 
   // --- Animation -------------------------------------------------------------
