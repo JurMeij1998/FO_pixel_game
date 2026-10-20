@@ -5,9 +5,9 @@ import { MESSAGE_EVENT } from '../ui/messages';
 import { COLORS, SMALL_TEXT, TEXT } from '../ui/theme';
 
 const LOG_LINES = 3;
-const CONTROLS = 'Arrows/WASD move   E/Space interact   I inventory   C character   Q swap weapon   Click enemy: attack';
+const CONTROLS = 'Arrows/WASD move   E/Space interact   I inventory   C character   Q swap weapon   R reload   Click enemy: attack';
 const COMBAT_CONTROLS =
-  'Arrows move (1 AP)   F/click attack   Tab next target   Space end turn   I inventory (4 AP)   Q swap';
+  'Arrows move (1 AP)  F/click attack  Tab target  R reload (2 AP)  I inventory (4 AP)  Q swap  Space end turn';
 
 /** Status bar along the top and the message log along the bottom, drawn at 1:1 over the zoomed world. */
 export class HudScene extends Phaser.Scene {
@@ -48,7 +48,8 @@ export class HudScene extends Phaser.Scene {
     const combat = state.combat;
     const ap = combat ? `${combat.actionPoints}/${p.maxActionPoints}` : `${p.maxActionPoints}`;
     const weapon = p.attack;
-    const ammo = weapon.ammo ? ` (${p.backpack.count(weapon.ammo)})` : '';
+    const magazine = p.activeWeapon?.weapon?.magazineSize;
+    const ammo = weapon.ammo ? ` ${p.loadedRounds()}/${magazine} (+${p.backpack.count(weapon.ammo)})` : '';
     const level = `Lv ${p.level}${p.skillPoints > 0 ? '+' : ''}`;
     this.status.setText(
       `${level}   HP ${p.hitPoints}/${p.maxHitPoints}   AC ${p.armorClass}   AP ${ap}   ` +

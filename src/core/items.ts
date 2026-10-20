@@ -10,6 +10,8 @@ export interface WeaponStats {
   skill: Skill;
   /** Item id used up per shot; melee weapons have none. */
   ammo?: string;
+  /** Rounds the weapon holds before it needs reloading. Set for every weapon with ammo. */
+  magazineSize?: number;
   damageMin: number;
   damageMax: number;
   /** Action points one attack costs. */
@@ -69,7 +71,7 @@ const DEFINITIONS: ItemDef[] = [
     weight: 3,
     value: 250,
     description: 'A reliable semi-automatic sidearm. Chambered for 10mm.',
-    weapon: { skill: 'smallGuns', ammo: 'ammo_10mm', damageMin: 5, damageMax: 12, apCost: 5, range: 6 },
+    weapon: { skill: 'smallGuns', ammo: 'ammo_10mm', magazineSize: 12, damageMin: 5, damageMax: 12, apCost: 5, range: 6 },
   },
   {
     id: 'hunting_rifle',
@@ -78,7 +80,7 @@ const DEFINITIONS: ItemDef[] = [
     weight: 9,
     value: 1000,
     description: 'A bolt-action rifle chambered for .223. Slow, heavy and hard-hitting.',
-    weapon: { skill: 'smallGuns', ammo: 'ammo_223', damageMin: 8, damageMax: 20, apCost: 6, range: 10 },
+    weapon: { skill: 'smallGuns', ammo: 'ammo_223', magazineSize: 5, damageMin: 8, damageMax: 20, apCost: 6, range: 10 },
   },
   {
     id: 'leather_jacket',

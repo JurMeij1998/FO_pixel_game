@@ -92,17 +92,35 @@ describe('Combat', () => {
     expect(combat.actionPoints).toBe(player.maxActionPoints - 3);
   });
 
-  it('uses up ammo and refuses to fire without it', () => {
+  it('fires from the magazine and needs a reload once it is empty', () => {
     const { roach, player, combat } = setup(ARENA, NEVER);
     player.backpack.add('10mm_pistol');
     player.backpack.add('ammo_10mm', 1);
     player.equip('10mm_pistol', 'primary');
-    expect(combat.attack(roach).ok).toBe(true);
+
+    const empty = combat.attack(roach);
+    expect(empty.ok).toBe(false);
+    if (!empty.ok) expect(empty.message).toMatch(/reload/);
+
+    expect(combat.reload().ok).toBe(true);
+    expect(combat.actionPoints).toBe(player.maxActionPoints - 2);
+    expect(player.loadedRounds()).toBe(1);
     expect(player.backpack.count('ammo_10mm')).toBe(0);
+
+    expect(combat.attack(roach).ok).toBe(true);
+    expect(player.loadedRounds()).toBe(0);
     combat.actionPoints = 10;
-    const result = combat.attack(roach);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/ammo/);
+    expect(combat.attack(roach).ok).toBe(false);
+  });
+
+  it('refuses to reload without the AP', () => {
+    const { player, combat } = setup(ARENA);
+    player.backpack.add('10mm_pistol');
+    player.backpack.add('ammo_10mm', 12);
+    player.equip('10mm_pistol', 'primary');
+    combat.actionPoints = 1;
+    expect(combat.reload().ok).toBe(false);
+    expect(player.loadedRounds()).toBe(0);
   });
 
   it('ends in defeat when the player dies', () => {

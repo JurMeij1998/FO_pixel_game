@@ -34,6 +34,8 @@ describe('save and load', () => {
     player.equip('knife', 'primary');
     player.equip('10mm_pistol', 'secondary');
     player.swapWeapons();
+    player.backpack.add('ammo_10mm', 7);
+    player.reload(); // 7 rounds in the pistol's magazine
     player.taggedSkills.add('unarmed');
     player.gainExperience(350);
     player.improveSkill('unarmed');
@@ -44,6 +46,7 @@ describe('save and load', () => {
     expect(loaded.toData()).toEqual(player.toData());
     expect(loaded.activeWeapon?.id).toBe('10mm_pistol');
     expect(loaded.skill('unarmed')).toBe(player.skill('unarmed'));
+    expect(loaded.loadedRounds('secondary')).toBe(7);
     expect(loaded.level).toBe(3);
     expect(loaded.maxHitPoints).toBe(player.maxHitPoints);
   });

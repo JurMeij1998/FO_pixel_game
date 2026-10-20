@@ -96,6 +96,7 @@ export class WorldScene extends Phaser.Scene {
     keyboard.on('keydown-TAB', () => state.combat?.cycleTarget());
     keyboard.on('keydown-I', () => this.openInventory());
     keyboard.on('keydown-C', () => this.openCharacterSheet());
+    keyboard.on('keydown-R', () => this.reload());
     keyboard.on('keydown-Q', () => {
       postMessage(this, state.player.swapWeapons().message);
       autosave();
@@ -383,6 +384,14 @@ export class WorldScene extends Phaser.Scene {
   private openLoot(lootable: Lootable): void {
     this.scene.pause();
     this.scene.launch('Loot', { lootable });
+  }
+
+  /** Free outside combat, 2 AP during it. */
+  private reload(): void {
+    if (this.busy) return;
+    const result = state.combat ? state.combat.reload() : state.player.reload();
+    postMessage(this, result.message);
+    autosave();
   }
 
   private openCharacterSheet(): void {

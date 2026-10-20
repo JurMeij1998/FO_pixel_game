@@ -134,6 +134,56 @@ describe('Character', () => {
     expect(c.improveSkill('unarmed').ok).toBe(false);
   });
 
+  describe('magazines', () => {
+    function gunner(rounds: number): Character {
+      const c = makeCharacter();
+      c.backpack.add('10mm_pistol'); // magazine of 12
+      if (rounds > 0) c.backpack.add('ammo_10mm', rounds);
+      c.equip('10mm_pistol', 'primary');
+      return c;
+    }
+
+    it('starts empty and reloads from the backpack', () => {
+      const c = gunner(20);
+      expect(c.loadedRounds()).toBe(0);
+      expect(c.reload().ok).toBe(true);
+      expect(c.loadedRounds()).toBe(12);
+      expect(c.backpack.count('ammo_10mm')).toBe(8);
+      expect(c.reload().ok).toBe(false); // already full
+    });
+
+    it('loads what it can when ammo runs short', () => {
+      const c = gunner(5);
+      c.reload();
+      expect(c.loadedRounds()).toBe(5);
+      expect(c.backpack.count('ammo_10mm')).toBe(0);
+      expect(c.spendRound()).toBe(true);
+      expect(c.loadedRounds()).toBe(4);
+      expect(c.reload().ok).toBe(false); // nothing left to load
+    });
+
+    it('returns loaded rounds to the backpack when the gun is unequipped or replaced', () => {
+      const c = gunner(12);
+      c.reload();
+      c.unequip('primary');
+      expect(c.backpack.count('ammo_10mm')).toBe(12);
+
+      c.equip('10mm_pistol', 'primary');
+      c.reload();
+      c.backpack.add('knife');
+      c.equip('knife', 'primary');
+      expect(c.backpack.count('ammo_10mm')).toBe(12);
+      expect(c.loadedRounds()).toBe(0);
+    });
+
+    it('has nothing to reload for melee weapons', () => {
+      const c = makeCharacter();
+      c.backpack.add('knife');
+      c.equip('knife', 'primary');
+      expect(c.reload().ok).toBe(false);
+    });
+  });
+
   it('computes how many more items fit', () => {
     const c = makeCharacter({ strength: 1 }); // 50 lb capacity
     c.backpack.add('scrap_metal', 5); // 30 lb

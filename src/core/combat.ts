@@ -3,10 +3,12 @@ import type { Creature } from './creature';
 import type { Fighter } from './fighter';
 import { addPos, DIRECTIONS, distance, samePos, type GridPos } from './grid';
 import type { GridMap } from './gridMap';
+import { failure, type ActionResult } from './result';
 
 export const MOVE_AP_COST = 1;
 /** Opening the backpack mid-fight costs AP, as in Fallout 1. */
 export const INVENTORY_AP_COST = 4;
+export const RELOAD_AP_COST = 2;
 /** Ranged attacks lose this much hit chance per tile beyond point-blank. */
 const RANGE_PENALTY_PER_TILE = 3;
 /** Creatures give up the chase once the player is this far beyond their sight range. */
@@ -93,10 +95,11 @@ export class Combat {
     if (!this.isPlayerTurn) return "It isn't your turn.";
     if (target.isDead) return `The ${target.name} is already dead.`;
     const attack = this.player.attack;
-    if (this.actionPoints < attack.apCost) return `Attacking with the ${attack.name} takes ${attack.apCost} AP.`;
+    // Kept short: the HUD shows these next to the target.
+    if (this.actionPoints < attack.apCost) return `Not enough AP (attack costs ${attack.apCost}).`;
     if (distance(this.player.pos, target.pos) > attack.range) return `The ${target.name} is out of range.`;
     if (!this.canSee(this.player, target)) return `You can't see the ${target.name} from here.`;
-    if (attack.ammo && this.player.backpack.count(attack.ammo) === 0) return "You're out of ammo.";
+    if (attack.ammo && this.player.loadedRounds() === 0) return 'Empty! Press R to reload.';
     return null;
   }
 
@@ -115,7 +118,7 @@ export class Combat {
     const problem = this.attackProblem(target);
     if (problem) return refused(problem);
     const attack = this.player.attack;
-    if (attack.ammo) this.player.backpack.remove(attack.ammo);
+    if (attack.ammo) this.player.spendRound();
 
     this.actionPoints -= attack.apCost;
     if (!this.participants.includes(target)) this.participants.push(target);
@@ -123,6 +126,14 @@ export class Combat {
     const event = this.resolveAttack(this.player, target);
     if (target.isDead) this.target = this.nearestEnemy();
     return done([event]);
+  }
+
+  reload(): ActionResult {
+    if (!this.isPlayerTurn) return failure("It isn't your turn.");
+    if (this.actionPoints < RELOAD_AP_COST) return failure(`Reloading takes ${RELOAD_AP_COST} AP.`);
+    const result = this.player.reload();
+    if (result.ok) this.actionPoints -= RELOAD_AP_COST;
+    return result;
   }
 
   /** Pays for something that isn't a move or an attack, such as opening the inventory. */

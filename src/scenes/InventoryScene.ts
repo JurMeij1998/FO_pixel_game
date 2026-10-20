@@ -93,9 +93,11 @@ export class InventoryScene extends Phaser.Scene {
     for (const [slot, text] of this.slotTexts) {
       const item = player.equippedItem(slot);
       const active = slot === player.activeWeaponSlot ? ' (in hand)' : '';
+      const magazine = item?.weapon?.magazineSize;
+      const rounds = magazine && slot !== 'armor' ? ` [${player.loadedRounds(slot)}/${magazine}]` : '';
       const selected = this.selection?.kind === 'slot' && this.selection.slot === slot;
       text
-        .setText(`${selected ? '>' : ' '} ${SLOT_LABELS[slot].padEnd(10)} ${item?.name ?? '-'}${active}`)
+        .setText(`${selected ? '>' : ' '} ${SLOT_LABELS[slot].padEnd(10)} ${item?.name ?? '-'}${rounds}${active}`)
         .setColor(selected ? COLORS.bright : COLORS.text);
     }
 

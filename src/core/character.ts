@@ -22,7 +22,8 @@ export interface CharacterData {
   activeWeaponSlot: WeaponSlot;
   equipment: Record<EquipSlot, string | null>;
   backpack: Array<[itemId: string, quantity: number]>;
-  // Optional so saves from before levelling still load.
+  // Optional so older saves still load.
+  loadedRounds?: Record<WeaponSlot, number>;
   level?: number;
   experience?: number;
   skillPoints?: number;
@@ -53,6 +54,12 @@ export class Character implements Fighter {
     armor: null,
   };
 
+  /**
+   * Rounds in each equipped gun's magazine. Kept per slot rather than per item because
+   * identical items share a stack; rounds go back to the backpack when the gun is unequipped.
+   */
+  private readonly loaded: Record<WeaponSlot, number> = { primary: 0, secondary: 0 };
+
   constructor(
     readonly name: string,
     readonly special: Special,
@@ -70,6 +77,7 @@ export class Character implements Fighter {
       activeWeaponSlot: this.activeWeaponSlot,
       equipment: { ...this.equipment },
       backpack: this.backpack.toData(),
+      loadedRounds: { ...this.loaded },
       level: this.level,
       experience: this.experience,
       skillPoints: this.skillPoints,
@@ -91,6 +99,7 @@ export class Character implements Fighter {
       c.equipment[slot] = id;
     }
     c.backpack.setData(data.backpack);
+    Object.assign(c.loaded, data.loadedRounds);
     c.level = data.level ?? 1;
     c.experience = data.experience ?? 0;
     c.skillPoints = data.skillPoints ?? 0;
@@ -198,17 +207,59 @@ export class Character implements Fighter {
 
     const previous = this.equipment[slot];
     this.backpack.remove(itemId);
-    if (previous) this.backpack.add(previous);
+    if (previous) {
+      this.unload(slot);
+      this.backpack.add(previous);
+    }
     this.equipment[slot] = itemId;
+    if (item.weapon?.ammo) return success(`Equipped the ${item.name}. It's empty: press R to reload.`);
     return success(`Equipped the ${item.name}.`);
   }
 
   unequip(slot: EquipSlot): ActionResult {
     const id = this.equipment[slot];
     if (!id) return failure('Nothing is equipped there.');
+    this.unload(slot);
     this.equipment[slot] = null;
     this.backpack.add(id);
     return success(`Unequipped the ${getItem(id).name}.`);
+  }
+
+  /** Rounds in the magazine of the gun in that slot (0 for melee weapons and empty hands). */
+  loadedRounds(slot: WeaponSlot = this.activeWeaponSlot): number {
+    return this.loaded[slot];
+  }
+
+  /** Fills the magazine of the gun in hand from the backpack, as far as the ammo goes. */
+  reload(): ActionResult {
+    const slot = this.activeWeaponSlot;
+    const item = this.equippedItem(slot);
+    const weapon = item?.weapon;
+    if (!item || !weapon?.ammo || !weapon.magazineSize) return failure("That doesn't need reloading.");
+    const missing = weapon.magazineSize - this.loaded[slot];
+    if (missing === 0) return failure(`The ${item.name} is already fully loaded.`);
+    const amount = Math.min(missing, this.backpack.count(weapon.ammo));
+    if (amount === 0) return failure(`You have no ${getItem(weapon.ammo).name} left.`);
+
+    this.backpack.remove(weapon.ammo, amount);
+    this.loaded[slot] += amount;
+    return success(`You reload the ${item.name} (${this.loaded[slot]}/${weapon.magazineSize}).`);
+  }
+
+  /** Uses one round from the gun in hand. Returns false if the magazine is empty. */
+  spendRound(): boolean {
+    const slot = this.activeWeaponSlot;
+    if (this.loaded[slot] === 0) return false;
+    this.loaded[slot]--;
+    return true;
+  }
+
+  /** Puts the rounds of a weapon slot's magazine back into the backpack. */
+  private unload(slot: EquipSlot): void {
+    if (slot === 'armor' || this.loaded[slot] === 0) return;
+    const ammo = this.equippedItem(slot)?.weapon?.ammo;
+    if (ammo) this.backpack.add(ammo, this.loaded[slot]);
+    this.loaded[slot] = 0;
   }
 
   swapWeapons(): ActionResult {
