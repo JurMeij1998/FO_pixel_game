@@ -1,25 +1,16 @@
 import { Character } from '../../core/character';
 import { Combat } from '../../core/combat';
 import { addPos, DIRECTIONS, type GridPos } from '../../core/grid';
-import { isBlockingTile, type GridMap } from '../../core/gridMap';
+import type { GridMap } from '../../core/gridMap';
 
 /**
  * Checks every biome's maps should pass, for use in their tests: returns what's wrong with a
- * generated map, or an empty list if a player can arrive safely and reach everything on it.
+ * generated map, or an empty list if a player can arrive safely through every exit and reach
+ * everything on it.
  */
-export function playabilityProblems(map: GridMap, arrivingFrom: string): string[] {
+export function playabilityProblems(map: GridMap): string[] {
   const problems: string[] = [];
-  const arrival = map.arrivalFrom(arrivingFrom);
-  if (!map.exits.some((e) => e.to === arrivingFrom)) problems.push(`no exit back to ${arrivingFrom}`);
-
-  const canReach = reachableFrom(map, arrival);
-  const reached = (p: GridPos) => canReach.has(`${p.x},${p.y}`);
-  for (const exit of map.exits) if (!reached(exit)) problems.push(`exit to ${exit.to} unreachable`);
-  for (const creature of map.creatures) if (!reached(creature.pos)) problems.push(`${creature.id} unreachable`);
-  for (const chest of map.chests) {
-    if (!DIRECTIONS.some((d) => reached(addPos(chest, d)))) problems.push(`chest ${chest.name} unreachable`);
-  }
-
+  if (map.exits.length === 0) problems.push('no exits');
   const visitor = new Character('Visitor', {
     strength: 5,
     perception: 5,
@@ -29,25 +20,19 @@ export function playabilityProblems(map: GridMap, arrivingFrom: string): string[
     agility: 5,
     luck: 5,
   });
-  visitor.pos = arrival;
-  for (const spotter of Combat.spotters(map, visitor)) problems.push(`${spotter.id} can see the arrival`);
-  return problems;
-}
 
-/** Tiles reachable on foot; creatures don't count as obstacles (they move, or die). */
-function reachableFrom(map: GridMap, start: GridPos): Set<string> {
-  const key = (p: GridPos) => `${p.x},${p.y}`;
-  const seen = new Set([key(start)]);
-  const queue = [start];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    for (const direction of DIRECTIONS) {
-      const next = addPos(current, direction);
-      const tile = map.tileAt(next.x, next.y);
-      if (!tile || isBlockingTile(tile) || map.chestAt(next.x, next.y) || seen.has(key(next))) continue;
-      seen.add(key(next));
-      queue.push(next);
+  for (const way of map.exits) {
+    // Arriving from that exit's map puts the player just inside it.
+    const arrival = map.arrivalFrom(way.to);
+    const canReach = map.reachableFrom(arrival);
+    const reached = (p: GridPos) => canReach.has(`${p.x},${p.y}`);
+    for (const exit of map.exits) if (!reached(exit)) problems.push(`from ${way.to}: exit to ${exit.to} unreachable`);
+    for (const creature of map.creatures) if (!reached(creature.pos)) problems.push(`from ${way.to}: ${creature.id} unreachable`);
+    for (const chest of map.chests) {
+      if (!DIRECTIONS.some((d) => reached(addPos(chest, d)))) problems.push(`from ${way.to}: chest ${chest.name} unreachable`);
     }
+    visitor.pos = arrival;
+    for (const spotter of Combat.spotters(map, visitor)) problems.push(`${spotter.id} can see the arrival from ${way.to}`);
   }
-  return seen;
+  return problems;
 }

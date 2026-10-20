@@ -1,12 +1,20 @@
 import type { Biome } from '../../core/generation/biome';
 import { flipVertical, type MapBuilder, type Prefab } from '../../core/generation/mapBuilder';
 import type { LootTable, SpawnTable } from '../../core/generation/tables';
-import { blob, border, farFrom, findOpenTile, findSpot, scatter, windingPath } from '../../core/generation/terrain';
+import {
+  blob,
+  border,
+  creatureSlots,
+  farFrom,
+  findOpenTile,
+  placeStructure,
+  prefabCenter,
+  SAFE_SPAWN_DISTANCE,
+  scatter,
+  windingPath,
+} from '../../core/generation/terrain';
 import type { GridPos } from '../../core/grid';
 import type { Random } from '../../core/random';
-
-/** Creatures are kept at least this far from the arrival: more than any creature's sight range. */
-const SAFE_DISTANCE = 14;
 
 // Tiles (see LEGEND in core/gridMap.ts).
 /** Overgrown ground: the village has been abandoned long enough for the green to take over. */
@@ -178,6 +186,7 @@ const STREET_BUILDINGS: Array<{ prefab: Prefab; weight: number; unique?: boolean
 
 export const VILLAGE: Biome = {
   id: 'village',
+  version: 2,
   names: ['Dusty Hollow', 'New Plenty', 'Rustwater', 'Cinder Creek', 'Harmony Flats', 'Last Stop'],
   width: 48,
   height: 34,
@@ -193,60 +202,55 @@ export const VILLAGE: Biome = {
       blob(b, center, rng.int(2, 3), DIRT, rng, (x, y) => b.get(x, y) === GROUND);
     }
 
-    const entries = exits.map((exit) => b.addExit(exit.side, exit.to, rng, PATH));
-    const arrival = entries[0];
+    const entries = exits.map((exit) => b.addExit(exit.side, exit.to, PATH));
 
-    // The main street: two tiles wide, right across the village, with a road in from the arrival.
+    // The main street: two tiles wide, right across the village, with a road in from every exit.
     const streetY = rng.int(Math.floor(b.height * 0.4), Math.floor(b.height * 0.55));
     const west = 4;
     const east = b.width - 5;
     road(b, { x: west, y: streetY }, { x: east, y: streetY + 1 });
-    road(b, arrival, { x: arrival.x, y: arrival.y < streetY ? streetY : streetY + 1 });
+    for (const entry of entries) roadToStreet(b, entry, streetY, west, east);
 
     const occupied: GridPos[] = [...entries];
-    const built = lineStreet(b, rng, streetY, west, east, arrival, occupied);
+    const built = lineStreet(b, rng, streetY, west, east, entries, occupied);
 
     // A well near the street, a field or two further out, each with a trail from the street.
-    // Fields have mole rats, so they stay out of sight of the arrival.
-    const nearStreet = (pos: GridPos) => Math.abs(pos.y - streetY) < 12;
-    const awayFromArrival = (pos: GridPos) => farFrom(pos, [arrival], SAFE_DISTANCE);
     // Doors face the street: as drawn (door at the bottom) north of it, flipped south of it.
     const place = (prefab: Prefab, isGood: (center: GridPos) => boolean) => {
-      const width = prefab.rows[0].length;
       const height = prefab.rows.length;
-      const center = (x: number, y: number) => ({ x: x + Math.floor(width / 2), y: y + Math.floor(height / 2) });
       const sides = [
         { prefab, onItsSide: (y: number) => y + height <= streetY },
         { prefab: flipVertical(prefab), onItsSide: (y: number) => y >= streetY + 2 },
       ];
       if (rng.chance(0.5)) sides.reverse();
       for (const side of sides) {
-        const spot = findSpot(
-          b,
-          side.prefab,
-          rng,
-          (x, y) => side.onItsSide(y) && farFrom(center(x, y), occupied, 7) && isGood(center(x, y)),
-        );
-        if (!spot) continue;
-        b.paint(GROUND, (x, y) => x >= spot.x - 1 && x <= spot.x + width && y >= spot.y - 1 && y <= spot.y + height);
-        const entrance = b.stamp(side.prefab, spot.x, spot.y, rng);
+        const placed = placeStructure(b, side.prefab, rng, {
+          occupied,
+          spacing: 7,
+          arrivals: entries,
+          clearTo: GROUND,
+          isGood: (x, y) => side.onItsSide(y) && isGood(prefabCenter(side.prefab, x, y)),
+        });
+        if (!placed) continue;
+        const { entrance } = placed;
         windingPath(b, entrance, { x: entrance.x, y: entrance.y < streetY ? streetY - 1 : streetY + 2 }, PATH, rng);
-        occupied.push(center(spot.x, spot.y));
         return;
       }
     };
-    if (rng.chance(0.7)) place(WELL, nearStreet);
-    for (let i = rng.int(1, 2); i > 0; i--) place(FARM_FIELD, awayFromArrival);
+    if (rng.chance(0.7)) place(WELL, (center) => Math.abs(center.y - streetY) < 12);
+    for (let i = rng.int(1, 2); i > 0; i--) place(FARM_FIELD, () => true);
     // No room for the barn on the street? Then it stands out by the fields.
-    if (!built.has(BARN)) place(BARN, awayFromArrival);
+    if (!built.has(BARN)) place(BARN, () => true);
 
     // Overgrowth on the open ground.
     scatter(b, BUSH, 0.03, rng, (x, y) => b.get(x, y) === GROUND);
     scatter(b, TREE, 0.015, rng, (x, y) => b.get(x, y) === GROUND);
 
-    // The street's new inhabitants, out of sight of the arrival.
+    // The village's new inhabitants, in the streets and around, out of sight of every exit.
+    // Roads are locked (nothing is built on them), so they're allowed explicitly.
+    const onRoad = (pos: GridPos) => b.get(pos.x, pos.y) === PATH;
     for (let i = rng.int(3, 6); i > 0; i--) {
-      const spot = findOpenTile(b, rng, awayFromArrival);
+      const spot = findOpenTile(b, rng, (pos) => farFrom(pos, entries, SAFE_SPAWN_DISTANCE), 200, onRoad);
       if (spot) b.addCreature(spot, rng.pickWeighted(STREET_LIFE).creatureId);
     }
   },
@@ -265,10 +269,19 @@ function road(b: MapBuilder, from: GridPos, to: GridPos): void {
 }
 
 /**
+ * A road from an exit's inside tile to the street, whichever edge the exit is on: across to
+ * the street's extent first (only needed for west and east exits), then up or down to it.
+ */
+function roadToStreet(b: MapBuilder, entry: GridPos, streetY: number, west: number, east: number): void {
+  const x = Math.max(west, Math.min(east, entry.x));
+  road(b, entry, { x, y: entry.y });
+  road(b, { x, y: entry.y }, { x, y: entry.y < streetY ? streetY : streetY + 1 });
+}
+
+/**
  * Fills both sides of the street with buildings, doors facing it: north of the street the
- * prefabs as drawn, south of it flipped. Spots the arrival road runs through are skipped, and
- * buildings with creatures inside aren't put where those creatures could see the arrival.
- * Returns the prefabs it used.
+ * prefabs as drawn, south of it flipped. Spots a road runs through are skipped, and a building
+ * with creatures inside only goes where none of them could see an exit. Returns the prefabs used.
  */
 function lineStreet(
   b: MapBuilder,
@@ -276,31 +289,35 @@ function lineStreet(
   streetY: number,
   west: number,
   east: number,
-  arrival: GridPos,
+  entries: readonly GridPos[],
   occupied: GridPos[],
 ): Set<Prefab> {
   const used = new Set<Prefab>();
   for (const side of ['north', 'south'] as const) {
     let x = west + rng.int(0, 2);
     while (x < east) {
-      const nearArrival = !farFrom({ x, y: streetY }, [arrival], SAFE_DISTANCE);
+      const oriented = (prefab: Prefab) => (side === 'north' ? prefab : flipVertical(prefab));
+      const topFor = (prefab: Prefab) => (side === 'north' ? streetY - prefab.rows.length : streetY + 2);
+      const safeHere = (prefab: Prefab) =>
+        creatureSlots(oriented(prefab), x, topFor(prefab)).every((slot) => farFrom(slot, entries, SAFE_SPAWN_DISTANCE));
+      // Only buildings that still fit before the street's end: a wide barn doesn't end the row
+      // when a house would have fitted.
+      const fits = (prefab: Prefab) => x + prefab.rows[0].length - 1 <= east;
       const options = STREET_BUILDINGS.filter(
-        (o) => !(o.unique && used.has(o.prefab)) && !(nearArrival && o.prefab.creatures),
+        (o) => !(o.unique && used.has(o.prefab)) && fits(o.prefab) && safeHere(o.prefab),
       );
+      if (options.length === 0) break;
       const choice = rng.pickWeighted(options);
-      const prefab = side === 'north' ? choice.prefab : flipVertical(choice.prefab);
-      const width = prefab.rows[0].length;
-      const height = prefab.rows.length;
-      const top = side === 'north' ? streetY - height : streetY + 2;
-      if (x + width - 1 > east) break;
+      const prefab = oriented(choice.prefab);
+      const top = topFor(choice.prefab);
       if (!b.canStamp(prefab, x, top, 1)) {
         x++;
         continue;
       }
       b.stamp(prefab, x, top, rng);
       used.add(choice.prefab);
-      occupied.push({ x: x + Math.floor(width / 2), y: top + Math.floor(height / 2) });
-      x += width + rng.int(1, 3);
+      occupied.push(prefabCenter(prefab, x, top));
+      x += prefab.rows[0].length + rng.int(1, 3);
     }
   }
   return used;

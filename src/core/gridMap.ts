@@ -104,6 +104,13 @@ export interface Exit {
 }
 
 export class GridMap {
+  /**
+   * For a generated map, which generator made it (biome, version, exits; see
+   * `generatorFingerprint`). Saves compare it to tell whether their saved state still fits.
+   * Null for hand-made maps.
+   */
+  generator: string | null = null;
+
   private constructor(
     /** Identifies the map in the world and in saves; see data/world.ts. */
     readonly id: string,
@@ -176,6 +183,10 @@ export class GridMap {
     for (const id of Object.keys(def.chests)) {
       if (!chests.some((c) => c.id === id)) throw new Error(`Map '${def.name}': chest '${id}' is not placed`);
     }
+    const placedExits = new Set(def.rows.join(''));
+    for (const digit of Object.keys(def.exits ?? {})) {
+      if (!placedExits.has(digit)) throw new Error(`Map '${def.name}': exit '${digit}' is not placed`);
+    }
     return new GridMap(id, def.name, tiles, chests, creatures, exits, playerStart);
   }
 
@@ -206,6 +217,27 @@ export class GridMap {
     );
     if (options.length === 0) return { ...this.playerStart };
     return options.reduce((best, p) => (fromEdge(p) > fromEdge(best) ? p : best));
+  }
+
+  /**
+   * Every tile reachable on foot from `start`, as "x,y" keys. Creatures don't count as
+   * obstacles here (they move, or die); chests and blocking tiles do.
+   */
+  reachableFrom(start: GridPos): Set<string> {
+    const key = (p: GridPos) => `${p.x},${p.y}`;
+    const seen = new Set([key(start)]);
+    const queue = [start];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      for (const direction of DIRECTIONS) {
+        const next = addPos(current, direction);
+        const tile = this.tileAt(next.x, next.y);
+        if (!tile || BLOCKING.has(tile) || this.chestAt(next.x, next.y) || seen.has(key(next))) continue;
+        seen.add(key(next));
+        queue.push(next);
+      }
+    }
+    return seen;
   }
 
   livingCreatureAt(x: number, y: number): Creature | undefined {

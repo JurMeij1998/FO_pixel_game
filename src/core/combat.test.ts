@@ -37,6 +37,31 @@ describe('Combat', () => {
     expect(combat.actionPoints).toBe(player.maxActionPoints);
   });
 
+  it("refuses a step onto an exit mid-fight, since you can't leave", () => {
+    const map = GridMap.parse({
+      name: 'door',
+      rows: ['#######', '1P..R.#', '#######'],
+      chests: {},
+      creatures: { R: 'radroach' },
+      exits: { '1': { to: 'elsewhere' } },
+    });
+    const player = new Character('Tester', {
+      strength: 5,
+      perception: 5,
+      endurance: 5,
+      charisma: 5,
+      intelligence: 5,
+      agility: 5,
+      luck: 5,
+    });
+    player.pos = { ...map.playerStart };
+    const combat = new Combat(map, player);
+    const result = combat.movePlayer({ x: -1, y: 0 });
+    expect(result).toMatchObject({ ok: false });
+    expect(player.pos).toEqual({ x: 1, y: 1 });
+    expect(combat.actionPoints).toBe(player.maxActionPoints);
+  });
+
   it('charges 1 AP per step and refuses blocked steps', () => {
     const { player, combat } = setup(ARENA);
     expect(combat.movePlayer({ x: 1, y: 0 }).ok).toBe(true);

@@ -45,17 +45,14 @@ describe('gauge placement', () => {
     for (const obstacle of obstacles) expect(overlap(gaugeAt(choice), obstacle)).toBe(0);
   });
 
-  it('stays where it is unless that spot gets worse', () => {
+  it('returns to straight above once the obstacle that pushed it aside has gone', () => {
     const shifted = 1;
-    // Nothing is in the way anywhere, so the current spot wins over the preferred one.
-    expect(choosePlacement(PLAYER, SIZE, OFFSETS, [], VIEW, shifted)).toBe(shifted);
-    // Something appears on the part of that spot that sticks out past the preferred one:
-    // now it moves, back to the preferred spot.
-    const spot = gaugeAt(shifted);
+    expect(choosePlacement(PLAYER, SIZE, OFFSETS, [], VIEW, shifted)).toBe(ABOVE);
+  });
+
+  it('moves off the preferred spot only when something is in the way there', () => {
     const preferred = gaugeAt(ABOVE);
-    const blocker = { x: preferred.x + preferred.width + 1, y: spot.y, width: 8, height: spot.height };
-    expect(overlap(blocker, preferred)).toBe(0);
-    expect(choosePlacement(PLAYER, SIZE, OFFSETS, [blocker], VIEW, shifted)).toBe(ABOVE);
+    expect(choosePlacement(PLAYER, SIZE, OFFSETS, [preferred], VIEW, ABOVE)).not.toBe(ABOVE);
   });
 
   it('stays above the player even at the top of the screen', () => {

@@ -10,6 +10,8 @@ type Entries = Array<[itemId: string, quantity: number]>;
 
 /** What can change on a map: the rest is rebuilt from its definition (or its seed, if generated). */
 interface MapState {
+  /** The generator a generated map was made with (missing in older saves; null for hand-made maps). */
+  generator?: string | null;
   chests: Record<string, { opened: boolean; contents: Entries }>;
   creatures: Record<string, { hitPoints: number; pos: GridPos; contents: Entries }>;
 }
@@ -41,7 +43,8 @@ export interface GameData {
 }
 
 /** Builds a map in its starting state; supplied by the caller so this file doesn't depend on the world data. */
-export type MapBuilderFn = (id: string, worldSeed: number) => GridMap;
+/** Builds a map in its starting state, or returns null if the world has no map by that id (any more). */
+export type MapBuilderFn = (id: string, worldSeed: number) => GridMap | null;
 
 export function saveGame(game: GameData): SaveData {
   const maps: SaveData['maps'] = {};
@@ -60,23 +63,38 @@ export function saveGame(game: GameData): SaveData {
  * data is invalid, or it refers to a map that doesn't exist. Chests and creatures that the
  * save doesn't mention (because they were added to a map later) keep their starting state.
  */
-export function loadGame(data: unknown, buildMap: MapBuilderFn): GameData {
+export function loadGame(data: unknown, buildMap: MapBuilderFn, startMap: string): GameData {
   const save = upgrade(data);
   if (!Number.isInteger(save.worldSeed)) throw new Error('Invalid world seed in save');
   if (typeof save.currentMap !== 'string' || !save.maps?.[save.currentMap]) throw new Error('Invalid current map in save');
 
   const maps: Record<string, GridMap> = {};
   for (const [id, state] of Object.entries(save.maps)) {
+    // A map the world no longer has (removed in a later version) is simply left out.
     const map = buildMap(id, save.worldSeed);
-    applyMapState(map, state);
+    if (!map) continue;
+    // A generated map whose generator has changed since the save comes out as a different
+    // layout; its saved chests and creatures would land in the wrong places, so it starts afresh.
+    if ((state.generator ?? null) === map.generator) applyMapState(map, state);
     maps[id] = map;
   }
+
   const player = Character.fromData(save.player);
-  // If the map has changed since the save (a new version of the game), the saved spot may now
-  // be a wall or a tree; put the player somewhere they can stand.
-  const current = maps[save.currentMap];
-  if (!current.isWalkable(player.pos.x, player.pos.y)) player.pos = { ...current.playerStart };
-  return { player, worldSeed: save.worldSeed, maps, currentMap: save.currentMap };
+  let currentMap = save.currentMap;
+  if (!maps[currentMap]) {
+    const start = buildMap(startMap, save.worldSeed);
+    if (!start) throw new Error(`Unknown start map '${startMap}'`);
+    maps[startMap] ??= start;
+    currentMap = startMap;
+    player.pos = { ...maps[startMap].playerStart };
+  }
+  // If the map has changed since the save, the saved spot may now be a wall, or walled off from
+  // the rest of the map; put the player back at its start, which is always connected.
+  const current = maps[currentMap];
+  const standable = current.isWalkable(player.pos.x, player.pos.y) || current.exitAt(player.pos.x, player.pos.y);
+  const connected = current.reachableFrom(current.playerStart).has(`${player.pos.x},${player.pos.y}`);
+  if (!standable || !connected) player.pos = { ...current.playerStart };
+  return { player, worldSeed: save.worldSeed, maps, currentMap };
 }
 
 function upgrade(data: unknown): SaveData {
@@ -91,7 +109,7 @@ function upgrade(data: unknown): SaveData {
 }
 
 function mapState(map: GridMap): MapState {
-  const state: MapState = { chests: {}, creatures: {} };
+  const state: MapState = { generator: map.generator, chests: {}, creatures: {} };
   for (const chest of map.chests) state.chests[chest.id] = { opened: chest.opened, contents: chest.contents.toData() };
   for (const c of map.creatures) {
     state.creatures[c.id] = { hitPoints: c.hitPoints, pos: { ...c.pos }, contents: c.contents.toData() };

@@ -24,7 +24,8 @@ below the start, creatures nearby and an exit, so combat UI such as the AP gauge
 around things. You play a sturdy test character with 10 AP, a loaded hunting rifle in hand,
 a loaded pistol in the other hand (Q), and plenty of stimpaks and ammo.
 Nothing in the arena is saved, so your real save is never touched; quitting to the menu
-goes back to it. Production builds leave the arena out entirely.
+goes back to it. Production builds have no way into the arena: the menu entry and the
+`?arena` link only exist in development.
 
 ## Controls
 
@@ -91,7 +92,7 @@ wild dogs and radroaches roaming the streets.
 
 ## Levelling
 
-Kills give XP (radroach 25, mole rat 40, raider 100). Level 2 takes 100 XP, level 3 300,
+Kills give XP (radroach 25, wild dog 35, mole rat 40, feral ghoul 50, raider 100). Level 2 takes 100 XP, level 3 300,
 level 4 600, and so on. Each level adds 3 + Endurance/2 max HP and 5 + 2 x Intelligence skill
 points, spent on the character sheet (C). Tagged skills gain 2% per point, others 1%.
 A `+` after your level in the HUD means you have points to spend.
@@ -136,9 +137,9 @@ During a fight an AP gauge floats above you (`ui/apGauge.ts`): the AP left in a 
 font (`gfx/pixelFont.ts`) inside a round seal, with a bar of pips sweeping out of it. Its
 light green border pulses and a glint sweeps across it every few seconds. Spending AP counts
 the number down, flashes the spent pips and pops a superscript "-3"; a new turn refills it
-with a "+N". It bobs gently, dims during the enemy turn, and picks whichever spot around you
-covers no chest, creature, lootable corpse or exit (`ui/gaugePlacement.ts`), always
-somewhere above you.
+with a "+N". It bobs gently, dims during the enemy turn, and always floats above you, picking the spot
+there that covers as little as possible of any chest, creature, lootable corpse or exit
+(`ui/gaugePlacement.ts`).
 
 ## Layout
 

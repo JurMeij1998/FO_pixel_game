@@ -1,4 +1,4 @@
-import { generateMap, type ExitRequest } from '../core/generation/biome';
+import { generateMap, generatorFingerprint, type ExitRequest } from '../core/generation/biome';
 import { GridMap, type MapDef } from '../core/gridMap';
 import { hashSeed } from '../core/random';
 import { BIOMES, type BiomeId } from './biomes';
@@ -34,6 +34,14 @@ export const START_MAP = 'wasteland';
 export function buildMap(id: string, worldSeed: number): GridMap {
   const source = WORLD[id];
   if (!source) throw new Error(`Unknown map '${id}'`);
-  const def = source.kind === 'fixed' ? source.def : generateMap(BIOMES[source.biome], hashSeed(worldSeed, id), source.exits);
-  return GridMap.parse(def, id);
+  if (source.kind === 'fixed') return GridMap.parse(source.def, id);
+  const biome = BIOMES[source.biome];
+  const map = GridMap.parse(generateMap(biome, hashSeed(worldSeed, id), source.exits), id);
+  map.generator = generatorFingerprint(biome, source.exits);
+  return map;
+}
+
+/** Like buildMap, but null for a map id the world doesn't have (any more), e.g. from an old save. */
+export function buildKnownMap(id: string, worldSeed: number): GridMap | null {
+  return WORLD[id] ? buildMap(id, worldSeed) : null;
 }

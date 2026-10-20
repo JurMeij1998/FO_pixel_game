@@ -93,6 +93,9 @@ const DEFINITIONS: CreatureDef[] = [
 
 const CREATURES = new Map(DEFINITIONS.map((def) => [def.id, def]));
 
+/** The farthest any creature can see; map generation keeps spawns beyond it from arrival points. */
+export const MAX_SIGHT_RANGE = Math.max(...DEFINITIONS.map((def) => def.sightRange));
+
 export function getCreatureDef(id: string): CreatureDef {
   const def = CREATURES.get(id);
   if (!def) throw new Error(`Unknown creature id '${id}'`);

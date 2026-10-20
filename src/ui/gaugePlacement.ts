@@ -18,10 +18,11 @@ export interface Offset {
  * preference: straight above first, then shifted sideways, then one tile higher.
  */
 export function placementOffsets(width: number, height: number, playerSize: number, gap = 2): Offset[] {
-  const above = playerSize / 2 + gap + height / 2;
+  // Whole pixels, rounded away from the player, so the gap holds after the gauge snaps to the pixel grid.
+  const above = Math.ceil(playerSize / 2 + gap + height / 2);
   const higher = above + playerSize;
-  const half = width / 2; // the gauge's edge at the player's centre
-  const beside = playerSize / 2 + gap + width / 2; // the gauge clear of the player's column
+  const half = Math.round(width / 2); // the gauge's edge at the player's centre
+  const beside = Math.ceil(playerSize / 2 + gap + width / 2); // the gauge clear of the player's column
   return [
     { x: 0, y: -above },
     { x: half, y: -above },
@@ -38,8 +39,12 @@ export function placementOffsets(width: number, height: number, playerSize: numb
 const COVER_WEIGHT = 10;
 const OFFSCREEN_WEIGHT = 5;
 const PREFERENCE_STEP = 0.5;
-/** Staying put is worth this much, so the gauge only moves when its spot really gets worse. */
-const STAY_BONUS = 3;
+/**
+ * Staying put is worth a little, so the gauge doesn't hop between spots that are equally good.
+ * It's less than one preference step, so once an obstacle has gone the gauge does return to a
+ * more preferred spot (closer, straight above) instead of staying wherever it was pushed.
+ */
+const STAY_BONUS = 0.25;
 
 /**
  * Picks where the gauge should float: the spot that covers the least of `obstacles` (chests,

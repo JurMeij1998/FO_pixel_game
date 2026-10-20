@@ -1,6 +1,6 @@
 import { addPos, DIRECTIONS, type GridPos } from '../grid';
 import { isBlockingTile, LEGEND, type MapDef, type TileType } from '../gridMap';
-import type { Random } from '../random';
+import { hashSeed, Random } from '../random';
 import { rollCreature, rollLoot, type LootTable, type SpawnTable } from './tables';
 
 export type Side = 'north' | 'south' | 'east' | 'west';
@@ -53,7 +53,7 @@ export class MapBuilder {
   private readonly locked: boolean[][];
   private readonly chests: Array<{ pos: GridPos; name: string; contents: Array<[string, number]> }> = [];
   private readonly creatures: Array<{ pos: GridPos; creatureId: string }> = [];
-  private readonly exits: Array<{ pos: GridPos; to: string }> = [];
+  private readonly exits: Array<{ pos: GridPos; side: Side; to: string }> = [];
   /** Places that must be reachable from the start once the map is finished. */
   private readonly landmarks: GridPos[] = [];
 
@@ -61,6 +61,8 @@ export class MapBuilder {
     readonly width: number,
     readonly height: number,
     fill: string,
+    /** Seeds each exit's own random numbers (see addExit). */
+    private readonly seed = 0,
   ) {
     tileOf(fill); // throws on a character that isn't a tile
     this.tiles = Array.from({ length: height }, () => Array<string>(width).fill(fill));
@@ -113,14 +115,21 @@ export class MapBuilder {
     }
   }
 
-  /** True if the prefab fits at (x, y) inside the map, at least `margin` from the edge, on unlocked tiles. */
+  /**
+   * True if the prefab fits at (x, y) inside the map, at least `margin` from the edge, on
+   * unlocked tiles, without building on or right next to another structure's entrance or an
+   * exit's way in (which could wall it off).
+   */
   canStamp(prefab: Prefab, x: number, y: number, margin = 2): boolean {
     const height = prefab.rows.length;
     const width = prefab.rows[0].length;
     if (x < margin || y < margin || x + width > this.width - margin || y + height > this.height - margin) return false;
+    const reserved = [...this.landmarks, ...this.exits.map((e) => addPos(e.pos, inwardStep(e.side)))];
     for (let dy = 0; dy < height; dy++) {
       for (let dx = 0; dx < width; dx++) {
-        if (prefab.rows[dy][dx] !== KEEP && this.locked[y + dy][x + dx]) return false;
+        if (prefab.rows[dy][dx] === KEEP) continue;
+        if (this.locked[y + dy][x + dx]) return false;
+        if (reserved.some((r) => Math.abs(r.x - (x + dx)) + Math.abs(r.y - (y + dy)) <= 1)) return false;
       }
     }
     return true;
@@ -168,23 +177,30 @@ export class MapBuilder {
   /**
    * Puts an exit somewhere along one edge, with a path tile just inside it, and returns that
    * inside tile. The first exit's inside tile also becomes the start if none is set.
+   *
+   * Each exit draws its position from its own random numbers (seeded by the map seed, its side
+   * and its destination), not the biome's, so adding an exit to a map doesn't reshuffle where
+   * the others are. Exits on the same side keep at least 3 tiles apart.
    */
-  addExit(side: Side, to: string, rng: Random, pathChar: string): GridPos {
+  addExit(side: Side, to: string, pathChar: string): GridPos {
+    const rng = new Random(hashSeed(this.seed, 'exit', side, to));
     const along = side === 'north' || side === 'south' ? this.width : this.height;
-    const offset = rng.int(Math.floor(along * 0.25), Math.floor(along * 0.75));
-    const pos =
+    const at = (offset: number): GridPos =>
       side === 'north' ? { x: offset, y: 0 }
       : side === 'south' ? { x: offset, y: this.height - 1 }
       : side === 'west' ? { x: 0, y: offset }
       : { x: this.width - 1, y: offset };
-    const inward = side === 'north' ? { x: 0, y: 1 } : side === 'south' ? { x: 0, y: -1 } : side === 'west' ? { x: 1, y: 0 } : { x: -1, y: 0 };
-    const inside = addPos(pos, inward);
+    const tooClose = (p: GridPos) => this.exits.some((e) => Math.abs(e.pos.x - p.x) + Math.abs(e.pos.y - p.y) < 3);
+    let pos = at(rng.int(Math.floor(along * 0.25), Math.floor(along * 0.75)));
+    for (let attempt = 0; attempt < 50 && tooClose(pos); attempt++) pos = at(rng.int(2, along - 3));
+    if (tooClose(pos)) throw new Error(`No room for another exit on the ${side} side`);
+    const inside = addPos(pos, inwardStep(side));
 
     for (const p of [pos, inside]) {
       this.set(p.x, p.y, pathChar);
       this.locked[p.y][p.x] = true;
     }
-    this.exits.push({ pos, to });
+    this.exits.push({ pos, side, to });
     this.start ??= inside;
     return inside;
   }
@@ -320,6 +336,11 @@ export class MapBuilder {
     }
     throw new Error(`Can't connect (${target.x}, ${target.y}) to the start`);
   }
+}
+
+/** The step from an exit on this side into the map. */
+function inwardStep(side: Side): GridPos {
+  return side === 'north' ? { x: 0, y: 1 } : side === 'south' ? { x: 0, y: -1 } : side === 'west' ? { x: 1, y: 0 } : { x: -1, y: 0 };
 }
 
 function tileOf(char: string): TileType {

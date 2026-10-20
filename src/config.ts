@@ -11,3 +11,5 @@ export const WORLD_ZOOM = 3;
 /** Screen pixels the HUD covers at the top (status bar) and bottom (message log). */
 export const HUD_TOP = 36;
 export const HUD_BOTTOM = 97;
+/** The combat bar that appears under the status bar during a fight. */
+export const COMBAT_BAR_HEIGHT = 30;

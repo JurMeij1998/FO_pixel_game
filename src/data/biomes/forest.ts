@@ -1,7 +1,18 @@
 import type { Biome } from '../../core/generation/biome';
 import type { Prefab } from '../../core/generation/mapBuilder';
 import { rollLoot, type LootTable, type SpawnTable } from '../../core/generation/tables';
-import { blob, border, farFrom, findOpenTile, findSpot, hasRoomAround, scatter, smooth, windingPath } from '../../core/generation/terrain';
+import {
+  blob,
+  border,
+  farFrom,
+  findOpenTile,
+  hasRoomAround,
+  placeStructure,
+  SAFE_SPAWN_DISTANCE,
+  scatter,
+  smooth,
+  windingPath,
+} from '../../core/generation/terrain';
 import type { GridPos } from '../../core/grid';
 
 // Tiles (see LEGEND in core/gridMap.ts).
@@ -113,6 +124,7 @@ const CAMPSITE: Prefab = {
 
 export const FOREST: Biome = {
   id: 'forest',
+  version: 2,
   names: ['Blackroot Woods', 'Whispering Pines', 'Deadwood Forest', 'The Old Growth', 'Ashen Timberland', 'Hollow Pines'],
   width: 44,
   height: 32,
@@ -130,22 +142,16 @@ export const FOREST: Biome = {
       blob(b, center, rng.int(2, 4), rng.pick([DIRT, GRASS]), rng, (x, y) => b.get(x, y) === FLOOR);
     }
 
-    const entries = exits.map((exit) => b.addExit(exit.side, exit.to, rng, PATH));
+    // Every exit is a way in: each gets room to look around, and creatures stay out of sight of all of them.
+    const entries = exits.map((exit) => b.addExit(exit.side, exit.to, PATH));
     const arrival = entries[0];
-    blob(b, arrival, 2.5, FLOOR, rng); // room to look around on arrival
+    for (const entry of entries) blob(b, entry, 2.5, FLOOR, rng);
 
-    // Structures: each kept away from the arrival and from each other, with a trail leading to it.
+    // Structures: each kept away from the entries and from each other, with a trail from the first entry.
     const occupied: GridPos[] = [...entries];
     const place = (prefab: Prefab) => {
-      const width = prefab.rows[0].length;
-      const height = prefab.rows.length;
-      const center = (x: number, y: number) => ({ x: x + Math.floor(width / 2), y: y + Math.floor(height / 2) });
-      const spot = findSpot(b, prefab, rng, (x, y) => farFrom(center(x, y), occupied, 12));
-      if (!spot) return;
-      b.paint(FLOOR, (x, y) => x >= spot.x - 1 && x <= spot.x + width && y >= spot.y - 1 && y <= spot.y + height);
-      const entrance = b.stamp(prefab, spot.x, spot.y, rng);
-      windingPath(b, arrival, entrance, PATH, rng);
-      occupied.push(center(spot.x, spot.y));
+      const placed = placeStructure(b, prefab, rng, { occupied, spacing: 12, arrivals: entries, clearTo: FLOOR });
+      if (placed) windingPath(b, arrival, placed.entrance, PATH, rng);
     };
     if (rng.chance(0.75)) place(LOGGING_CAMP);
     if (rng.chance(0.6)) place(HUNTERS_CABIN);
@@ -167,9 +173,9 @@ export const FOREST: Biome = {
       occupied.push(spot);
     }
 
-    // Wildlife, kept out of sight of the arrival so nothing attacks the moment you walk in.
+    // Wildlife, kept out of sight of every entry so nothing attacks the moment you walk in.
     for (let i = rng.int(4, 7); i > 0; i--) {
-      const spot = findOpenTile(b, rng, (pos) => farFrom(pos, [arrival], 12));
+      const spot = findOpenTile(b, rng, (pos) => farFrom(pos, entries, SAFE_SPAWN_DISTANCE));
       if (spot) b.addCreature(spot, rng.pickWeighted(WILDLIFE).creatureId);
     }
   },

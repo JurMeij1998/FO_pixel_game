@@ -39,8 +39,10 @@ export const SEAL_SIZE = 15;
 export const SEAL_TEXTURE = 'ap_seal';
 
 /**
- * The round seal the AP number sits in: a dark disc with a green ring and a thin black edge
- * outside it, so it reads on any ground. Drawn pixel by pixel to match the rest of the art.
+ * The round seal the AP number sits in: a dark disc with a thin black edge, so it reads on any
+ * ground. Drawn pixel by pixel to match the rest of the art. The green ring between them is
+ * left transparent: the AP gauge draws it (pulsing and shining), and drawing it here too would
+ * show through the glow whenever the gauge is dimmed or fading.
  */
 function createSealTexture(scene: Phaser.Scene): void {
   createTexture(scene, SEAL_TEXTURE, SEAL_SIZE, SEAL_SIZE, (ctx) => {
@@ -49,7 +51,8 @@ function createSealTexture(scene: Phaser.Scene): void {
       for (let x = 0; x < SEAL_SIZE; x++) {
         const d = Math.hypot(x + 0.5 - center, y + 0.5 - center);
         if (d > center) continue;
-        pixel(ctx, x, y, d > center - 1 ? '#000000' : d > center - 2 ? '#3cd070' : '#0a140c');
+        if (d > center - 1) pixel(ctx, x, y, '#000000');
+        else if (d <= center - 2) pixel(ctx, x, y, '#0a140c');
       }
     }
   });

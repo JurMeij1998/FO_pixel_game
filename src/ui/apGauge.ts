@@ -63,11 +63,11 @@ const DELTA_MS = 900;
 const FOLLOW_RATE = 0.012;
 
 /**
- * A small badge floating beside the player in combat: the AP left, in pixel digits, inside a
+ * A small badge floating above the player in combat: the AP left, in pixel digits, inside a
  * round seal, with a bar of pips (one per action point) sweeping out of it to the right, a bit
  * like a swoosh. Spending AP counts the number down, flashes the spent pips and pops a
  * superscript "-3" that rises and fades; a new turn refills it with a "+N". It bobs gently,
- * and moves around the player so it never covers a chest, creature or exit.
+ * and picks the spot above the player that covers the least of any chest, creature or exit.
  */
 export class ApGauge {
   private readonly root: Phaser.GameObjects.Container;
@@ -93,6 +93,11 @@ export class ApGauge {
   private placement = 0;
   private wasActive = false;
   private time = 0;
+  /**
+   * Where the gauge is gliding, unrounded. The containers themselves are always placed on whole
+   * world pixels, so the pixel art stays on the map's pixel grid instead of shimmering against it.
+   */
+  private readonly glide = { x: 0, y: 0 };
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -127,7 +132,7 @@ export class ApGauge {
       }
     }
     const seal = scene.add.image(left, top, SEAL_TEXTURE).setOrigin(0);
-    // The seal's green ring (as drawn in its texture), so it can glow along with the bar's border.
+    // The seal's green ring, which its texture leaves open, so it glows along with the bar's border.
     for (let y = 0; y < SEAL_SIZE; y++) {
       for (let x = 0; x < SEAL_SIZE; x++) {
         const d = Math.hypot(x + 0.5 - radius, y + 0.5 - radius);
@@ -142,6 +147,11 @@ export class ApGauge {
 
     this.body = scene.add.container(0, 0, [frame, seal, this.glow, ...this.digits, this.pips]);
     this.root = scene.add.container(0, 0, [this.body]).setDepth(depth).setAlpha(0).setVisible(false);
+  }
+
+  /** True while out of combat and fully faded out: nothing to update or draw. */
+  get idle(): boolean {
+    return !this.wasActive && !this.root.visible;
   }
 
   update(deltaMs: number, s: ApGaugeState): void {
@@ -164,20 +174,28 @@ export class ApGauge {
     this.drawPips(deltaMs);
     this.drawGlow();
 
-    // Float beside the player in the least obstructive spot, gliding there smoothly, with a gentle bob.
+    // Float above the player in the least obstructive spot, gliding there smoothly, with a gentle bob.
     this.placement = choosePlacement(s.anchor, this.size(), this.offsets, s.obstacles, s.view, this.placement);
     const goal = { x: s.anchor.x + this.offsets[this.placement].x, y: s.anchor.y + this.offsets[this.placement].y };
     const follow = 1 - Math.exp(-deltaMs * FOLLOW_RATE);
-    this.root.setPosition(this.root.x + (goal.x - this.root.x) * follow, this.root.y + (goal.y - this.root.y) * follow);
+    this.glide.x += (goal.x - this.glide.x) * follow;
+    this.glide.y += (goal.y - this.glide.y) * follow;
+    this.root.setPosition(Math.round(this.glide.x), Math.round(this.glide.y));
     this.body.setY(Math.round(Math.sin(this.time / 650)));
   }
 
-  /** Combat just started: show the current AP straight away, with no animation. */
+  /**
+   * Combat just started. The gauge starts from full AP and counts down to the current value, so
+   * an opening attack (which has already spent its AP by the time combat starts) still shows
+   * its "-N"; a fight that starts with full AP looks the same as before.
+   */
   private start(s: ApGaugeState): void {
-    this.shown = this.target = this.lastSeen = s.actionPoints;
+    this.shown = this.target = this.lastSeen = this.maxActionPoints;
     this.flashes.clear();
     this.placement = choosePlacement(s.anchor, this.size(), this.offsets, s.obstacles, s.view, 0);
-    this.root.setPosition(s.anchor.x + this.offsets[this.placement].x, s.anchor.y + this.offsets[this.placement].y);
+    this.glide.x = s.anchor.x + this.offsets[this.placement].x;
+    this.glide.y = s.anchor.y + this.offsets[this.placement].y;
+    this.root.setPosition(Math.round(this.glide.x), Math.round(this.glide.y));
     this.drawNumber();
   }
 

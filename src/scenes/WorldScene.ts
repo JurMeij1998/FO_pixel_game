@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
-import { HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
+import { COMBAT_BAR_HEIGHT, HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
 import { Combat, INVENTORY_AP_COST, type CombatEvent } from '../core/combat';
 import type { Creature } from '../core/creature';
 import type { Fighter } from '../core/fighter';
@@ -27,8 +27,6 @@ const STEP: Record<Direction, GridPos> = {
 const MOVE_DURATION_MS = 140;
 
 const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, gauge: 9, effects: 10 };
-/** Height of the HUD's combat bar under the status bar, in screen pixels. */
-const COMBAT_BAR_HEIGHT = 30;
 const FADE_MS = 250;
 
 /** Pixel position of a tile's centre. */
@@ -50,6 +48,8 @@ export class WorldScene extends Phaser.Scene {
   private readonly creatureImages = new Map<Creature, Phaser.GameObjects.Image>();
   private targetMarker!: Phaser.GameObjects.Graphics;
   private apGauge!: ApGauge;
+  /** Whether the camera bounds currently leave the extra room combat needs at the top. */
+  private combatBounds = false;
   private keys!: Record<Direction, Phaser.Input.Keyboard.Key[]>;
 
   constructor() {
@@ -90,14 +90,9 @@ export class WorldScene extends Phaser.Scene {
     this.targetMarker = this.add.graphics().setDepth(DEPTH.marker);
     this.apGauge = new ApGauge(this, state.player.maxActionPoints, DEPTH.gauge);
 
-    // Let the camera scroll past the map edges by the HUD's height, so the HUD never hides a tile.
-    const top = HUD_TOP / WORLD_ZOOM;
-    const bottom = HUD_BOTTOM / WORLD_ZOOM;
-    this.cameras.main
-      .setBounds(0, -top, map.width * TILE_SIZE, map.height * TILE_SIZE + top + bottom)
-      .setZoom(WORLD_ZOOM)
-      .fadeIn(FADE_MS)
-      .startFollow(this.player, true);
+    this.combatBounds = state.combat !== null;
+    this.setCameraBounds();
+    this.cameras.main.setZoom(WORLD_ZOOM).fadeIn(FADE_MS).startFollow(this.player, true);
 
     const keyboard = this.input.keyboard!;
     const K = Phaser.Input.Keyboard.KeyCodes;
@@ -137,6 +132,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    if (this.combatBounds !== (state.combat !== null)) {
+      this.combatBounds = state.combat !== null;
+      this.setCameraBounds();
+    }
     this.drawTargetMarker();
     this.updateApGauge(delta);
     if (this.busy) return;
@@ -170,7 +169,17 @@ export class WorldScene extends Phaser.Scene {
       this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => resolve());
       this.cameras.main.fadeOut(FADE_MS);
     });
-    const map = travelTo(exit.to);
+    let map;
+    try {
+      map = travelTo(exit.to);
+    } catch (error) {
+      // Generation retries several seeds before giving up, so this should be very rare; never
+      // leave the screen faded out over it.
+      console.error(`Couldn't travel to '${exit.to}':`, error);
+      postMessage(this, 'The way ahead is impassable. Try again later.');
+      this.cameras.main.fadeIn(FADE_MS);
+      return;
+    }
     postMessage(this, `You make your way to ${map.name}.`);
     this.scene.restart(); // create() draws the new map and fades back in
   }
@@ -179,9 +188,13 @@ export class WorldScene extends Phaser.Scene {
     const combat = state.combat!;
     if (!combat.isPlayerTurn) return;
     const result = combat.movePlayer(STEP[direction]);
-    if (!result.ok) return;
-    if (state.map.exitAt(state.player.pos.x, state.player.pos.y)) {
-      postMessage(this, "You can't leave in the middle of a fight.");
+    if (!result.ok) {
+      // Say why only for the refusal worth explaining; bumping into walls while a key is held stays quiet.
+      if (state.map.exitAt(state.player.pos.x + STEP[direction].x, state.player.pos.y + STEP[direction].y)) {
+        postMessage(this, result.message);
+        this.input.keyboard!.resetKeys(); // once, not every frame the key is held
+      }
+      return;
     }
     void this.run(() => this.play(result.events));
   }
@@ -386,8 +399,21 @@ export class WorldScene extends Phaser.Scene {
     return new Promise((resolve) => this.time.delayedCall(ms, resolve));
   }
 
+  /**
+   * Lets the camera scroll past the map edges by the HUD's height, so the HUD never hides a tile.
+   * In combat it can scroll further at the top, past the combat bar and with a tile to spare, so
+   * the AP gauge (always above the player) still has room when the player is on the top rows.
+   */
+  private setCameraBounds(): void {
+    const map = state.map;
+    const top = (HUD_TOP + (this.combatBounds ? COMBAT_BAR_HEIGHT : 0)) / WORLD_ZOOM + (this.combatBounds ? TILE_SIZE : 0);
+    const bottom = HUD_BOTTOM / WORLD_ZOOM;
+    this.cameras.main.setBounds(0, -top, map.width * TILE_SIZE, map.height * TILE_SIZE + top + bottom);
+  }
+
   private updateApGauge(delta: number): void {
     const combat = state.combat;
+    if (!combat && this.apGauge.idle) return; // out of combat and faded out: no need to look for obstacles
     this.apGauge.update(delta, {
       active: combat !== null,
       playerTurn: combat?.isPlayerTurn ?? false,

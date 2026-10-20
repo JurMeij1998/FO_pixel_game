@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { isMuted } from '../audio/sfx';
-import { GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM } from '../config';
+import { COMBAT_BAR_HEIGHT, GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM, HUD_TOP } from '../config';
 import { state } from '../state';
 import { MESSAGE_EVENT } from '../ui/messages';
 import { COLORS, SMALL_TEXT, TEXT } from '../ui/theme';
@@ -25,10 +25,10 @@ export class HudScene extends Phaser.Scene {
 
   create(): void {
     this.messages.length = 0; // the scene object is reused when a game is loaded or started
-    this.add.rectangle(0, 0, GAME_WIDTH, 36, 0x000000, 0.7).setOrigin(0);
+    this.add.rectangle(0, 0, GAME_WIDTH, HUD_TOP, 0x000000, 0.7).setOrigin(0);
     this.status = this.add.text(12, 9, '', TEXT);
-    this.combatBar = this.add.rectangle(0, 36, GAME_WIDTH, 30, 0x400c08, 0.85).setOrigin(0);
-    this.combatText = this.add.text(12, 41, '', { ...TEXT, color: COLORS.warn });
+    this.combatBar = this.add.rectangle(0, HUD_TOP, GAME_WIDTH, COMBAT_BAR_HEIGHT, 0x400c08, 0.85).setOrigin(0);
+    this.combatText = this.add.text(12, HUD_TOP + 5, '', { ...TEXT, color: COLORS.warn });
 
     const logHeight = HUD_BOTTOM;
     this.add.rectangle(0, GAME_HEIGHT - logHeight, GAME_WIDTH, logHeight, 0x000000, 0.6).setOrigin(0);

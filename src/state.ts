@@ -3,7 +3,7 @@ import type { Combat } from './core/combat';
 import type { GridMap } from './core/gridMap';
 import { loadGame, saveGame, type GameData } from './core/save';
 import { testCharacter } from './data/testArena';
-import { buildMap, START_MAP, TEST_ARENA_MAP } from './data/world';
+import { buildKnownMap, buildMap, START_MAP, TEST_ARENA_MAP } from './data/world';
 import { clearSave, readSave, writeSave } from './storage';
 
 function newGame() {
@@ -41,7 +41,7 @@ function readSavedGame() {
   const saved = readSave();
   if (!saved) return null;
   try {
-    return toState(loadGame(saved, buildMap));
+    return toState(loadGame(saved, buildKnownMap, START_MAP));
   } catch (error) {
     console.warn('Ignoring a save that could not be loaded:', error);
     return null;

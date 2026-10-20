@@ -16,6 +16,6 @@ describe('GLYPHS', () => {
   });
 
   it('has every digit and the signs the AP gauge needs', () => {
-    for (const char of '0123456789+-AP') expect(GLYPHS[char]).toBeDefined();
+    for (const char of '0123456789+-') expect(GLYPHS[char]).toBeDefined();
   });
 });

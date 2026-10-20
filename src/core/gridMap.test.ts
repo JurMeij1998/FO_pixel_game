@@ -38,6 +38,9 @@ describe('GridMap', () => {
     expect(map.arrivalFrom('east-map')).toEqual({ x: 3, y: 1 });
     expect(map.arrivalFrom('nowhere')).toEqual(map.playerStart);
     expect(() => GridMap.parse({ name: 'bad', rows: ['P1'], chests: {} })).toThrow(/no exit/);
+    expect(() => GridMap.parse({ name: 'lost', rows: ['P.'], chests: {}, exits: { '1': { to: 'x' } } })).toThrow(
+      /exit '1' is not placed/,
+    );
   });
 
   it('treats trees and wooden walls as cover, but not log piles or bushes', () => {

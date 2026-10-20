@@ -123,6 +123,8 @@ export class Combat {
     if (this.actionPoints < MOVE_AP_COST) return refused('You are out of action points.');
     const to = addPos(this.player.pos, step);
     if (!this.isFree(to)) return refused('Something is in the way.');
+    // Leaving the map isn't possible mid-fight, so there's no point stepping onto an exit.
+    if (this.map.exitAt(to.x, to.y)) return refused("You can't leave in the middle of a fight.");
 
     this.player.pos = to;
     this.actionPoints -= MOVE_AP_COST;

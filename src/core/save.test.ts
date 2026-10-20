@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildMap } from '../data/world';
+import { buildKnownMap, buildMap } from '../data/world';
 import { Character } from './character';
+import { GridMap } from './gridMap';
 import { takeItem } from './loot';
 import { loadGame, saveGame, SAVE_VERSION, type GameData } from './save';
 
@@ -23,7 +24,7 @@ function freshGame(): GameData {
 
 /** Goes through JSON like the real save does, so nothing relies on shared object references. */
 function roundTrip(game: GameData): GameData {
-  return loadGame(JSON.parse(JSON.stringify(saveGame(game))), buildMap);
+  return loadGame(JSON.parse(JSON.stringify(saveGame(game))), buildKnownMap, 'wasteland');
 }
 
 /** The save as plain JSON, to edit like a corrupt or old save would be. */
@@ -62,7 +63,7 @@ describe('save and load', () => {
     const game = freshGame();
     const save = saveJson(game);
     for (const key of ['level', 'experience', 'skillPoints', 'skillBonus', 'bonusHitPoints']) delete save.player[key];
-    const loaded = loadGame(save, buildMap).player;
+    const loaded = loadGame(save, buildKnownMap, 'wasteland').player;
     expect(loaded.level).toBe(1);
     expect(loaded.skill('smallGuns')).toBe(game.player.skill('smallGuns'));
   });
@@ -114,6 +115,61 @@ describe('save and load', () => {
     expect(loaded.player.pos).toEqual(game.maps.wasteland.playerStart);
   });
 
+  it('starts a generated map afresh when its generator has changed since the save', () => {
+    const game = freshGame();
+    const forest = buildMap('forest', SEED);
+    forest.chests[0].contents.clear();
+    game.maps.forest = forest;
+    const save = saveJson(game);
+    expect(save.maps.forest.generator).toBe(forest.generator);
+
+    // Same generator: the looted chest stays looted.
+    expect(loadGame(save, buildKnownMap, 'wasteland').maps.forest.chests[0].contents.isEmpty).toBe(true);
+    // A different (or, in older saves, missing) generator: the saved state no longer fits.
+    for (const generator of ['forest@1:west>wasteland', undefined]) {
+      const old = { ...save, maps: { ...save.maps, forest: { ...save.maps.forest, generator } } };
+      expect(loadGame(old, buildKnownMap, 'wasteland').maps.forest.chests[0].contents.isEmpty).toBe(false);
+    }
+  });
+
+  it('keeps hand-made maps\' state, also from saves that have no generator field', () => {
+    const game = freshGame();
+    game.maps.wasteland.chests[0].contents.clear();
+    const save = saveJson(game);
+    delete save.maps.wasteland.generator;
+    expect(loadGame(save, buildKnownMap, 'wasteland').maps.wasteland.chests[0].contents.isEmpty).toBe(true);
+  });
+
+  it('leaves out maps the world no longer has, instead of discarding the save', () => {
+    const save = saveJson(freshGame());
+    save.maps.moon_base = { chests: {}, creatures: {} };
+    const loaded = loadGame(save, buildKnownMap, 'wasteland');
+    expect(Object.keys(loaded.maps)).toEqual(['wasteland']);
+  });
+
+  it('puts the player on the start map if the map they were on no longer exists', () => {
+    const save = saveJson(freshGame());
+    save.maps.moon_base = { chests: {}, creatures: {} };
+    save.currentMap = 'moon_base';
+    save.player.pos = { x: 40, y: 40 };
+    const loaded = loadGame(save, buildKnownMap, 'wasteland');
+    expect(loaded.currentMap).toBe('wasteland');
+    expect(loaded.player.pos).toEqual(loaded.maps.wasteland.playerStart);
+  });
+
+  it('moves the player off a tile that is walkable but walled off from the rest of the map', () => {
+    // A map with a sealed pocket at (3,1), as a changed layout could leave a saved player in.
+    const pocket = () => GridMap.parse({ name: 'Pocket', rows: ['#####', '#P#.#', '#####'], chests: {} }, 'pocket');
+    const build = (id: string) => (id === 'pocket' ? pocket() : null);
+    const game: GameData = { ...freshGame(), maps: { pocket: pocket() }, currentMap: 'pocket' };
+    game.player.pos = { x: 3, y: 1 };
+    const loaded = loadGame(JSON.parse(JSON.stringify(saveGame(game))), build, 'pocket');
+    expect(loaded.player.pos).toEqual({ x: 1, y: 1 });
+
+    game.player.pos = { x: 1, y: 1 }; // the connected part is left alone
+    expect(loadGame(JSON.parse(JSON.stringify(saveGame(game))), build, 'pocket').player.pos).toEqual({ x: 1, y: 1 });
+  });
+
   it('only stores maps that have been visited', () => {
     const save = saveJson(freshGame());
     expect(Object.keys(save.maps)).toEqual(['wasteland']);
@@ -125,7 +181,7 @@ describe('save and load', () => {
     const v2 = saveJson(game);
     const v1 = { version: 1, player: v2.player, ...v2.maps.wasteland };
 
-    const loaded = loadGame(v1, buildMap);
+    const loaded = loadGame(v1, buildKnownMap, 'wasteland');
     expect(loaded.currentMap).toBe('wasteland');
     expect(loaded.maps.wasteland.creatures.find((c) => c.def.id === 'raider')!.isDead).toBe(true);
     expect(Number.isInteger(loaded.worldSeed)).toBe(true);
@@ -141,14 +197,14 @@ describe('save and load', () => {
     });
     save.maps.wasteland.creatures = legacy;
 
-    const loaded = loadGame(save, buildMap);
+    const loaded = loadGame(save, buildKnownMap, 'wasteland');
     expect(loaded.maps.wasteland.creatures.every((c) => c.isDead)).toBe(true);
   });
 
   it('keeps chests and creatures the save does not know about (added to the map later)', () => {
     const save = saveJson(freshGame());
     save.maps.wasteland = { chests: {}, creatures: {} };
-    const loaded = loadGame(save, buildMap);
+    const loaded = loadGame(save, buildKnownMap, 'wasteland');
     expect(loaded.maps.wasteland.chests[0].contents.isEmpty).toBe(false);
     expect(loaded.maps.wasteland.creatures.every((c) => !c.isDead)).toBe(true);
   });
@@ -159,13 +215,13 @@ describe('save and load', () => {
     game.player.equip('10mm_pistol', 'primary');
     const save = saveJson(game);
 
-    expect(() => loadGame({ ...save, player: { ...save.player, special: undefined } }, buildMap)).toThrow(/strength/);
-    expect(() => loadGame({ ...save, player: { ...save.player, activeWeaponSlot: 'tail' } }, buildMap)).toThrow(
+    expect(() => loadGame({ ...save, player: { ...save.player, special: undefined } }, buildKnownMap, 'wasteland')).toThrow(/strength/);
+    expect(() => loadGame({ ...save, player: { ...save.player, activeWeaponSlot: 'tail' } }, buildKnownMap, 'wasteland')).toThrow(
       /weapon slot/,
     );
 
     const tooMuch = { ...save.player, hitPoints: 999, loadedRounds: { primary: 50, secondary: 3 } };
-    const loaded = loadGame({ ...save, player: tooMuch }, buildMap).player;
+    const loaded = loadGame({ ...save, player: tooMuch }, buildKnownMap, 'wasteland').player;
     expect(loaded.hitPoints).toBe(loaded.maxHitPoints);
     expect(loaded.loadedRounds('primary')).toBe(12); // the pistol's magazine
     expect(loaded.loadedRounds('secondary')).toBe(0); // nothing equipped there
@@ -173,12 +229,12 @@ describe('save and load', () => {
 
   it('rejects saves from another version, with unknown items, or pointing at a missing map', () => {
     const save = saveJson(freshGame());
-    expect(() => loadGame({ ...save, version: SAVE_VERSION + 1 }, buildMap)).toThrow(/version/);
-    expect(() => loadGame(null, buildMap)).toThrow();
-    expect(() => loadGame({ ...save, currentMap: 'moon' }, buildMap)).toThrow(/current map/);
+    expect(() => loadGame({ ...save, version: SAVE_VERSION + 1 }, buildKnownMap, 'wasteland')).toThrow(/version/);
+    expect(() => loadGame(null, buildKnownMap, 'wasteland')).toThrow();
+    expect(() => loadGame({ ...save, currentMap: 'moon' }, buildKnownMap, 'wasteland')).toThrow(/current map/);
 
     const broken = JSON.parse(JSON.stringify(save));
     broken.player.backpack = [['laser_sword', 1]];
-    expect(() => loadGame(broken, buildMap)).toThrow(/Unknown item/);
+    expect(() => loadGame(broken, buildKnownMap, 'wasteland')).toThrow(/Unknown item/);
   });
 });
