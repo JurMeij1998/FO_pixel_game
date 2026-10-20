@@ -21,7 +21,8 @@ With `npm run dev`, the main menu has a **Test arena (dev)** entry, and
 http://localhost:5173/?arena skips the menu and goes straight there. It's a small room
 (`data/testArena.ts`) where a fight starts the moment you arrive, with chests above and
 below the start, creatures nearby and an exit, so combat UI such as the AP gauge has to work
-around things. You play a sturdy test character with 10 AP and plenty of stimpaks and ammo.
+around things. You play a sturdy test character with 10 AP, a loaded hunting rifle in hand,
+a loaded pistol in the other hand (Q), and plenty of stimpaks and ammo.
 Nothing in the arena is saved, so your real save is never touched; quitting to the menu
 goes back to it. Production builds leave the arena out entirely.
 
@@ -124,11 +125,15 @@ Fallout-style and turn-based, on the same grid you explore. Combat starts when a
 sees you (or you attack one). You act first with your Action Points, then each enemy
 takes its turn.
 
-During a fight an AP gauge floats beside you (`ui/apGauge.ts`): "AP 8" in a 3x5 pixel font
-(`gfx/pixelFont.ts`) over a row of pips. Spending AP counts the number down, flashes the
-spent pips and pops a superscript "-3"; a new turn refills it with a "+N". It bobs gently,
-dims during the enemy turn, and picks whichever spot around you covers no chest, creature,
-lootable corpse or exit (`ui/gaugePlacement.ts`). Hit chance is your weapon skill minus the target's Armor Class (minus a
+During a fight a combat card floats beside you (`ui/combatCard.ts`), drawn in its own
+overlay at 2x (`scenes/CardScene.ts`) so it stays crisp but small. In a 3x5 pixel font
+(`gfx/pixelFont.ts`): AP top left, a small HP bar with the values in it top right, one pip
+per AP, and along the bottom the weapon's damage in red and its ammo as loaded/carried. The
+weapon in hand lies behind the card with only its end sticking out (`gfx/weaponSprites.ts`).
+Spending AP counts the number down, flashes the spent pips and pops a superscript "-3"; a
+new turn refills it with a "+N". It bobs gently, dims during the enemy turn, and picks
+whichever spot around you covers no chest, creature, lootable corpse or exit
+(`ui/gaugePlacement.ts`). Hit chance is your weapon skill minus the target's Armor Class (minus a
 range penalty for guns; the spear's reach of 2 is still melee), damage is reduced by Damage Resistance, and Luck is your critical
 chance. Guns fire from their magazine (10mm pistol 12, hunting rifle 5) and are reloaded
 from the backpack with R: free while exploring, 2 AP in combat. A gun you unequip puts its

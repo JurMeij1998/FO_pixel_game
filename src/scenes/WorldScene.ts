@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
-import { HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
 import { Combat, INVENTORY_AP_COST, type CombatEvent } from '../core/combat';
 import type { Creature } from '../core/creature';
 import type { Fighter } from '../core/fighter';
@@ -9,9 +9,9 @@ import type { Exit } from '../core/gridMap';
 import type { Lootable } from '../core/loot';
 import { tileTextureKey } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
-import { ApGauge } from '../ui/apGauge';
 import type { Rect } from '../ui/gaugePlacement';
 import { postMessage } from '../ui/messages';
+import { CARD_ZOOM, type CardScene } from './CardScene';
 import { FONT } from '../ui/theme';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
@@ -26,7 +26,7 @@ const STEP: Record<Direction, GridPos> = {
 
 const MOVE_DURATION_MS = 140;
 
-const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, gauge: 9, effects: 10 };
+const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, effects: 10 };
 /** Height of the HUD's combat bar under the status bar, in screen pixels. */
 const COMBAT_BAR_HEIGHT = 30;
 const FADE_MS = 250;
@@ -49,7 +49,6 @@ export class WorldScene extends Phaser.Scene {
   private readonly chestImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly creatureImages = new Map<Creature, Phaser.GameObjects.Image>();
   private targetMarker!: Phaser.GameObjects.Graphics;
-  private apGauge!: ApGauge;
   private keys!: Record<Direction, Phaser.Input.Keyboard.Key[]>;
 
   constructor() {
@@ -88,7 +87,6 @@ export class WorldScene extends Phaser.Scene {
     const start = state.player.pos;
     this.player = this.add.image(toPixel(start.x), toPixel(start.y), 'player_down').setDepth(DEPTH.player);
     this.targetMarker = this.add.graphics().setDepth(DEPTH.marker);
-    this.apGauge = new ApGauge(this, state.player.maxActionPoints, DEPTH.gauge);
 
     // Let the camera scroll past the map edges by the HUD's height, so the HUD never hides a tile.
     const top = HUD_TOP / WORLD_ZOOM;
@@ -138,7 +136,7 @@ export class WorldScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.drawTargetMarker();
-    this.updateApGauge(delta);
+    this.updateCombatCard(delta);
     if (this.busy) return;
     const direction = this.heldDirection();
     if (!direction) return;
@@ -386,20 +384,43 @@ export class WorldScene extends Phaser.Scene {
     return new Promise((resolve) => this.time.delayedCall(ms, resolve));
   }
 
-  private updateApGauge(delta: number): void {
+  /**
+   * Feeds the combat card in its overlay (see CardScene). The card works in card pixels, which
+   * are screen pixels / CARD_ZOOM, so world positions are converted on the way.
+   */
+  private updateCombatCard(delta: number): void {
+    const card = (this.scene.get('Card') as CardScene | null)?.card;
+    if (!card) return;
     const combat = state.combat;
-    this.apGauge.update(delta, {
+    const player = state.player;
+    const attack = player.attack;
+    const ammo = attack.ammo
+      ? { loaded: player.loadedRounds(), total: player.loadedRounds() + player.backpack.count(attack.ammo) }
+      : null;
+    const scale = WORLD_ZOOM / CARD_ZOOM;
+    card.update(delta, {
       active: combat !== null,
       playerTurn: combat?.isPlayerTurn ?? false,
-      actionPoints: combat?.actionPoints ?? state.player.maxActionPoints,
-      anchor: { x: this.player.x, y: this.player.y },
-      obstacles: this.gaugeObstacles(),
-      view: this.visibleWorld(),
+      actionPoints: combat?.actionPoints ?? player.maxActionPoints,
+      maxActionPoints: player.maxActionPoints,
+      hitPoints: player.hitPoints,
+      maxHitPoints: player.maxHitPoints,
+      weapon: { itemId: player.activeWeapon?.id ?? null, damageMin: attack.damageMin, damageMax: attack.damageMax, ammo },
+      anchor: this.worldToCard(this.player.x, this.player.y),
+      playerSize: TILE_SIZE * scale,
+      obstacles: this.cardObstacles().map((r) => ({ ...this.worldToCard(r.x, r.y), width: r.width * scale, height: r.height * scale })),
+      view: this.cardView(),
     });
   }
 
-  /** What the AP gauge must never cover: everything the player might want to see or click. */
-  private gaugeObstacles(): Rect[] {
+  private worldToCard(x: number, y: number): { x: number; y: number } {
+    const view = this.cameras.main.worldView;
+    const scale = WORLD_ZOOM / CARD_ZOOM;
+    return { x: (x - view.x) * scale, y: (y - view.y) * scale };
+  }
+
+  /** What the combat card must never cover, in world pixels: everything the player might want to see or click. */
+  private cardObstacles(): Rect[] {
     const map = state.map;
     const tile = (x: number, y: number): Rect => ({ x: x * TILE_SIZE, y: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE });
     // Living creatures use their sprites, which may be mid-step.
@@ -417,12 +438,11 @@ export class WorldScene extends Phaser.Scene {
     return rects;
   }
 
-  /** The part of the world on screen, not counting what the HUD covers at the top and bottom. */
-  private visibleWorld(): Rect {
-    const view = this.cameras.main.worldView;
-    const top = (HUD_TOP + (state.combat ? COMBAT_BAR_HEIGHT : 0)) / WORLD_ZOOM;
-    const bottom = HUD_BOTTOM / WORLD_ZOOM;
-    return { x: view.x, y: view.y + top, width: view.width, height: view.height - top - bottom };
+  /** The screen minus what the HUD covers at the top and bottom, in card pixels. */
+  private cardView(): Rect {
+    const top = (HUD_TOP + (state.combat ? COMBAT_BAR_HEIGHT : 0)) / CARD_ZOOM;
+    const bottom = HUD_BOTTOM / CARD_ZOOM;
+    return { x: 0, y: top, width: GAME_WIDTH / CARD_ZOOM, height: GAME_HEIGHT / CARD_ZOOM - top - bottom };
   }
 
   private drawTargetMarker(): void {

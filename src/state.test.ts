@@ -101,7 +101,9 @@ describe('game state', () => {
       expect(state.sandbox).toBe(true);
       expect(Combat.spotters(state.map, state.player).length).toBeGreaterThan(0);
       expect(state.player.maxActionPoints).toBe(10);
-      expect(state.player.loadedRounds('secondary')).toBe(12); // the pistol comes loaded
+      expect(state.player.activeWeapon?.id).toBe('hunting_rifle'); // in hand, loaded
+      expect(state.player.loadedRounds('primary')).toBe(5);
+      expect(state.player.loadedRounds('secondary')).toBe(12); // the pistol comes loaded too
     });
 
     it('never touches the real save', () => {

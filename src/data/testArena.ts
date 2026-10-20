@@ -39,7 +39,10 @@ export const TEST_ARENA: MapDef = {
   },
 };
 
-/** Sturdy and well equipped, so fights last long enough to watch the UI. 10 Agility gives 10 AP. */
+/**
+ * Sturdy and well equipped, so fights last long enough to watch the UI. 10 Agility gives 10 AP.
+ * The hunting rifle is in hand, loaded; the pistol (loaded too) is in the other hand.
+ */
 export function testCharacter(): Character {
   const player = new Character('Tester', {
     strength: 6,
@@ -63,10 +66,11 @@ export function testCharacter(): Character {
   ] as const) {
     player.backpack.add(itemId, quantity);
   }
-  player.equip('knife', 'primary');
+  player.equip('hunting_rifle', 'primary');
   player.equip('10mm_pistol', 'secondary');
-  player.swapWeapons(); // pistol in hand
-  player.reload();
-  player.swapWeapons(); // back to the knife
+  player.reload(); // the rifle, in hand
+  player.swapWeapons();
+  player.reload(); // the pistol
+  player.swapWeapons(); // back to the rifle
   return player;
 }

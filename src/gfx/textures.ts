@@ -9,8 +9,10 @@ import {
   GLYPH_WIDTH,
   GLYPHS,
   glyphTextureKey,
+  plainGlyphKey,
 } from './pixelFont';
 import { SPRITES, type PixelSprite } from './sprites';
+import { WEAPON_SPRITES, weaponTextureKey } from './weaponSprites';
 
 /**
  * Builds every texture at startup, so there are no image files yet.
@@ -28,7 +30,18 @@ export function createTextures(scene: Phaser.Scene): void {
   }
   for (const [char, rows] of Object.entries(GLYPHS)) {
     createGlyphTexture(scene, char, rows);
+    createPlainGlyphTexture(scene, char, rows);
   }
+  for (const [itemId, sprite] of Object.entries(WEAPON_SPRITES)) {
+    createSpriteTexture(scene, weaponTextureKey(itemId), sprite);
+  }
+}
+
+/** The glyph alone, white so it can be tinted, for text on a solid background. */
+function createPlainGlyphTexture(scene: Phaser.Scene, char: string, rows: string[]): void {
+  createTexture(scene, plainGlyphKey(char), GLYPH_WIDTH, GLYPH_HEIGHT, (ctx) => {
+    rows.forEach((row, y) => [...row].forEach((c, x) => c === '#' && pixel(ctx, x, y, '#ffffff')));
+  });
 }
 
 /**
