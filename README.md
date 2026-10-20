@@ -49,8 +49,10 @@ Fallout-style and turn-based, on the same grid you explore. Combat starts when a
 sees you (or you attack one). You act first with your Action Points, then each enemy
 takes its turn. Hit chance is your weapon skill minus the target's Armor Class (minus a
 range penalty for guns), damage is reduced by Damage Resistance, and Luck is your critical
-chance. Guns use ammo from your backpack. Get far enough away and enemies lose track of
-you; kill them and their corpses can be looted.
+chance. Guns use ammo from your backpack. Walls and rocks block line of sight (water
+doesn't): enemies can't spot or shoot you through them, nor you them, and they walk around
+cover to get a clear shot. Get far enough away, or out of range behind cover, and enemies
+lose track of you; kill them and their corpses can be looted.
 
 ## Layout
 

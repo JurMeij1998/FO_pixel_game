@@ -14,6 +14,8 @@ const LEGEND: Record<string, TileType> = {
 };
 
 const BLOCKING: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'water']);
+/** Tiles you can't see (or shoot) through. Water blocks walking but not sight. */
+const OPAQUE: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock']);
 
 const PLAYER_MARKER = 'P';
 const CHEST_MARKER = /^[a-z]$/;
@@ -126,6 +128,44 @@ export class GridMap {
 
   corpseAt(x: number, y: number): Creature | undefined {
     return this.creatures.find((c) => c.isDead && c.pos.x === x && c.pos.y === y);
+  }
+
+  blocksSight(x: number, y: number): boolean {
+    const tile = this.tileAt(x, y);
+    return tile === null || OPAQUE.has(tile);
+  }
+
+  /**
+   * True if no wall or rock lies on the line between two tiles (the end tiles themselves
+   * don't count). A Bresenham line from a to b can differ from one from b to a, so both are
+   * tried and either being clear is enough; that keeps sight symmetric.
+   */
+  hasLineOfSight(a: GridPos, b: GridPos): boolean {
+    return this.isLineClear(a, b) || this.isLineClear(b, a);
+  }
+
+  private isLineClear(from: GridPos, to: GridPos): boolean {
+    const dx = Math.abs(to.x - from.x);
+    const dy = -Math.abs(to.y - from.y);
+    const stepX = from.x < to.x ? 1 : -1;
+    const stepY = from.y < to.y ? 1 : -1;
+    let error = dx + dy;
+    let x = from.x;
+    let y = from.y;
+    while (x !== to.x || y !== to.y) {
+      const doubled = 2 * error;
+      if (doubled >= dy) {
+        error += dy;
+        x += stepX;
+      }
+      if (doubled <= dx) {
+        error += dx;
+        y += stepY;
+      }
+      const reachedEnd = x === to.x && y === to.y;
+      if (!reachedEnd && this.blocksSight(x, y)) return false;
+    }
+    return true;
   }
 
   /** Corpses don't block; living creatures do. The player's own tile is not checked here. */

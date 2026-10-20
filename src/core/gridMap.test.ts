@@ -31,6 +31,20 @@ describe('GridMap', () => {
     expect(tiny.isWalkable(5, 1)).toBe(false);
   });
 
+  it('blocks line of sight with walls and rocks, but not water', () => {
+    const map = GridMap.parse({
+      name: 'sight',
+      rows: ['.......', '.P.#...', '.......', '.~~~...', '...o...'],
+      chests: {},
+    });
+    expect(map.hasLineOfSight({ x: 1, y: 1 }, { x: 5, y: 1 })).toBe(false); // wall at (3,1)
+    expect(map.hasLineOfSight({ x: 5, y: 1 }, { x: 1, y: 1 })).toBe(false); // and the other way
+    expect(map.hasLineOfSight({ x: 1, y: 1 }, { x: 5, y: 2 })).toBe(true); // passes below the wall
+    expect(map.hasLineOfSight({ x: 0, y: 3 }, { x: 5, y: 3 })).toBe(true); // over water
+    expect(map.hasLineOfSight({ x: 1, y: 4 }, { x: 5, y: 4 })).toBe(false); // rock at (3,4)
+    expect(map.hasLineOfSight({ x: 2, y: 1 }, { x: 3, y: 1 })).toBe(true); // the end tiles don't count
+  });
+
   it('rejects malformed maps', () => {
     expect(() => GridMap.parse({ name: 'ragged', rows: ['P..', '..'], chests: {} })).toThrow(/row 1/);
     expect(() => GridMap.parse({ name: 'nostart', rows: ['...'], chests: {} })).toThrow(/player start/);

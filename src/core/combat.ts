@@ -64,7 +64,9 @@ export class Combat {
 
   /** Living creatures that can see the player. If there are any, combat should start. */
   static spotters(map: GridMap, player: Character): Creature[] {
-    return map.creatures.filter((c) => !c.isDead && distance(c.pos, player.pos) <= c.def.sightRange);
+    return map.creatures.filter(
+      (c) => !c.isDead && distance(c.pos, player.pos) <= c.def.sightRange && map.hasLineOfSight(c.pos, player.pos),
+    );
   }
 
   get isPlayerTurn(): boolean {
@@ -82,6 +84,22 @@ export class Combat {
     return Math.max(5, Math.min(95, chance));
   }
 
+  canSee(a: Fighter, b: Fighter): boolean {
+    return this.map.hasLineOfSight(a.pos, b.pos);
+  }
+
+  /** Why the player can't attack this target right now, or null if they can. */
+  attackProblem(target: Creature): string | null {
+    if (!this.isPlayerTurn) return "It isn't your turn.";
+    if (target.isDead) return `The ${target.name} is already dead.`;
+    const attack = this.player.attack;
+    if (this.actionPoints < attack.apCost) return `Attacking with the ${attack.name} takes ${attack.apCost} AP.`;
+    if (distance(this.player.pos, target.pos) > attack.range) return `The ${target.name} is out of range.`;
+    if (!this.canSee(this.player, target)) return `You can't see the ${target.name} from here.`;
+    if (attack.ammo && this.player.backpack.count(attack.ammo) === 0) return "You're out of ammo.";
+    return null;
+  }
+
   movePlayer(step: GridPos): CombatAction {
     if (!this.isPlayerTurn) return refused("It isn't your turn.");
     if (this.actionPoints < MOVE_AP_COST) return refused('You are out of action points.');
@@ -94,14 +112,10 @@ export class Combat {
   }
 
   attack(target: Creature): CombatAction {
-    if (!this.isPlayerTurn) return refused("It isn't your turn.");
-    if (target.isDead) return refused(`The ${target.name} is already dead.`);
+    const problem = this.attackProblem(target);
+    if (problem) return refused(problem);
     const attack = this.player.attack;
-    if (this.actionPoints < attack.apCost) {
-      return refused(`Attacking with the ${attack.name} takes ${attack.apCost} AP.`);
-    }
-    if (distance(this.player.pos, target.pos) > attack.range) return refused(`The ${target.name} is out of range.`);
-    if (attack.ammo && !this.player.backpack.remove(attack.ammo)) return refused(`You're out of ammo.`);
+    if (attack.ammo) this.player.backpack.remove(attack.ammo);
 
     this.actionPoints -= attack.apCost;
     if (!this.participants.includes(target)) this.participants.push(target);
@@ -150,12 +164,12 @@ export class Combat {
     return events;
   }
 
-  /** Simple AI: attack while in range and affordable, otherwise walk towards the player. */
+  /** Simple AI: attack while it can and has the AP, otherwise walk towards a spot it can attack from. */
   private runEnemyTurn(enemy: Creature, events: CombatEvent[]): void {
     let ap = enemy.maxActionPoints;
-    const { apCost, range } = enemy.attack;
+    const { apCost } = enemy.attack;
     while (!this.outcome) {
-      if (distance(enemy.pos, this.player.pos) <= range) {
+      if (this.canAttackFrom(enemy, enemy.pos)) {
         if (ap < apCost) return;
         ap -= apCost;
         events.push(this.resolveAttack(enemy, this.player));
@@ -216,6 +230,11 @@ export class Combat {
     return { type: 'attack', attacker, target, ranged, hit: true, critical, damage, killed, message, newLevel };
   }
 
+  /** In range and with a clear line of sight. */
+  private canAttackFrom(enemy: Creature, pos: GridPos): boolean {
+    return distance(pos, this.player.pos) <= enemy.attack.range && this.map.hasLineOfSight(pos, this.player.pos);
+  }
+
   /**
    * Breadth-first search from the creature to the nearest tile from which it can attack.
    * Returns the first step of that path, or null if it is already in range or has no way there.
@@ -227,7 +246,7 @@ export class Combat {
 
     while (queue.length > 0) {
       const current = queue.shift()!;
-      if (distance(current, this.player.pos) <= enemy.attack.range) {
+      if (this.canAttackFrom(enemy, current)) {
         // Walk the path back to the step right after the start.
         let step = current;
         let previous = cameFrom.get(key(step)) ?? null;
@@ -258,12 +277,14 @@ export class Combat {
     }
   }
 
+  /** Creatures give up when you are well out of sight range, or out of range and hidden behind cover. */
   private dropLostEnemies(): void {
     for (let i = this.participants.length - 1; i >= 0; i--) {
       const c = this.participants[i];
-      if (!c.isDead && distance(c.pos, this.player.pos) > c.def.sightRange + GIVE_UP_MARGIN) {
-        this.participants.splice(i, 1);
-      }
+      if (c.isDead) continue;
+      const d = distance(c.pos, this.player.pos);
+      const hidden = d > c.def.sightRange && !this.map.hasLineOfSight(c.pos, this.player.pos);
+      if (d > c.def.sightRange + GIVE_UP_MARGIN || hidden) this.participants.splice(i, 1);
     }
   }
 

@@ -8,7 +8,7 @@ const ALWAYS = () => 0;
 const NEVER = () => 0.999;
 
 function setup(rows: string[], rng: () => number = ALWAYS) {
-  const map = GridMap.parse({ name: 'arena', rows, chests: {}, creatures: { R: 'radroach' } });
+  const map = GridMap.parse({ name: 'arena', rows, chests: {}, creatures: { R: 'radroach', X: 'raider' } });
   const player = new Character('Tester', {
     strength: 5,
     perception: 5,
@@ -120,6 +120,51 @@ describe('Combat', () => {
     combat.participants.push(roach);
     combat.endTurn();
     expect(combat.outcome).toBe('escaped');
+  });
+
+  describe('line of sight', () => {
+    // A wall between the player and a raider well within its sight range of 7.
+    const WALLED = ['#########', '#P..#..X#', '#...#...#', '#.......#', '#########'];
+
+    it('hides the player from creatures behind a wall', () => {
+      const { map, player, combat } = setup(WALLED);
+      expect(Combat.spotters(map, player)).toEqual([]);
+      expect(combat.participants).toEqual([]);
+    });
+
+    it("won't let the player shoot through a wall", () => {
+      const { map, player, combat } = setup(WALLED);
+      const raider = map.creatures[0];
+      player.backpack.add('10mm_pistol');
+      player.backpack.add('ammo_10mm', 5);
+      player.equip('10mm_pistol', 'primary');
+      const result = combat.attack(raider);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.message).toMatch(/can't see/);
+      expect(player.backpack.count('ammo_10mm')).toBe(5);
+    });
+
+    it('makes enemies walk around cover until they have a shot', () => {
+      const { map, player, combat } = setup(WALLED);
+      const raider = map.creatures[0];
+      combat.participants.push(raider);
+
+      const firstTurn = combat.endTurn();
+      expect(firstTurn.every((e) => e.type === 'move')).toBe(true); // no shots through the wall
+      expect(player.hitPoints).toBe(player.maxHitPoints);
+
+      const secondTurn = combat.endTurn();
+      expect(secondTurn.some((e) => e.type === 'attack')).toBe(true);
+      expect(map.hasLineOfSight(raider.pos, player.pos)).toBe(true);
+    });
+
+    it('lets enemies lose track of a player hiding behind cover', () => {
+      // Raider out of sight range (8 tiles) and behind a wall: it gives up at the end of the turn.
+      const { map, combat } = setup(['###########', '#P...#...X#', '###########']);
+      combat.participants.push(map.creatures[0]);
+      combat.endTurn();
+      expect(combat.outcome).toBe('escaped');
+    });
   });
 
   it('clamps hit chance and penalises long shots', () => {
