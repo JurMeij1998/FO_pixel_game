@@ -6,7 +6,7 @@ import type { Conversation, DialogAction } from '../core/dialog';
  * where the box goes, what its lines say, and which reply is selected.
  */
 
-// The box covers the HUD's message log and controls line, so nothing shows around it.
+// The box covers the HUD's message log (and the health bar), so nothing shows around it.
 export const BOX_X = 8;
 export const BOX_WIDTH = GAME_WIDTH - 2 * BOX_X;
 export const BOX_BOTTOM = GAME_HEIGHT - 8;

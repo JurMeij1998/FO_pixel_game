@@ -29,6 +29,28 @@ function setup(rows: string[], rng: () => number = ALWAYS) {
 const ARENA = ['#######', '#P..R.#', '#.....#', '#######'];
 
 describe('Combat', () => {
+  it("reports the target's health before and after each attack, for the scene to show it landing", () => {
+    const { roach, combat } = setup(['#####', '#PR.#', '#####']);
+    const hitResult = combat.attack(roach);
+    if (!hitResult.ok || hitResult.events[0].type !== 'attack') throw new Error('expected an attack');
+    expect(hitResult.events[0].targetHitPoints).toEqual({ before: 8, after: roach.hitPoints });
+
+    // An overkill hit still reports the health the target really had, not before = after + damage.
+    roach.hitPoints = 1;
+    combat.endTurn();
+    combat.startPlayerTurn();
+    const killing = combat.attack(roach);
+    if (!killing.ok || killing.events[0].type !== 'attack') throw new Error('expected an attack');
+    expect(killing.events[0].targetHitPoints).toEqual({ before: 1, after: 0 });
+  });
+
+  it("reports unchanged health for a miss", () => {
+    const { roach, combat } = setup(['#####', '#PR.#', '#####'], NEVER);
+    const result = combat.attack(roach);
+    if (!result.ok || result.events[0].type !== 'attack') throw new Error('expected an attack');
+    expect(result.events[0].targetHitPoints).toEqual({ before: 8, after: 8 });
+  });
+
   it('starts with the creatures that can see the player', () => {
     const { map, player, roach, combat } = setup(ARENA);
     expect(Combat.spotters(map, player)).toEqual([roach]);

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
-import { COMBAT_BAR_HEIGHT, HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
+import { COMBAT_LABEL, HUD_BOTTOM, TILE_SIZE, WORLD_ZOOM } from '../config';
 import { Combat, INVENTORY_AP_COST, type AttackEvent, type CombatEvent } from '../core/combat';
 import { capitalize, listNames, type Creature } from '../core/creature';
 import type { DialogData } from './DialogScene';
@@ -11,6 +11,8 @@ import type { Lootable } from '../core/loot';
 import { tileTextureKey } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
 import { ApGauge } from '../ui/apGauge';
+import { ENEMY_BAR_GAP, ENEMY_BAR_HEIGHT, enemyBar } from '../ui/healthBar';
+import { holdHealth, releaseHealth, showHit, shownHitPoints } from '../ui/shownHealth';
 import type { Rect } from '../ui/gaugePlacement';
 import { postMessage } from '../ui/messages';
 import { FONT } from '../ui/theme';
@@ -27,7 +29,8 @@ const STEP: Record<Direction, GridPos> = {
 
 const MOVE_DURATION_MS = 140;
 
-const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, gauge: 9, effects: 10 };
+const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, healthBars: 5, gauge: 9, effects: 10 };
+const ENEMY_RED = 0xd02020;
 const FADE_MS = 250;
 
 /** Pixel position of a tile's centre. */
@@ -48,6 +51,8 @@ export class WorldScene extends Phaser.Scene {
   private readonly chestImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly creatureImages = new Map<Creature, Phaser.GameObjects.Image>();
   private targetMarker!: Phaser.GameObjects.Graphics;
+  /** The thin health bars floating over the creatures you're fighting. */
+  private enemyBars!: Phaser.GameObjects.Graphics;
   private apGauge!: ApGauge;
   /** Whether the camera bounds currently leave the extra room combat needs at the top. */
   private combatBounds = false;
@@ -93,6 +98,7 @@ export class WorldScene extends Phaser.Scene {
     const towardsSomeone = (['up', 'down', 'left', 'right'] as const).find((d) => state.map.personFacing(start, STEP[d]));
     this.face(towardsSomeone ?? 'down');
     this.targetMarker = this.add.graphics().setDepth(DEPTH.marker);
+    this.enemyBars = this.add.graphics().setDepth(DEPTH.healthBars);
     this.apGauge = new ApGauge(this, state.player.maxActionPoints, DEPTH.gauge);
 
     this.combatBounds = state.combat !== null;
@@ -142,6 +148,7 @@ export class WorldScene extends Phaser.Scene {
       this.setCameraBounds();
     }
     this.drawTargetMarker();
+    this.drawEnemyBars();
     this.updateApGauge(delta);
     if (this.busy) return;
     const direction = this.heldDirection();
@@ -327,14 +334,20 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private async play(events: CombatEvent[]): Promise<void> {
-    for (const event of events) {
-      if (event.type === 'move') {
-        const image = this.imageFor(event.fighter);
-        if (event.fighter !== state.player) playSound('creatureStep'); // the player's steps play in showStride
-        await this.tweenTo(image, event.to);
-      } else {
-        await this.showAttack(event);
+    // The rules have already applied every hit; the health bars catch up as each one is shown.
+    holdHealth(events);
+    try {
+      for (const event of events) {
+        if (event.type === 'move') {
+          const image = this.imageFor(event.fighter);
+          if (event.fighter !== state.player) playSound('creatureStep'); // the player's steps play in showStride
+          await this.tweenTo(image, event.to);
+        } else {
+          await this.showAttack(event);
+        }
       }
+    } finally {
+      releaseHealth();
     }
   }
 
@@ -356,6 +369,7 @@ export class WorldScene extends Phaser.Scene {
 
     postMessage(this, event.message);
     if (event.hit) {
+      showHit(event);
       playSound(targetIsPlayer ? 'hurt' : 'impact');
       this.floatText(target, `-${event.damage}`, event.critical ? '#ffe040' : '#ff5040');
       target.setTintFill(0xff3030);
@@ -446,13 +460,13 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * Lets the camera scroll past the map edges by the HUD's height, so the HUD never hides a tile.
-   * In combat it can scroll further at the top, past the combat bar and with a tile to spare, so
-   * the AP gauge (always above the player) still has room when the player is on the top rows.
+   * Lets the camera scroll past the bottom of the map by the message log's height, so the log
+   * never hides a tile. In combat it can scroll a tile past the top, so the AP gauge (always
+   * above the player) still has room when the player is on the top row.
    */
   private setCameraBounds(): void {
     const map = state.map;
-    const top = (HUD_TOP + (this.combatBounds ? COMBAT_BAR_HEIGHT : 0)) / WORLD_ZOOM + (this.combatBounds ? TILE_SIZE : 0);
+    const top = this.combatBounds ? TILE_SIZE : 0;
     const bottom = HUD_BOTTOM / WORLD_ZOOM;
     this.cameras.main.setBounds(0, -top, map.width * TILE_SIZE, map.height * TILE_SIZE + top + bottom);
   }
@@ -474,27 +488,61 @@ export class WorldScene extends Phaser.Scene {
   private gaugeObstacles(): Rect[] {
     const map = state.map;
     const tile = (x: number, y: number): Rect => ({ x: x * TILE_SIZE, y: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE });
-    // Living creatures use their sprites, which may be mid-step.
-    const around = (image: Phaser.GameObjects.Image): Rect => ({
-      x: image.x - TILE_SIZE / 2,
-      y: image.y - TILE_SIZE / 2,
-      width: TILE_SIZE,
-      height: TILE_SIZE,
-    });
+    // Living creatures use their sprites, which may be mid-step, plus the health bar over the
+    // ones you're fighting.
+    const around = (image: Phaser.GameObjects.Image, withBar: boolean): Rect => {
+      const overhead = withBar ? ENEMY_BAR_GAP + ENEMY_BAR_HEIGHT : 0;
+      return { x: image.x - TILE_SIZE / 2, y: image.y - TILE_SIZE / 2 - overhead, width: TILE_SIZE, height: TILE_SIZE + overhead };
+    };
     const rects = [...map.chests.map((c) => tile(c.x, c.y)), ...map.exits.map((e) => tile(e.x, e.y))];
+    const fighting = new Set(this.creaturesWithBars());
     for (const creature of map.creatures) {
-      if (!creature.isDead) rects.push(around(this.imageFor(creature)));
+      if (!creature.isDead) rects.push(around(this.imageFor(creature), fighting.has(creature)));
       else if (!creature.contents.isEmpty) rects.push(tile(creature.pos.x, creature.pos.y)); // lootable corpse
     }
+    // The HUD's floating combat label, in the top left corner of the screen, in world pixels.
+    const view = this.cameras.main.worldView;
+    rects.push({
+      x: view.x + COMBAT_LABEL.x / WORLD_ZOOM,
+      y: view.y + COMBAT_LABEL.y / WORLD_ZOOM,
+      width: COMBAT_LABEL.width / WORLD_ZOOM,
+      height: COMBAT_LABEL.height / WORLD_ZOOM,
+    });
     return rects;
   }
 
-  /** The part of the world on screen, not counting what the HUD covers at the top and bottom. */
+  /** The part of the world on screen, not counting the message log at the bottom. */
   private visibleWorld(): Rect {
     const view = this.cameras.main.worldView;
-    const top = (HUD_TOP + (state.combat ? COMBAT_BAR_HEIGHT : 0)) / WORLD_ZOOM;
     const bottom = HUD_BOTTOM / WORLD_ZOOM;
-    return { x: view.x, y: view.y + top, width: view.width, height: view.height - top - bottom };
+    return { x: view.x, y: view.y, width: view.width, height: view.height - bottom };
+  }
+
+  /**
+   * The creatures you're fighting whose death hasn't been shown yet: the ones with a health bar.
+   * A creature killed by an attack still playing keeps its bar until the hit is shown.
+   */
+  private creaturesWithBars(): Creature[] {
+    return (state.combat?.participants ?? []).filter((c) => shownHitPoints(c) > 0);
+  }
+
+  /**
+   * A thin bar over every creature you're in combat with, red for the health it has left and
+   * black, from the right, for what it has lost. None outside combat, nor over creatures that
+   * haven't joined the fight. Redrawn every frame, so it follows creatures mid-step, and it
+   * shows health as the animation has got to (ui/shownHealth.ts).
+   */
+  private drawEnemyBars(): void {
+    this.enemyBars.clear();
+    for (const creature of this.creaturesWithBars()) {
+      const image = this.imageFor(creature);
+      const bar = enemyBar(image.x, image.y, TILE_SIZE, shownHitPoints(creature), creature.maxHitPoints);
+      this.enemyBars
+        .fillStyle(0x000000)
+        .fillRect(bar.x, bar.y, bar.width, bar.height)
+        .fillStyle(ENEMY_RED)
+        .fillRect(bar.x, bar.y, bar.red, bar.height);
+    }
   }
 
   private drawTargetMarker(): void {

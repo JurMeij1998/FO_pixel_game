@@ -146,7 +146,7 @@ wild dogs and radroaches roaming the streets.
 Kills give XP (radroach 25, wild dog 35, mole rat 40, feral ghoul 50, raider 100). Level 2 takes 100 XP, level 3 300,
 level 4 600, and so on. Each level adds 3 + Endurance/2 max HP and 5 + 2 x Intelligence skill
 points, spent on the character sheet (C). Tagged skills gain 2% per point, others 1%.
-A `+` after your level in the HUD means you have points to spend.
+The level-up message tells you when you have points to spend.
 
 ## Sound
 
@@ -185,7 +185,7 @@ they walk around cover to get a clear shot. Get far enough away, or out of range
 cover, and enemies lose track of you; kill them and their corpses can be looted.
 
 Your shots don't pass through people: anyone standing in your line of fire takes the bullet
-instead (hit or miss, at their own odds), and the HUD warns you ("Gus is in the way"). Hit a
+instead (hit or miss, at their own odds), and the log says so ("Gus is in the way!"). Hit a
 friendly bystander and they turn hostile, with their group. Enemies aren't that careful:
 their shots fly past whoever is in between and hit you. Melee isn't affected.
 
@@ -196,6 +196,23 @@ the number down, flashes the spent pips and pops a superscript "-3"; a new turn 
 with a "+N". It bobs gently, dims during the enemy turn, and always floats above you, picking the spot
 there that covers as little as possible of any chest, creature, lootable corpse or exit
 (`ui/gaugePlacement.ts`).
+
+The HUD is kept small and mostly sits straight on the map: the message log in the bottom
+left, a "COMBAT - YOUR TURN" (or ENEMY TURN) label in the top left during a fight, and
+"[muted]" in the top right when the sound is off. Your other stats (level, AC, AP, carry
+weight) are on the character sheet (C) and the inventory screen (I).
+
+Your health is always on screen, in the bottom right corner: a black bar whose green border
+pulses and shines like the AP gauge's (`ui/glow.ts`), filled dark red, with your HP in it
+(orange-red once you're down to a quarter).
+Directly above it is the weapon in hand: a gun's name with the rounds in its magazine out of
+what it holds and the spare rounds in your pack ("Hunting Rifle 5/5 (+10)"), or just the
+name of a melee weapon (`ui/healthBar.ts`).
+
+In a fight, every creature you're fighting has a thin health bar floating just above it:
+red for the health it has left, turning black from the right as it loses health, so the bar
+always stays the same length. Outside combat, and over creatures that haven't joined the
+fight, there are none.
 
 ## Layout
 
@@ -222,7 +239,9 @@ src/
   data/       Content: the wasteland map, biomes/, and world.ts (which maps exist)
   gfx/        Procedurally generated placeholder pixel art
   audio/      Synthesised sound effects
-  ui/         Theme, widgets (panel, buttons, scrollable list), formatting
+  ui/         Theme, widgets (panel, buttons, scrollable list), formatting, and the pure logic
+              behind the HUD and screens: AP gauge and its placement, health bars, the
+              shared glow, dialog box, barter lists, the message log
   scenes/     Phaser scenes: Boot, Menu, World, Hud, Inventory, Loot, Dialog, Barter,
               Character, Pause, GameOver, Controls; flow.ts switches between menus and the game
   state.ts    The running game (player + map), loaded from the save if there is one
