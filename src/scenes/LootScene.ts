@@ -7,13 +7,17 @@ import { state } from '../state';
 import { stackRows } from '../ui/format';
 import { postMessage } from '../ui/messages';
 import { COLORS, HEADER_TEXT, SMALL_TEXT, TEXT } from '../ui/theme';
+import { ListCursor } from '../ui/listCursor';
 import { amountFor } from '../ui/trade';
-import { addButton, closeOverlay, drawPanel, ListView, PANEL } from '../ui/widgets';
+import { addButton, bindCursorKeys, closeOverlay, drawPanel, ListView, PANEL, showCursor } from '../ui/widgets';
 
 const LEFT = PANEL.x + 30;
 const RIGHT = PANEL.x + 470;
 
-/** Two-column transfer screen between the backpack and a chest or corpse; see amountFor() for what a click moves. */
+/**
+ * Two-column transfer screen between the backpack and a chest or corpse; see amountFor() for
+ * what a click moves. W/S and A/D move a cursor through the two lists.
+ */
 export class LootScene extends Phaser.Scene {
   private lootable!: Lootable;
   /** Called after the screen has closed, when taking something turned its owners hostile. */
@@ -24,6 +28,7 @@ export class LootScene extends Phaser.Scene {
   private wasEmpty = false;
   private yourItems!: ListView;
   private containerItems!: ListView;
+  private cursor!: ListCursor;
   private yourHeader!: Phaser.GameObjects.Text;
   private feedback!: Phaser.GameObjects.Text;
 
@@ -49,12 +54,14 @@ export class LootScene extends Phaser.Scene {
     this.add.text(LEFT, 500, 'Click: move 1   Ctrl+click: half   Shift+click: all', SMALL_TEXT);
 
     this.yourItems = new ListView(this, LEFT, 122, 36, 15, (itemId, modifiers) => {
+      this.cursor.focus(0, itemId);
       const quantity = transferQuantity(player.backpack.count(itemId), amountFor(modifiers));
       const result = storeItem(player, this.lootable.contents, itemId, quantity);
       if (result.ok) this.stash.stored(itemId, quantity);
       this.apply(result);
     });
     this.containerItems = new ListView(this, RIGHT, 122, 36, 15, (itemId, modifiers) => {
+      this.cursor.focus(1, itemId);
       const quantity = transferQuantity(this.lootable.contents.count(itemId), amountFor(modifiers));
       this.take(() => takeItem(player, this.lootable.contents, itemId, quantity));
     });
@@ -62,6 +69,8 @@ export class LootScene extends Phaser.Scene {
     addButton(this, RIGHT, 500, 'Take all (Space)', () => this.take(() => takeAll(player, this.lootable.contents)));
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
 
+    this.cursor = new ListCursor(this.keys(), 1);
+    bindCursorKeys(this, this.cursor, () => this.refresh());
     const keyboard = this.input.keyboard!;
     keyboard.on('keydown-ESC', () => this.close());
     keyboard.on('keydown-E', () => this.close());
@@ -104,6 +113,13 @@ export class LootScene extends Phaser.Scene {
     this.yourHeader.setText(`YOU  (${player.carriedWeight}/${player.carryCapacity} lb)`);
     this.yourItems.setRows(stackRows(player.backpack.items));
     this.containerItems.setRows(stackRows(this.lootable.contents.items));
+    this.cursor.update(this.keys());
+    showCursor(this.cursor, [this.yourItems, this.containerItems]);
+  }
+
+  /** The item ids in each list, left to right, as the cursor walks them. */
+  private keys(): string[][] {
+    return [state.player.backpack.items, this.lootable.contents.items].map((items) => items.map((s) => s.itemId));
   }
 
   private close(): void {

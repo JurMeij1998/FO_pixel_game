@@ -15,4 +15,5 @@ export const CONTROL_ROWS: Array<[keys: string, exploring: string, combat: strin
   ['Esc', 'Pause menu / close', 'Pause menu'],
   ['M', 'Sound on/off', 'Sound on/off'],
   ['Space (loot)', 'Take all', '-'],
+  ['W/S, A/D (screens)', 'Move the cursor in lists', 'Same'],
 ];

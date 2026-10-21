@@ -5,10 +5,14 @@ import { getItem, type ItemDef } from '../core/items';
 import type { ActionResult } from '../core/result';
 import { state } from '../state';
 import { describeItem, stackRows } from '../ui/format';
+import { ListCursor } from '../ui/listCursor';
 import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
-import { addButton, closeOverlay, drawPanel, ListView, PANEL } from '../ui/widgets';
+import { addButton, bindCursorKeys, closeOverlay, drawPanel, ListView, PANEL } from '../ui/widgets';
 
 type Selection = { kind: 'backpack'; itemId: string } | { kind: 'slot'; slot: EquipSlot } | null;
+
+const BACKPACK = 0;
+const EQUIPMENT = 1;
 type Action = { label: string; run: () => ActionResult; sound?: SoundName };
 
 const SLOT_LABELS: Record<EquipSlot, string> = { primary: 'Primary', secondary: 'Secondary', armor: 'Armor' };
@@ -17,7 +21,10 @@ const MAX_ACTIONS = 3;
 const LEFT = PANEL.x + 30;
 const RIGHT = PANEL.x + 490;
 
-/** Fallout-style inventory: backpack on the left, equipment and item details on the right. */
+/**
+ * Fallout-style inventory: backpack on the left, equipment and item details on the right.
+ * W/S move the selection up and down, A/D between the backpack and the equipment.
+ */
 export class InventoryScene extends Phaser.Scene {
   private backpack!: ListView;
   private readonly slotTexts = new Map<EquipSlot, Phaser.GameObjects.Text>();
@@ -26,7 +33,8 @@ export class InventoryScene extends Phaser.Scene {
   private feedback!: Phaser.GameObjects.Text;
   private actionButtons: Phaser.GameObjects.Text[] = [];
   private actions: Action[] = [];
-  private selection: Selection = null;
+  /** The keyboard cursor, which is also the selection: what the details and actions are for. */
+  private cursor!: ListCursor;
 
   constructor() {
     super('Inventory');
@@ -34,19 +42,19 @@ export class InventoryScene extends Phaser.Scene {
 
   create(): void {
     // A scene object is reused each time it is launched, so reset its state here.
-    this.selection = null;
     this.slotTexts.clear();
+    this.cursor = new ListCursor(this.keys(), BACKPACK);
 
     drawPanel(this, 'INVENTORY');
     addButton(this, PANEL.x + PANEL.width - 130, PANEL.y + 18, 'Close', () => closeOverlay(this));
 
     this.add.text(LEFT, 90, 'BACKPACK', HEADER_TEXT);
-    this.backpack = new ListView(this, LEFT, 122, 38, 17, (itemId) => this.select({ kind: 'backpack', itemId }));
+    this.backpack = new ListView(this, LEFT, 122, 38, 17, (itemId) => this.select(BACKPACK, itemId));
 
     this.add.text(RIGHT, 90, 'EQUIPPED', HEADER_TEXT);
     EQUIP_SLOTS.forEach((slot, i) => {
       const text = this.add.text(RIGHT, 122 + i * 26, '', TEXT).setInteractive({ useHandCursor: true });
-      text.on('pointerdown', () => this.select({ kind: 'slot', slot }));
+      text.on('pointerdown', () => this.select(EQUIPMENT, slot));
       this.slotTexts.set(slot, text);
     });
 
@@ -59,6 +67,7 @@ export class InventoryScene extends Phaser.Scene {
       this.actionButtons.push(addButton(this, RIGHT, 480 + i * 30, '', () => this.runAction(i)));
     }
 
+    bindCursorKeys(this, this.cursor, () => this.select());
     const keyboard = this.input.keyboard!;
     keyboard.on('keydown-I', () => closeOverlay(this));
     keyboard.on('keydown-ESC', () => closeOverlay(this));
@@ -66,10 +75,22 @@ export class InventoryScene extends Phaser.Scene {
     this.refresh();
   }
 
-  private select(selection: Selection): void {
-    this.selection = selection;
+  /** Selects a row (one that was clicked), or just shows where the keyboard moved the cursor. */
+  private select(column?: number, key?: string): void {
+    if (column !== undefined && key !== undefined) this.cursor.focus(column, key);
     this.feedback.setText('');
     this.refresh();
+  }
+
+  /** The backpack's item ids and the equipment slots, as the cursor walks them. */
+  private keys(): string[][] {
+    return [state.player.backpack.items.map((s) => s.itemId), [...EQUIP_SLOTS]];
+  }
+
+  private get selection(): Selection {
+    const key = this.cursor.selectedKey;
+    if (key === null) return null;
+    return this.cursor.activeColumn === BACKPACK ? { kind: 'backpack', itemId: key } : { kind: 'slot', slot: key as EquipSlot };
   }
 
   private runAction(index: number): void {
@@ -84,13 +105,12 @@ export class InventoryScene extends Phaser.Scene {
   private refresh(): void {
     const player = state.player;
 
-    // Clear the selection if the item it points at is gone (used up, dropped, equipped).
-    if (this.selection?.kind === 'backpack' && player.backpack.count(this.selection.itemId) === 0) {
-      this.selection = null;
-    }
+    // An item used up, dropped or equipped leaves the backpack: the cursor moves to its neighbour.
+    this.cursor.update(this.keys());
 
     this.backpack.selectedKey = this.selection?.kind === 'backpack' ? this.selection.itemId : null;
     this.backpack.setRows(stackRows(player.backpack.items));
+    if (this.selection?.kind === 'backpack') this.backpack.reveal(this.selection.itemId);
 
     for (const [slot, text] of this.slotTexts) {
       const item = player.equippedItem(slot);

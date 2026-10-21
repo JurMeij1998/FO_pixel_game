@@ -53,6 +53,7 @@ behind it, and the guard outside by the door.
 | E / Esc (loot)  | Close the loot screen            |                               |
 | Up/Down, Enter (talk) | Pick a reply and answer (or click it, or press its number); Esc walks away | |
 | Click (barter)  | Sell (left) or buy (right) 1; Ctrl+click half, Shift+click all |     |
+| W/S, A/D (screens) | Inventory, loot, barter: move the `>` cursor up/down a list, and between the lists (arrow keys too) | |
 
 ## Talking and trading
 
