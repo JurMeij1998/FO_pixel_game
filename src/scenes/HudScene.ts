@@ -3,17 +3,39 @@ import { isMuted } from '../audio/sfx';
 import { COMBAT_BAR_HEIGHT, GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM, HUD_TOP } from '../config';
 import { capitalize } from '../core/creature';
 import { state } from '../state';
+import { healthFill, healthLabel, weaponLine } from '../ui/healthBar';
 import { MESSAGE_EVENT } from '../ui/messages';
 import { COLORS, SMALL_TEXT, TEXT } from '../ui/theme';
 
 const LOG_LINES = 3;
-const CONTROLS = 'Arrows/WASD move  E/Space interact  I inventory  C character  Q swap  R reload  Click enemy: attack  Esc menu';
-const COMBAT_CONTROLS =
-  'Arrows move (1 AP)  F/click attack  Tab target  R reload (2 AP)  I inventory (4 AP)  Q swap  Space end turn';
+/** The message log's panel covers the left half of the bottom of the screen; its text wraps inside it. */
+const LOG_PANEL_WIDTH = GAME_WIDTH / 2;
+const LOG_WIDTH = LOG_PANEL_WIDTH - 2 * 12;
+const LOG_TEXT = { ...TEXT, fontSize: '16px', wordWrap: { width: LOG_WIDTH } };
+/** The health bar sits right on the map in the bottom right corner, with the gun line above it. */
+const BAR_WIDTH = 240;
+const BAR_HEIGHT = 22;
+const BAR_X = GAME_WIDTH - 12 - BAR_WIDTH;
+const BAR_Y = GAME_HEIGHT - 12 - BAR_HEIGHT;
+/** Health is dark red inside the same black, green-bordered box as the dialog. */
+const HEALTH_RED = 0x8a1414;
+/** Text straight on the map gets a black outline, so it reads on any ground. */
+const ON_MAP = { stroke: '#000000', strokeThickness: 3 };
+// Two lines each, short enough for the log panel's half of the screen.
+const CONTROLS = 'Arrows/WASD move  E/Space interact  I inventory\nC character  Q swap  R reload  Click: attack  Esc menu';
+const COMBAT_CONTROLS = 'Arrows move (1 AP)  F/click attack  Tab target\nR reload (2 AP)  I pack (4 AP)  Q swap  Space end turn';
 
-/** Status bar along the top and the message log along the bottom, drawn at 1:1 over the zoomed world. */
+/**
+ * Status bar along the top, and along the bottom the message log with, in the bottom right
+ * corner, the weapon in hand above a health bar. Drawn at 1:1 over the zoomed world.
+ */
 export class HudScene extends Phaser.Scene {
   private status!: Phaser.GameObjects.Text;
+  private weapon!: Phaser.GameObjects.Text;
+  private healthBar!: Phaser.GameObjects.Graphics;
+  private healthText!: Phaser.GameObjects.Text;
+  /** What the bar was last drawn for, so it's only redrawn when that changes. */
+  private drawnHealth = '';
   private combatBar!: Phaser.GameObjects.Rectangle;
   private combatText!: Phaser.GameObjects.Text;
   private controls!: Phaser.GameObjects.Text;
@@ -32,9 +54,17 @@ export class HudScene extends Phaser.Scene {
     this.combatText = this.add.text(12, HUD_TOP + 5, '', { ...TEXT, color: COLORS.warn });
 
     const logHeight = HUD_BOTTOM;
-    this.add.rectangle(0, GAME_HEIGHT - logHeight, GAME_WIDTH, logHeight, 0x000000, 0.6).setOrigin(0);
-    this.log = this.add.text(12, GAME_HEIGHT - logHeight + 6, '', TEXT);
-    this.controls = this.add.text(12, GAME_HEIGHT - 22, CONTROLS, SMALL_TEXT);
+    this.add.rectangle(0, GAME_HEIGHT - logHeight, LOG_PANEL_WIDTH, logHeight, 0x000000, 0.6).setOrigin(0);
+    this.log = this.add.text(12, GAME_HEIGHT - logHeight + 6, '', LOG_TEXT);
+    this.controls = this.add.text(12, GAME_HEIGHT - 6, CONTROLS, SMALL_TEXT).setOrigin(0, 1);
+
+    // Right-aligned with the bar, so a long gun name grows to the left instead of off the screen.
+    this.weapon = this.add.text(BAR_X + BAR_WIDTH, BAR_Y - 6, '', { ...TEXT, ...ON_MAP }).setOrigin(1, 1);
+    this.healthBar = this.add.graphics();
+    this.healthText = this.add
+      .text(BAR_X + BAR_WIDTH / 2, BAR_Y + BAR_HEIGHT / 2, '', { ...TEXT, fontSize: '16px', stroke: '#000000', strokeThickness: 3 })
+      .setOrigin(0.5);
+    this.drawnHealth = '';
 
     this.game.events.on(MESSAGE_EVENT, this.addMessage, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(MESSAGE_EVENT, this.addMessage, this));
@@ -51,15 +81,13 @@ export class HudScene extends Phaser.Scene {
     const p = state.player;
     const combat = state.combat;
     const ap = combat ? `${combat.actionPoints}/${p.maxActionPoints}` : `${p.maxActionPoints}`;
-    const weapon = p.attack;
-    const magazine = p.activeWeapon?.weapon?.magazineSize;
-    const ammo = weapon.ammo ? ` ${p.loadedRounds()}/${magazine} (+${p.backpack.count(weapon.ammo)})` : '';
     const level = `Lv ${p.level}${p.skillPoints > 0 ? '+' : ''}`;
+    // HP and the weapon in hand are in the bottom right, by the health bar.
     this.status.setText(
-      `${level}   HP ${p.hitPoints}/${p.maxHitPoints}   AC ${p.armorClass}   AP ${ap}   ` +
-        `Wt ${p.carriedWeight}/${p.carryCapacity}   ${weapon.name}${ammo}${isMuted() ? '   [muted]' : ''}`,
+      `${level}   AC ${p.armorClass}   AP ${ap}   Wt ${p.carriedWeight}/${p.carryCapacity}${isMuted() ? '   [muted]' : ''}`,
     );
-    this.status.setColor(p.hitPoints <= p.maxHitPoints / 4 ? COLORS.warn : COLORS.text);
+    this.weapon.setText(weaponLine(p));
+    this.drawHealth();
 
     this.combatBar.setVisible(combat !== null);
     this.combatText.setVisible(combat !== null);
@@ -79,9 +107,28 @@ export class HudScene extends Phaser.Scene {
     this.combatText.setText(`COMBAT - ${turn}   ${targetInfo}`);
   }
 
+  /** The health bar: black, with a green border (and a thin black edge outside it), dark red health inside. */
+  private drawHealth(): void {
+    const p = state.player;
+    const label = healthLabel(p);
+    if (label === this.drawnHealth) return;
+    this.drawnHealth = label;
+    const inner = BAR_WIDTH - 6;
+    this.healthBar
+      .clear()
+      .fillStyle(0x000000)
+      .fillRect(BAR_X - 2, BAR_Y - 2, BAR_WIDTH + 4, BAR_HEIGHT + 4)
+      .lineStyle(2, COLORS.border)
+      .strokeRect(BAR_X + 1, BAR_Y + 1, BAR_WIDTH - 2, BAR_HEIGHT - 2)
+      .fillStyle(HEALTH_RED)
+      .fillRect(BAR_X + 3, BAR_Y + 3, healthFill(p.hitPoints, p.maxHitPoints, inner), BAR_HEIGHT - 6);
+    this.healthText.setText(label).setColor(p.hitPoints <= p.maxHitPoints / 4 ? COLORS.warn : COLORS.text);
+  }
+
   private addMessage(text: string): void {
     this.messages.push(text);
     if (this.messages.length > LOG_LINES) this.messages.shift();
-    this.log.setText(this.messages.join('\n'));
+    // Long messages wrap, so show the last few lines rather than the last few messages.
+    this.log.setText(this.log.getWrappedText(this.messages.join('\n')).slice(-LOG_LINES));
   }
 }

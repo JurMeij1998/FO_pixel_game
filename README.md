@@ -197,6 +197,13 @@ with a "+N". It bobs gently, dims during the enemy turn, and always floats above
 there that covers as little as possible of any chest, creature, lootable corpse or exit
 (`ui/gaugePlacement.ts`).
 
+Your health is always on screen, sitting right on the map in the bottom right corner (the
+message log only covers the left half of the bottom): a black bar with a green border,
+filled dark red, with your HP in it (orange-red once you're down to a quarter).
+Directly above it is the weapon in hand: a gun's name with the rounds in its magazine out of
+what it holds and the spare rounds in your pack ("Hunting Rifle 5/5 (+10)"), or just the
+name of a melee weapon (`ui/healthBar.ts`).
+
 ## Layout
 
 ```
