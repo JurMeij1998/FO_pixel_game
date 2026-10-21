@@ -11,6 +11,7 @@ import type { Lootable } from '../core/loot';
 import { tileTextureKey } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
 import { ApGauge } from '../ui/apGauge';
+import { ENEMY_BAR_GAP, ENEMY_BAR_HEIGHT, enemyBar } from '../ui/healthBar';
 import type { Rect } from '../ui/gaugePlacement';
 import { postMessage } from '../ui/messages';
 import { FONT } from '../ui/theme';
@@ -27,7 +28,8 @@ const STEP: Record<Direction, GridPos> = {
 
 const MOVE_DURATION_MS = 140;
 
-const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, gauge: 9, effects: 10 };
+const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, healthBars: 5, gauge: 9, effects: 10 };
+const ENEMY_RED = 0xd02020;
 const FADE_MS = 250;
 
 /** Pixel position of a tile's centre. */
@@ -48,6 +50,8 @@ export class WorldScene extends Phaser.Scene {
   private readonly chestImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly creatureImages = new Map<Creature, Phaser.GameObjects.Image>();
   private targetMarker!: Phaser.GameObjects.Graphics;
+  /** The thin health bars floating over every living hostile creature. */
+  private enemyBars!: Phaser.GameObjects.Graphics;
   private apGauge!: ApGauge;
   /** Whether the camera bounds currently leave the extra room combat needs at the top. */
   private combatBounds = false;
@@ -93,6 +97,7 @@ export class WorldScene extends Phaser.Scene {
     const towardsSomeone = (['up', 'down', 'left', 'right'] as const).find((d) => state.map.personFacing(start, STEP[d]));
     this.face(towardsSomeone ?? 'down');
     this.targetMarker = this.add.graphics().setDepth(DEPTH.marker);
+    this.enemyBars = this.add.graphics().setDepth(DEPTH.healthBars);
     this.apGauge = new ApGauge(this, state.player.maxActionPoints, DEPTH.gauge);
 
     this.combatBounds = state.combat !== null;
@@ -142,6 +147,7 @@ export class WorldScene extends Phaser.Scene {
       this.setCameraBounds();
     }
     this.drawTargetMarker();
+    this.drawEnemyBars();
     this.updateApGauge(delta);
     if (this.busy) return;
     const direction = this.heldDirection();
@@ -474,12 +480,13 @@ export class WorldScene extends Phaser.Scene {
   private gaugeObstacles(): Rect[] {
     const map = state.map;
     const tile = (x: number, y: number): Rect => ({ x: x * TILE_SIZE, y: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE });
-    // Living creatures use their sprites, which may be mid-step.
+    // Living creatures use their sprites, which may be mid-step, plus the health bar over them.
+    const overhead = ENEMY_BAR_GAP + ENEMY_BAR_HEIGHT;
     const around = (image: Phaser.GameObjects.Image): Rect => ({
       x: image.x - TILE_SIZE / 2,
-      y: image.y - TILE_SIZE / 2,
+      y: image.y - TILE_SIZE / 2 - overhead,
       width: TILE_SIZE,
-      height: TILE_SIZE,
+      height: TILE_SIZE + overhead,
     });
     const rects = [...map.chests.map((c) => tile(c.x, c.y)), ...map.exits.map((e) => tile(e.x, e.y))];
     for (const creature of map.creatures) {
@@ -495,6 +502,24 @@ export class WorldScene extends Phaser.Scene {
     const top = (HUD_TOP + (state.combat ? COMBAT_BAR_HEIGHT : 0)) / WORLD_ZOOM;
     const bottom = HUD_BOTTOM / WORLD_ZOOM;
     return { x: view.x, y: view.y + top, width: view.width, height: view.height - top - bottom };
+  }
+
+  /**
+   * A thin bar over every living hostile creature, red for the health it has left and black,
+   * from the right, for what it has lost. Redrawn every frame, so it follows creatures mid-step.
+   */
+  private drawEnemyBars(): void {
+    this.enemyBars.clear();
+    for (const creature of state.map.creatures) {
+      if (creature.isDead || !creature.hostile) continue;
+      const image = this.imageFor(creature);
+      const bar = enemyBar(image.x, image.y, TILE_SIZE, creature.hitPoints, creature.maxHitPoints);
+      this.enemyBars
+        .fillStyle(0x000000)
+        .fillRect(bar.x, bar.y, bar.width, bar.height)
+        .fillStyle(ENEMY_RED)
+        .fillRect(bar.x, bar.y, bar.red, bar.height);
+    }
   }
 
   private drawTargetMarker(): void {

@@ -204,6 +204,10 @@ Directly above it is the weapon in hand: a gun's name with the rounds in its mag
 what it holds and the spare rounds in your pack ("Hunting Rifle 5/5 (+10)"), or just the
 name of a melee weapon (`ui/healthBar.ts`).
 
+Every living hostile creature has a thin health bar floating just above it: red for the
+health it has left, turning black from the right as it loses health, so the bar always stays
+the same length. Friendly people don't show one until they turn hostile.
+
 ## Layout
 
 ```
