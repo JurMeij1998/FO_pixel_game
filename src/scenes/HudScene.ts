@@ -24,9 +24,6 @@ const BAR_Y = GAME_HEIGHT - 12 - BAR_HEIGHT;
 const HEALTH_RED = 0x8a1414;
 /** Text straight on the map gets a black outline, so it reads on any ground. */
 const ON_MAP = { stroke: '#000000', strokeThickness: 3 };
-// Two lines each, short enough for the log panel's half of the screen.
-const CONTROLS = 'Arrows/WASD move  E/Space interact  I inventory\nC character  Q swap  R reload  Click: attack  Esc menu';
-const COMBAT_CONTROLS = 'Arrows move (1 AP)  F/click attack  Tab target\nR reload (2 AP)  I pack (4 AP)  Q swap  Space end turn';
 
 /**
  * Status bar along the top, and along the bottom the message log with, in the bottom right
@@ -41,7 +38,6 @@ export class HudScene extends Phaser.Scene {
   private drawnHealth = '';
   private combatBar!: Phaser.GameObjects.Graphics;
   private combatText!: Phaser.GameObjects.Text;
-  private controls!: Phaser.GameObjects.Text;
   private log!: Phaser.GameObjects.Text;
   private readonly messages: string[] = [];
 
@@ -60,7 +56,6 @@ export class HudScene extends Phaser.Scene {
     const logHeight = HUD_BOTTOM;
     this.add.rectangle(0, GAME_HEIGHT - logHeight, LOG_PANEL_WIDTH, logHeight, 0x000000, 0.6).setOrigin(0);
     this.log = this.add.text(12, GAME_HEIGHT - logHeight + 6, '', LOG_TEXT);
-    this.controls = this.add.text(12, GAME_HEIGHT - 6, CONTROLS, SMALL_TEXT).setOrigin(0, 1);
 
     // Right-aligned with the bar, so a long gun name grows to the left instead of off the screen.
     this.weapon = this.add.text(BAR_X + BAR_WIDTH, BAR_Y - 6, '', { ...TEXT, ...ON_MAP }).setOrigin(1, 1);
@@ -74,11 +69,15 @@ export class HudScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(MESSAGE_EVENT, this.addMessage, this));
 
     if (state.sandbox) this.addMessage(`${state.map.name}: nothing here is saved. Esc, then Quit, to leave.`);
-    else this.addMessage(
-      state.loadedFromSave
-        ? 'Welcome back to the wasteland. (Your game saves automatically.)'
-        : "You wake up in a stranger's shack. Face the woman and press E to talk.",
-    );
+    else {
+      this.addMessage(
+        state.loadedFromSave
+          ? 'Welcome back to the wasteland. (Your game saves automatically.)'
+          : "You wake up in a stranger's shack. Face the woman and press E to talk.",
+      );
+      // The keys are listed in the menu, not on screen.
+      this.addMessage('Press Esc for the menu and the controls.');
+    }
   }
 
   update(): void {
@@ -95,7 +94,6 @@ export class HudScene extends Phaser.Scene {
 
     this.combatBar.setVisible(combat !== null);
     this.combatText.setVisible(combat !== null);
-    this.controls.setText(combat ? COMBAT_CONTROLS : CONTROLS);
     if (!combat) return;
 
     const turn = combat.isPlayerTurn ? 'YOUR TURN' : 'ENEMY TURN';

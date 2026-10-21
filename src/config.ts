@@ -13,4 +13,4 @@ export const WORLD_ZOOM = 3;
  * left half; the health bar sits on the map in the bottom right).
  */
 export const HUD_TOP = 36;
-export const HUD_BOTTOM = 110;
+export const HUD_BOTTOM = 72;
