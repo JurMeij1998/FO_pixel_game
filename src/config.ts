@@ -14,5 +14,3 @@ export const WORLD_ZOOM = 3;
  */
 export const HUD_TOP = 36;
 export const HUD_BOTTOM = 110;
-/** The combat bar that appears under the status bar during a fight. */
-export const COMBAT_BAR_HEIGHT = 30;

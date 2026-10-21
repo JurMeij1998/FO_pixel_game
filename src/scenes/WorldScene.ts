@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
-import { COMBAT_BAR_HEIGHT, HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
+import { HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
 import { Combat, INVENTORY_AP_COST, type AttackEvent, type CombatEvent } from '../core/combat';
 import { capitalize, listNames, type Creature } from '../core/creature';
 import type { DialogData } from './DialogScene';
@@ -453,12 +453,12 @@ export class WorldScene extends Phaser.Scene {
 
   /**
    * Lets the camera scroll past the map edges by the HUD's height, so the HUD never hides a tile.
-   * In combat it can scroll further at the top, past the combat bar and with a tile to spare, so
-   * the AP gauge (always above the player) still has room when the player is on the top rows.
+   * In combat it can scroll a tile further at the top, so the AP gauge (always above the player)
+   * still has room when the player is on the top row.
    */
   private setCameraBounds(): void {
     const map = state.map;
-    const top = (HUD_TOP + (this.combatBounds ? COMBAT_BAR_HEIGHT : 0)) / WORLD_ZOOM + (this.combatBounds ? TILE_SIZE : 0);
+    const top = HUD_TOP / WORLD_ZOOM + (this.combatBounds ? TILE_SIZE : 0);
     const bottom = HUD_BOTTOM / WORLD_ZOOM;
     this.cameras.main.setBounds(0, -top, map.width * TILE_SIZE, map.height * TILE_SIZE + top + bottom);
   }
@@ -499,7 +499,7 @@ export class WorldScene extends Phaser.Scene {
   /** The part of the world on screen, not counting what the HUD covers at the top and bottom. */
   private visibleWorld(): Rect {
     const view = this.cameras.main.worldView;
-    const top = (HUD_TOP + (state.combat ? COMBAT_BAR_HEIGHT : 0)) / WORLD_ZOOM;
+    const top = HUD_TOP / WORLD_ZOOM;
     const bottom = HUD_BOTTOM / WORLD_ZOOM;
     return { x: view.x, y: view.y + top, width: view.width, height: view.height - top - bottom };
   }

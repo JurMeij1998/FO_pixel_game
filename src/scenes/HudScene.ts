@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { isMuted } from '../audio/sfx';
-import { COMBAT_BAR_HEIGHT, GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM, HUD_TOP } from '../config';
+import { GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM, HUD_TOP } from '../config';
 import { capitalize } from '../core/creature';
 import { state } from '../state';
 import { healthFill, healthLabel, weaponLine } from '../ui/healthBar';
@@ -8,6 +8,9 @@ import { MESSAGE_EVENT } from '../ui/messages';
 import { COLORS, SMALL_TEXT, TEXT } from '../ui/theme';
 
 const LOG_LINES = 3;
+/** The combat ribbon: two lines in the top right corner, inside the status bar's height. */
+const RIBBON_TEXT = { ...SMALL_TEXT, color: COLORS.warn, lineSpacing: 2 };
+const RIBBON_PADDING = 10;
 /** The message log's panel covers the left half of the bottom of the screen; its text wraps inside it. */
 const LOG_PANEL_WIDTH = GAME_WIDTH / 2;
 const LOG_WIDTH = LOG_PANEL_WIDTH - 2 * 12;
@@ -36,7 +39,7 @@ export class HudScene extends Phaser.Scene {
   private healthText!: Phaser.GameObjects.Text;
   /** What the bar was last drawn for, so it's only redrawn when that changes. */
   private drawnHealth = '';
-  private combatBar!: Phaser.GameObjects.Rectangle;
+  private combatBar!: Phaser.GameObjects.Graphics;
   private combatText!: Phaser.GameObjects.Text;
   private controls!: Phaser.GameObjects.Text;
   private log!: Phaser.GameObjects.Text;
@@ -50,8 +53,9 @@ export class HudScene extends Phaser.Scene {
     this.messages.length = 0; // the scene object is reused when a game is loaded or started
     this.add.rectangle(0, 0, GAME_WIDTH, HUD_TOP, 0x000000, 0.7).setOrigin(0);
     this.status = this.add.text(12, 9, '', TEXT);
-    this.combatBar = this.add.rectangle(0, HUD_TOP, GAME_WIDTH, COMBAT_BAR_HEIGHT, 0x400c08, 0.85).setOrigin(0);
-    this.combatText = this.add.text(12, HUD_TOP + 5, '', { ...TEXT, color: COLORS.warn });
+    // In a fight, a red ribbon in the top right corner, next to the status line.
+    this.combatBar = this.add.graphics();
+    this.combatText = this.add.text(GAME_WIDTH - RIBBON_PADDING, HUD_TOP / 2, '', RIBBON_TEXT).setOrigin(1, 0.5);
 
     const logHeight = HUD_BOTTOM;
     this.add.rectangle(0, GAME_HEIGHT - logHeight, LOG_PANEL_WIDTH, logHeight, 0x000000, 0.6).setOrigin(0);
@@ -104,7 +108,10 @@ export class HudScene extends Phaser.Scene {
       const odds = problem?.message ?? blocked ?? `${combat.hitChance(p, target)}% to hit`;
       targetInfo = `Target: ${target.name} ${target.hitPoints}/${target.maxHitPoints} HP, ${odds}`;
     }
-    this.combatText.setText(`COMBAT - ${turn}   ${targetInfo}`);
+    this.combatText.setText(`COMBAT - ${turn}\n${targetInfo}`);
+    // The ribbon is as wide as its text, out to the right edge of the screen.
+    const width = this.combatText.width + 2 * RIBBON_PADDING;
+    this.combatBar.clear().fillStyle(0x400c08, 0.9).fillRect(GAME_WIDTH - width, 0, width, HUD_TOP);
   }
 
   /** The health bar: black, with a green border (and a thin black edge outside it), dark red health inside. */
