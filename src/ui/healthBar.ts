@@ -45,8 +45,13 @@ export function enemyBar(x: number, y: number, tileSize: number, hitPoints: numb
 }
 
 /** "41/41": the numbers shown inside the bar. */
-export function healthLabel(player: Character): string {
-  return `${player.hitPoints}/${player.maxHitPoints}`;
+export function healthLabel(hitPoints: number, max: number): string {
+  return `${hitPoints}/${max}`;
+}
+
+/** Down to a quarter or less: the numbers turn from green to orange-red. */
+export function isLowHealth(hitPoints: number, max: number): boolean {
+  return hitPoints <= max / 4;
 }
 
 /**

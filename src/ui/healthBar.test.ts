@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Character } from '../core/character';
-import { ENEMY_BAR_WIDTH, enemyBar, healthFill, healthLabel, weaponLine } from './healthBar';
+import { ENEMY_BAR_GAP, ENEMY_BAR_HEIGHT, ENEMY_BAR_WIDTH, enemyBar, healthFill, healthLabel, isLowHealth, weaponLine } from './healthBar';
 
 function wanderer(): Character {
   return new Character('Wanderer', {
@@ -33,9 +33,13 @@ describe('health bar', () => {
   });
 
   it('shows the numbers as current/max', () => {
-    const player = wanderer();
-    player.hitPoints = 12;
-    expect(healthLabel(player)).toBe(`12/${player.maxHitPoints}`);
+    expect(healthLabel(12, 29)).toBe('12/29');
+  });
+
+  it('counts a quarter or less as low health', () => {
+    expect(isLowHealth(10, 40)).toBe(true);
+    expect(isLowHealth(11, 40)).toBe(false);
+    expect(isLowHealth(0, 40)).toBe(true);
   });
 });
 
@@ -72,8 +76,9 @@ describe('weapon line', () => {
 describe('enemy health bar', () => {
   it('floats centred just above the creature, a thin line', () => {
     const bar = enemyBar(40, 56, 16, 8, 8); // a sprite centred at (40, 56): its tile spans y 48-63
-    expect(bar).toMatchObject({ x: 40 - ENEMY_BAR_WIDTH / 2, width: ENEMY_BAR_WIDTH, height: 1 });
-    expect(bar.y + bar.height).toBeLessThan(48);
+    expect(bar).toMatchObject({ x: 40 - ENEMY_BAR_WIDTH / 2, width: ENEMY_BAR_WIDTH, height: ENEMY_BAR_HEIGHT });
+    // Exactly the room above the tile that the AP gauge keeps clear (WorldScene.gaugeObstacles).
+    expect(bar.y).toBe(48 - ENEMY_BAR_GAP - ENEMY_BAR_HEIGHT);
   });
 
   it('is all red at full health, and turns black from the right as health is lost', () => {

@@ -13,3 +13,8 @@ export const WORLD_ZOOM = 3;
  * of the HUD (the health bar, the combat label) sits straight on the map.
  */
 export const HUD_BOTTOM = 72;
+/**
+ * Where the floating "COMBAT - YOUR TURN" label goes, in screen pixels (top left corner, and
+ * room for the longest text). The AP gauge keeps clear of it.
+ */
+export const COMBAT_LABEL = { x: 12, y: 10, width: 220, height: 24 };

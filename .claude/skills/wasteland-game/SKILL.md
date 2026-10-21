@@ -115,7 +115,15 @@ mouse, ignores key auto-repeat so a held key from the previous screen can't pick
 The AP gauge (`ui/apGauge.ts`) lives in world space: the AP number in a round pixel seal with a
 pip bar sweeping out of it, its green border pulsing and shining. Its spot comes from the pure,
 tested `ui/gaugePlacement.ts`: always above the player, and never covering a chest, creature,
-lootable corpse or exit.
+lootable corpse, exit, an enemy's health bar or the HUD's combat label.
+The HUD is kept minimal and mostly sits straight on the map: no top bar (stats live on the
+character sheet), the message log across the bottom left (`HUD_BOTTOM`; it shows whole
+messages only, `logLines`), a floating combat label top left (`COMBAT_LABEL`), and the
+player's health bar bottom right with the weapon line above it (`ui/healthBar.ts`). Its border
+shines with the same pulse and glint as the AP gauge (`ui/glow.ts`, one shared clock: the game
+loop's time). Enemies you're fighting get a thin red/black bar over them. Health bars draw
+`shownHitPoints` (`ui/shownHealth.ts`), not live `hitPoints`: combat resolves a whole turn at
+once, so `WorldScene.play()` holds each target's health and lowers it as each hit is shown.
 
 **A development-only test arena.** With `npm run dev`, http://localhost:5173/?arena (or the
 "Test arena (dev)" menu entry) drops a sturdy test character (10 AP, loaded hunting rifle in

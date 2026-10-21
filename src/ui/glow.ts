@@ -17,6 +17,16 @@ export const PULSE_MS = 1600;
 export const SHINE_EVERY_MS = 2600;
 /** How long the glint takes to cross. */
 export const SHINE_MS = 700;
+/** How wide the glint is, in world pixels (multiply by the zoom for something drawn at 1:1). */
+export const SHINE_WIDTH = 2.5;
+
+/**
+ * True while a glint is sweeping across; the rest of the time the whole border is one colour.
+ * Both glows run on the game loop's clock, so the AP gauge and the health bar shine together.
+ */
+export function glintActive(time: number): boolean {
+  return time % SHINE_EVERY_MS < SHINE_MS;
+}
 
 /** Blends two 0xRRGGBB colours; t = 0 gives a, t = 1 gives b. */
 export function mixColor(a: number, b: number, t: number): number {
@@ -36,8 +46,8 @@ export function mixColor(a: number, b: number, t: number): number {
 export function glowColor(time: number, diagonal: number, span: number, width: number): number {
   const pulse = (Math.sin((time / PULSE_MS) * Math.PI * 2) + 1) / 2;
   const base = mixColor(GLOW_COLOR.border, GLOW_COLOR.pulse, pulse * 0.75);
+  if (!glintActive(time)) return base;
   const sinceShine = time % SHINE_EVERY_MS;
-  if (sinceShine >= SHINE_MS) return base;
   // The glint's position along the diagonal, travelling from before the start to past the end.
   const sweep = -width + (sinceShine / SHINE_MS) * (span + 2 * width);
   const shine = Math.max(0, 1 - Math.abs(diagonal - sweep) / width);

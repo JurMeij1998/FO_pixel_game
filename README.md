@@ -239,7 +239,9 @@ src/
   data/       Content: the wasteland map, biomes/, and world.ts (which maps exist)
   gfx/        Procedurally generated placeholder pixel art
   audio/      Synthesised sound effects
-  ui/         Theme, widgets (panel, buttons, scrollable list), formatting
+  ui/         Theme, widgets (panel, buttons, scrollable list), formatting, and the pure logic
+              behind the HUD and screens: AP gauge and its placement, health bars, the
+              shared glow, dialog box, barter lists, the message log
   scenes/     Phaser scenes: Boot, Menu, World, Hud, Inventory, Loot, Dialog, Barter,
               Character, Pause, GameOver, Controls; flow.ts switches between menus and the game
   state.ts    The running game (player + map), loaded from the save if there is one

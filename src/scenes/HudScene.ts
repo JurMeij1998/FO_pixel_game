@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import { isMuted } from '../audio/sfx';
-import { GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM, WORLD_ZOOM } from '../config';
+import { COMBAT_LABEL, GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM, WORLD_ZOOM } from '../config';
 import { state } from '../state';
-import { glowColor } from '../ui/glow';
-import { healthFill, healthLabel, weaponLine } from '../ui/healthBar';
-import { MESSAGE_EVENT } from '../ui/messages';
+import { glintActive, glowColor, SHINE_WIDTH } from '../ui/glow';
+import { healthFill, healthLabel, isLowHealth, weaponLine } from '../ui/healthBar';
+import { logLines, MESSAGE_EVENT } from '../ui/messages';
+import { shownHitPoints } from '../ui/shownHealth';
 import { COLORS, SMALL_TEXT, TEXT } from '../ui/theme';
 
 const LOG_LINES = 3;
@@ -20,7 +21,7 @@ const BAR_Y = GAME_HEIGHT - 12 - BAR_HEIGHT;
 /** The bar's green border is 2 pixels thick, and shines like the AP gauge's (ui/glow.ts). */
 const BORDER = 2;
 /** The glint's width: the AP gauge's, which is drawn at the world's zoom, at 1:1. */
-const SHINE_WIDTH = 2.5 * WORLD_ZOOM;
+const BAR_SHINE_WIDTH = SHINE_WIDTH * WORLD_ZOOM;
 /** Health is dark red inside the black box. */
 const HEALTH_RED = 0x8a1414;
 /** Text straight on the map gets a black outline, so it reads on any ground. */
@@ -51,7 +52,7 @@ export class HudScene extends Phaser.Scene {
 
   create(): void {
     this.messages.length = 0; // the scene object is reused when a game is loaded or started
-    this.combatLabel = this.add.text(12, 10, '', { ...TEXT, color: COLORS.warn, fontStyle: 'bold', ...ON_MAP });
+    this.combatLabel = this.add.text(COMBAT_LABEL.x, COMBAT_LABEL.y, '', { ...TEXT, color: COLORS.warn, fontStyle: 'bold', ...ON_MAP });
     this.mutedLabel = this.add.text(GAME_WIDTH - 12, 10, '[muted]', { ...SMALL_TEXT, ...ON_MAP }).setOrigin(1, 0);
 
     const logHeight = HUD_BOTTOM;
@@ -82,21 +83,24 @@ export class HudScene extends Phaser.Scene {
     }
   }
 
-  update(time: number): void {
+  update(): void {
     const combat = state.combat;
-    this.combatLabel
-      .setVisible(combat !== null)
-      .setText(combat ? `COMBAT - ${combat.isPlayerTurn ? 'YOUR TURN' : 'ENEMY TURN'}` : '');
+    // Once the fight is decided (the last kill still playing) it's nobody's turn any more.
+    const turn = !combat || combat.outcome ? '' : combat.isPlayerTurn ? ' - YOUR TURN' : ' - ENEMY TURN';
+    this.combatLabel.setVisible(combat !== null).setText(`COMBAT${turn}`);
     this.mutedLabel.setVisible(isMuted());
     this.weapon.setText(weaponLine(state.player));
     this.drawHealth();
-    this.drawHealthBorder(time);
+    // The game loop's clock, shared with the AP gauge's glow, so the two shine together.
+    this.drawHealthBorder(this.game.loop.time);
   }
 
   /** The health bar's box: black, with a thin black edge outside the border, and dark red health inside. */
   private drawHealth(): void {
     const p = state.player;
-    const label = healthLabel(p);
+    // As the animation has got to: a hit only shows when it's seen landing (ui/shownHealth.ts).
+    const hitPoints = shownHitPoints(p);
+    const label = healthLabel(hitPoints, p.maxHitPoints);
     if (label === this.drawnHealth) return;
     this.drawnHealth = label;
     const inner = BAR_WIDTH - 2 * (BORDER + 1);
@@ -105,8 +109,8 @@ export class HudScene extends Phaser.Scene {
       .fillStyle(0x000000)
       .fillRect(BAR_X - 2, BAR_Y - 2, BAR_WIDTH + 4, BAR_HEIGHT + 4)
       .fillStyle(HEALTH_RED)
-      .fillRect(BAR_X + BORDER + 1, BAR_Y + BORDER + 1, healthFill(p.hitPoints, p.maxHitPoints, inner), BAR_HEIGHT - 2 * (BORDER + 1));
-    this.healthText.setText(label).setColor(p.hitPoints <= p.maxHitPoints / 4 ? COLORS.warn : COLORS.text);
+      .fillRect(BAR_X + BORDER + 1, BAR_Y + BORDER + 1, healthFill(hitPoints, p.maxHitPoints, inner), BAR_HEIGHT - 2 * (BORDER + 1));
+    this.healthText.setText(label).setColor(isLowHealth(hitPoints, p.maxHitPoints) ? COLORS.warn : COLORS.text);
   }
 
   /**
@@ -117,20 +121,29 @@ export class HudScene extends Phaser.Scene {
   private drawHealthBorder(time: number): void {
     const span = BAR_WIDTH + BAR_HEIGHT;
     const g = this.healthBorder.clear();
+    if (!glintActive(time)) {
+      // Between glints the whole border is one colour: four rectangles will do.
+      g.fillStyle(glowColor(time, 0, span, BAR_SHINE_WIDTH))
+        .fillRect(BAR_X, BAR_Y, BAR_WIDTH, BORDER)
+        .fillRect(BAR_X, BAR_Y + BAR_HEIGHT - BORDER, BAR_WIDTH, BORDER)
+        .fillRect(BAR_X, BAR_Y + BORDER, BORDER, BAR_HEIGHT - 2 * BORDER)
+        .fillRect(BAR_X + BAR_WIDTH - BORDER, BAR_Y + BORDER, BORDER, BAR_HEIGHT - 2 * BORDER);
+      return;
+    }
     for (let x = 0; x < BAR_WIDTH; x++) {
-      g.fillStyle(glowColor(time, x, span, SHINE_WIDTH)).fillRect(BAR_X + x, BAR_Y, 1, BORDER);
-      g.fillStyle(glowColor(time, x + BAR_HEIGHT - 1, span, SHINE_WIDTH)).fillRect(BAR_X + x, BAR_Y + BAR_HEIGHT - BORDER, 1, BORDER);
+      g.fillStyle(glowColor(time, x, span, BAR_SHINE_WIDTH)).fillRect(BAR_X + x, BAR_Y, 1, BORDER);
+      g.fillStyle(glowColor(time, x + BAR_HEIGHT - 1, span, BAR_SHINE_WIDTH)).fillRect(BAR_X + x, BAR_Y + BAR_HEIGHT - BORDER, 1, BORDER);
     }
     for (let y = BORDER; y < BAR_HEIGHT - BORDER; y++) {
-      g.fillStyle(glowColor(time, y, span, SHINE_WIDTH)).fillRect(BAR_X, BAR_Y + y, BORDER, 1);
-      g.fillStyle(glowColor(time, BAR_WIDTH - 1 + y, span, SHINE_WIDTH)).fillRect(BAR_X + BAR_WIDTH - BORDER, BAR_Y + y, BORDER, 1);
+      g.fillStyle(glowColor(time, y, span, BAR_SHINE_WIDTH)).fillRect(BAR_X, BAR_Y + y, BORDER, 1);
+      g.fillStyle(glowColor(time, BAR_WIDTH - 1 + y, span, BAR_SHINE_WIDTH)).fillRect(BAR_X + BAR_WIDTH - BORDER, BAR_Y + y, BORDER, 1);
     }
   }
 
   private addMessage(text: string): void {
     this.messages.push(text);
     if (this.messages.length > LOG_LINES) this.messages.shift();
-    // Long messages wrap, so show the last few lines rather than the last few messages.
-    this.log.setText(this.log.getWrappedText(this.messages.join('\n')).slice(-LOG_LINES));
+    // Long messages wrap: show the newest whole messages that fit.
+    this.log.setText(logLines(this.messages, (text) => this.log.getWrappedText(text), LOG_LINES));
   }
 }

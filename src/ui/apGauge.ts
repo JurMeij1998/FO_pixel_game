@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { GLYPH_HEIGHT, GLYPH_WIDTH, glyphTextureKey, plainGlyphKey } from '../gfx/pixelFont';
 import { SEAL_SIZE, SEAL_TEXTURE } from '../gfx/textures';
 import { choosePlacement, placementOffsets, type Offset, type Rect } from './gaugePlacement';
-import { GLOW_COLOR, glowColor } from './glow';
+import { GLOW_COLOR, glowColor, SHINE_WIDTH } from './glow';
 
 /** Everything the gauge needs to know each frame. Positions are in world pixels. */
 export interface ApGaugeState {
@@ -46,8 +46,6 @@ const COLOR = {
   refillDelta: 0x7dff9a,
 };
 
-/** How wide the border's glint is, in diagonal (world) pixels; see ui/glow.ts. */
-const SHINE_WIDTH = 2.5;
 
 /** Milliseconds per step when the number counts towards a new value, and for a pip's flash. */
 const COUNT_STEP_MS = 70;
@@ -216,9 +214,11 @@ export class ApGauge {
   private drawGlow(): void {
     const { left, top } = this.corner();
     const span = this.width + this.height;
+    // The game loop's clock, shared with the health bar's glow, so the two shine together.
+    const time = this.scene.game.loop.time;
     this.glow.clear();
     for (const p of this.borderPixels) {
-      const color = glowColor(this.time, p.x - left + (p.y - top), span, SHINE_WIDTH);
+      const color = glowColor(time, p.x - left + (p.y - top), span, SHINE_WIDTH);
       this.glow.fillStyle(color, 1).fillRect(p.x, p.y, 1, 1);
     }
   }

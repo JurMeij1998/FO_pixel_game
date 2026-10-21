@@ -29,6 +29,11 @@ export type CombatEvent =
       critical: boolean;
       damage: number;
       killed: boolean;
+      /**
+       * The target's health just before and after this attack, captured when it happens: the
+       * scene shows health dropping as each hit lands, not when the whole turn was resolved.
+       */
+      targetHitPoints: { before: number; after: number };
       message: string;
       /** The level the player reached with this kill, if they levelled up. */
       newLevel: number | null;
@@ -125,7 +130,7 @@ export class Combat {
     if (!this.isPlayerTurn) return problem('notYourTurn', "It isn't your turn.");
     if (target.isDead) return problem('targetDead', `${capitalize(target.theName)} is already dead.`);
     const attack = this.player.attack;
-    // Kept short: the HUD shows these next to the target.
+    // Kept short: they go to the message log when an attack is refused.
     if (this.actionPoints < attack.apCost) return problem('noAP', `Not enough AP (attack costs ${attack.apCost}).`);
     if (distance(this.player.pos, target.pos) > attack.range) {
       return problem('outOfRange', `${capitalize(target.theName)} is out of range.`);
@@ -286,6 +291,7 @@ export class Combat {
         critical: false,
         damage: 0,
         killed: false,
+        targetHitPoints: { before: target.hitPoints, after: target.hitPoints },
         message,
         newLevel: null,
       };
@@ -295,6 +301,7 @@ export class Combat {
     let damage = attack.damageMin + Math.floor(this.rng() * (attack.damageMax - attack.damageMin + 1));
     if (critical) damage *= 2;
     damage = Math.max(1, Math.round((damage * (100 - target.damageResist)) / 100));
+    const before = target.hitPoints;
     target.hitPoints = Math.max(0, target.hitPoints - damage);
     const killed = target.hitPoints === 0;
 
@@ -312,7 +319,8 @@ export class Combat {
 
     if (this.player.hitPoints === 0) this.outcome = 'defeat';
     else if (this.livingEnemies.length === 0) this.outcome = 'victory';
-    return { type: 'attack', attacker, target, ranged, sound, hit: true, critical, damage, killed, message, newLevel };
+    const targetHitPoints = { before, after: target.hitPoints };
+    return { type: 'attack', attacker, target, ranged, sound, hit: true, critical, damage, killed, targetHitPoints, message, newLevel };
   }
 
   /** In range and with a clear line of sight. */
