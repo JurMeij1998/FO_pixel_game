@@ -2,8 +2,10 @@ import Phaser from 'phaser';
 import { toggleMuted } from './audio/sfx';
 import { GAME_HEIGHT, GAME_WIDTH } from './config';
 import { BootScene } from './scenes/BootScene';
+import { BarterScene } from './scenes/BarterScene';
 import { CharacterScene } from './scenes/CharacterScene';
 import { ControlsScene } from './scenes/ControlsScene';
+import { DialogScene } from './scenes/DialogScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
 import { InventoryScene } from './scenes/InventoryScene';
@@ -38,6 +40,8 @@ new Phaser.Game({
     HudScene,
     InventoryScene,
     LootScene,
+    DialogScene,
+    BarterScene,
     CharacterScene,
     PauseScene,
     GameOverScene,

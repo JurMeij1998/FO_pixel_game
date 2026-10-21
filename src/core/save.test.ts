@@ -108,6 +108,40 @@ describe('save and load', () => {
     expect(loaded.maps.wasteland).toBeDefined();
   });
 
+  it("restores what a trader has left to sell, and whether people have turned hostile", () => {
+    const game = freshGame();
+    const village = buildMap('village', SEED);
+    game.maps.village = village;
+    const gus = village.creatures.find((c) => c.def.id === 'shopkeeper')!;
+    gus.contents.remove('stimpak', 2);
+    gus.contents.add('canteen', 1);
+    village.provoke(gus);
+
+    const loaded = roundTrip(game).maps.village.creatures;
+    const loadedGus = loaded.find((c) => c.id === gus.id)!;
+    expect(loadedGus.contents.count('stimpak')).toBe(0);
+    expect(loadedGus.contents.count('canteen')).toBe(1);
+    expect(loaded.filter((c) => c.def.group === 'store').every((c) => c.hostile)).toBe(true);
+  });
+
+  it('keeps people friendly in saves from before hostility was saved, and never makes a monster friendly', () => {
+    const game = freshGame();
+    const village = buildMap('village', SEED);
+    game.maps.village = village;
+    const old = saveJson(game);
+    for (const creature of Object.values(old.maps.village.creatures) as Array<{ hostile?: boolean }>) {
+      delete creature.hostile;
+    }
+    const roach = Object.keys(old.maps.village.creatures).find((id) => !id.startsWith('shopkeeper') && !id.startsWith('guard'))!;
+    const edited = saveJson(game);
+    edited.maps.village.creatures[roach].hostile = false;
+
+    const fromOld = loadGame(old, buildKnownMap, 'wasteland').maps.village.creatures;
+    expect(fromOld.find((c) => c.def.id === 'shopkeeper')?.hostile).toBe(false);
+    const fromEdited = loadGame(edited, buildKnownMap, 'wasteland').maps.village.creatures;
+    expect(fromEdited.find((c) => c.id === roach)?.hostile).toBe(true);
+  });
+
   it('moves the player off a tile that is no longer walkable', () => {
     const game = freshGame();
     game.player.pos = { x: 0, y: 0 }; // a rock, as if the map had changed under the save

@@ -105,6 +105,81 @@ describe('GridMap', () => {
     expect(map.creatures.map((c) => c.id)).toEqual(['radroach@1,0', 'radroach@3,0']);
   });
 
+  describe('people', () => {
+    // Gus (G) behind a counter, a guard (W) beside the player, a radroach (R), and the store's crate (a).
+    const shop = () =>
+      GridMap.parse({
+        name: 'shop',
+        rows: ['.G.a', '.]..', 'WP..', '...R'],
+        chests: { a: { name: 'Stockroom Crate', contents: [['rope', 1]], owner: 'store' } },
+        creatures: { G: 'shopkeeper', W: 'guard', R: 'radroach' },
+      });
+    const people = (map: GridMap) => {
+      const [gus, guard, roach] = ['shopkeeper', 'guard', 'radroach'].map((id) => map.creatures.find((c) => c.def.id === id)!);
+      return { gus, guard, roach };
+    };
+
+    it('start friendly (creatures hostile), and block the way like any creature', () => {
+      const map = shop();
+      const { gus, guard, roach } = people(map);
+      expect([gus.hostile, guard.hostile, roach.hostile]).toEqual([false, false, true]);
+      expect(map.isWalkable(1, 0)).toBe(false);
+      expect(map.chests[0].owner).toBe('store');
+    });
+
+    it('can be talked to face to face or across a counter, but not across open ground', () => {
+      const map = shop();
+      const { gus, guard } = people(map);
+      expect(map.personFacing({ x: 1, y: 2 }, { x: 0, y: -1 })).toBe(gus); // across the counter
+      expect(map.personFacing({ x: 1, y: 2 }, { x: -1, y: 0 })).toBe(guard); // right beside
+      expect(map.personFacing({ x: 2, y: 2 }, { x: 0, y: -1 })).toBeUndefined(); // dirt, not a counter, in between
+      expect(map.personFacing({ x: 3, y: 2 }, { x: 0, y: 1 })).toBeUndefined(); // a radroach won't talk
+    });
+
+    it("can't be talked to once hostile or dead", () => {
+      const map = shop();
+      const { gus, guard } = people(map);
+      guard.hostile = true;
+      gus.hitPoints = 0;
+      expect(map.personFacing({ x: 1, y: 2 }, { x: -1, y: 0 })).toBeUndefined();
+      expect(map.personFacing({ x: 1, y: 2 }, { x: 0, y: -1 })).toBeUndefined();
+    });
+
+    it('turn hostile together when one of their group is provoked', () => {
+      const map = shop();
+      const { gus, guard } = people(map);
+      expect(map.provoke(gus)).toEqual([gus, guard]);
+      expect([gus.hostile, guard.hostile]).toEqual([true, true]);
+      expect(map.provoke(guard)).toEqual([]); // already hostile: nobody new
+    });
+
+    it("leave the dead out, and don't drag other creatures in", () => {
+      const map = shop();
+      const { gus, guard, roach } = people(map);
+      gus.hitPoints = 0;
+      roach.hostile = false; // even a friendly one from another group stays out of it
+      expect(map.provoke(guard)).toEqual([guard]);
+      expect(roach.hostile).toBe(false);
+    });
+
+    it("notice theft from their group's chest while any of them is alive and friendly", () => {
+      const map = shop();
+      const { gus, guard } = people(map);
+      expect(map.noticeTheft(undefined)).toEqual([]); // unowned: no one cares
+      expect(map.noticeTheft('someone_else')).toEqual([]);
+      expect(map.noticeTheft(map.chests[0].owner)).toEqual([gus, guard]);
+      expect(map.noticeTheft('store')).toEqual([]); // already hostile
+    });
+
+    it('let you take what you like once the whole group is dead', () => {
+      const map = shop();
+      const { gus, guard } = people(map);
+      gus.hitPoints = 0;
+      guard.hitPoints = 0;
+      expect(map.noticeTheft('store')).toEqual([]);
+    });
+  });
+
   it('rejects malformed maps', () => {
     expect(() => GridMap.parse({ name: 'ragged', rows: ['P..', '..'], chests: {} })).toThrow(/row 1/);
     expect(() => GridMap.parse({ name: 'nostart', rows: ['...'], chests: {} })).toThrow(/player start/);
@@ -116,5 +191,17 @@ describe('GridMap', () => {
     const map = GridMap.parse(WASTELAND);
     expect(map.chests).toHaveLength(4);
     expect(map.isWalkable(map.playerStart.x, map.playerStart.y)).toBe(true);
+  });
+
+  it('starts a new game inside the shack, with Rosa right beside you to talk to', () => {
+    const map = GridMap.parse(WASTELAND);
+    const rosa = map.creatures.find((c) => c.def.id === 'rosa')!;
+    expect(rosa.hostile).toBe(false);
+    expect(map.personFacing(map.playerStart, { x: -1, y: 0 })).toBe(rosa);
+    expect(map.tileAt(map.playerStart.x, map.playerStart.y)).toBe('floor');
+    // The footlocker she tells you about is in the shack with you, and isn't anyone's.
+    const footlocker = map.chests.find((c) => c.name === 'Footlocker')!;
+    expect(footlocker.owner).toBeUndefined();
+    expect(map.reachableFrom(map.playerStart).has(`${footlocker.x},${footlocker.y + 1}`)).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Character } from './character';
 import { ItemContainer } from './container';
-import { storeItem, takeAll, takeItem, transferQuantity } from './loot';
+import { OwnStash, storeItem, takeAll, takeItem, transferQuantity } from './loot';
 
 // Strength 1 gives a 50 lb carry capacity.
 function weakling(): Character {
@@ -94,5 +94,17 @@ describe('takeAll', () => {
 
   it('fails on an empty container', () => {
     expect(takeAll(weakling(), new ItemContainer()).ok).toBe(false);
+  });
+});
+
+describe('OwnStash', () => {
+  it("lets you take back what you put in yourself, but counts anything more as someone else's", () => {
+    const stash = new OwnStash();
+    stash.stored('knife', 1);
+    stash.stored('ammo_10mm', 10);
+    expect(stash.took('knife', 1)).toBe(0);
+    expect(stash.took('knife', 1)).toBe(1); // the second one wasn't yours
+    expect(stash.took('ammo_10mm', 15)).toBe(5); // 10 of the 15 rounds were yours
+    expect(stash.took('rope', 1)).toBe(1);
   });
 });

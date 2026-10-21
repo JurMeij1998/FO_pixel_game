@@ -10,14 +10,17 @@ export type Side = 'north' | 'south' | 'east' | 'west';
  *   ' '  keep whatever terrain is underneath
  *   '$'  the prefab's chest
  *   '&'  a creature, picked from the prefab's spawn table
+ *   A-Z  a resident: a particular person who is always there (see `residents`)
  */
 export interface Prefab {
   name: string;
   rows: string[];
   /** The tile a path should lead to, relative to the top-left corner. */
   entrance: GridPos;
-  chest?: { name: string; loot: LootTable };
+  chest?: { name: string; loot: LootTable; owner?: string };
   creatures?: SpawnTable;
+  /** Letter in the rows to the creature id of the person standing there, e.g. the shopkeeper. */
+  residents?: Record<string, string>;
 }
 
 /**
@@ -35,6 +38,7 @@ export function flipVertical(prefab: Prefab): Prefab {
 const KEEP = ' ';
 const CHEST_SLOT = '$';
 const CREATURE_SLOT = '&';
+const RESIDENT_SLOT = /^[A-Z]$/;
 /** Cost of carving through a tree, bush or rock when connecting places, versus 1 for open ground. */
 const CARVE_COST = 8;
 
@@ -51,8 +55,9 @@ export class MapBuilder {
 
   private readonly tiles: string[][];
   private readonly locked: boolean[][];
-  private readonly chests: Array<{ pos: GridPos; name: string; contents: Array<[string, number]> }> = [];
-  private readonly creatures: Array<{ pos: GridPos; creatureId: string }> = [];
+  private readonly chests: Array<{ pos: GridPos; name: string; contents: Array<[string, number]>; owner?: string }> = [];
+  /** Residents stay where they are (until a fight), so paths go around them, not through. */
+  private readonly creatures: Array<{ pos: GridPos; creatureId: string; resident: boolean }> = [];
   private readonly exits: Array<{ pos: GridPos; side: Side; to: string }> = [];
   /** Places that must be reachable from the start once the map is finished. */
   private readonly landmarks: GridPos[] = [];
@@ -142,12 +147,16 @@ export class MapBuilder {
       [...row].forEach((char, dx) => {
         if (char === KEEP) return;
         const pos = { x: x + dx, y: y + dy };
-        if (char === CHEST_SLOT || char === CREATURE_SLOT) {
+        if (char === CHEST_SLOT || char === CREATURE_SLOT || RESIDENT_SLOT.test(char)) {
           // The slot itself stands on the prefab's floor, taken from its left neighbour.
           this.tiles[pos.y][pos.x] = floorBeside(row, dx);
           if (char === CHEST_SLOT) {
             if (!prefab.chest) throw new Error(`Prefab '${prefab.name}' has a chest slot but no chest`);
-            this.addChest(pos, prefab.chest.name, rollLoot(prefab.chest.loot, rng));
+            this.addChest(pos, prefab.chest.name, rollLoot(prefab.chest.loot, rng), prefab.chest.owner);
+          } else if (char !== CREATURE_SLOT) {
+            const resident = prefab.residents?.[char];
+            if (!resident) throw new Error(`Prefab '${prefab.name}' has no resident for '${char}'`);
+            this.addCreature(pos, resident, true);
           } else {
             if (!prefab.creatures) throw new Error(`Prefab '${prefab.name}' has a creature slot but no creatures`);
             this.addCreature(pos, rollCreature(prefab.creatures, rng));
@@ -164,14 +173,15 @@ export class MapBuilder {
     return entrance;
   }
 
-  addChest(pos: GridPos, name: string, contents: Array<[string, number]>): void {
+  addChest(pos: GridPos, name: string, contents: Array<[string, number]>, owner?: string): void {
     if (!this.isOpen(pos.x, pos.y)) throw new Error(`Can't place a chest at (${pos.x}, ${pos.y})`);
-    this.chests.push({ pos, name, contents });
+    this.chests.push({ pos, name, contents, owner });
   }
 
-  addCreature(pos: GridPos, creatureId: string): void {
+  /** A `resident` stays put, like a shopkeeper: paths lead up to them, not through them. */
+  addCreature(pos: GridPos, creatureId: string, resident = false): void {
     if (!this.isOpen(pos.x, pos.y)) throw new Error(`Can't place a creature at (${pos.x}, ${pos.y})`);
-    this.creatures.push({ pos, creatureId });
+    this.creatures.push({ pos, creatureId, resident });
   }
 
   /**
@@ -206,15 +216,19 @@ export class MapBuilder {
   }
 
   /**
-   * Makes sure every exit, structure entrance, chest and creature can be reached from the
-   * start, by carving the cheapest path through trees, bushes and rocks where needed.
-   * Locked structure walls are never carved.
+   * Makes sure every exit, structure entrance, chest, creature and resident can be reached from
+   * the start, by carving the cheapest path through trees, bushes and rocks where needed.
+   * Locked structure walls are never carved. (A chest or resident counts as reached when a tile
+   * next to it is.)
    */
   connect(pathChar: string): void {
     if (!this.start) throw new Error('The map has no start; add an exit first');
-    const targets: GridPos[] = [...this.exits.map((e) => e.pos), ...this.landmarks, ...this.creatures.map((c) => c.pos)];
+    const roaming = this.creatures.filter((c) => !c.resident).map((c) => c.pos);
+    const targets: GridPos[] = [...this.exits.map((e) => e.pos), ...this.landmarks, ...roaming];
     for (const target of targets) this.connectTo(target, pathChar);
-    for (const chest of this.chests) this.connectTo(this.chestAccess(chest.pos), pathChar);
+    for (const fixed of [...this.chests, ...this.creatures.filter((c) => c.resident)]) {
+      this.connectTo(this.chestAccess(fixed.pos), pathChar);
+    }
   }
 
   toMapDef(name: string): MapDef {
@@ -227,7 +241,7 @@ export class MapBuilder {
       if (i >= 26) throw new Error('A map can hold at most 26 chests');
       const letter = String.fromCharCode(97 + i);
       rows[chest.pos.y][chest.pos.x] = letter;
-      def.chests[letter] = { name: chest.name, contents: chest.contents };
+      def.chests[letter] = { name: chest.name, contents: chest.contents, ...(chest.owner && { owner: chest.owner }) };
     });
     // One letter per creature type, skipping P (the player start).
     const letters = 'ABCDEFGHIJKLMNOQRSTUVWXYZ';
@@ -276,21 +290,23 @@ export class MapBuilder {
 
   /** Can be walked over, ignoring creatures (they move, or die). */
   private passable(p: GridPos): boolean {
-    return (
-      this.inBounds(p.x, p.y) &&
-      !isBlockingTile(this.tileAt(p.x, p.y)) &&
-      !this.chests.some((c) => c.pos.x === p.x && c.pos.y === p.y)
-    );
+    return this.inBounds(p.x, p.y) && !isBlockingTile(this.tileAt(p.x, p.y)) && !this.standsInTheWay(p);
+  }
+
+  /** A chest or resident: never moves, so paths go around it. */
+  private standsInTheWay(p: GridPos): boolean {
+    const here = (q: GridPos) => q.x === p.x && q.y === p.y;
+    return this.chests.some((c) => here(c.pos)) || this.creatures.some((c) => c.resident && here(c.pos));
   }
 
   /** The cost of a path stepping onto this tile; Infinity where a path can't go. */
   private stepCost(p: GridPos): number {
-    if (!this.inBounds(p.x, p.y) || this.chests.some((c) => c.pos.x === p.x && c.pos.y === p.y)) return Infinity;
+    if (!this.inBounds(p.x, p.y) || this.standsInTheWay(p)) return Infinity;
     if (!isBlockingTile(this.tileAt(p.x, p.y))) return 1;
     return this.locked[p.y][p.x] ? Infinity : CARVE_COST;
   }
 
-  /** The neighbour of a chest the player will stand on to open it: the cheapest one to reach. */
+  /** The neighbour of a chest (or resident) the player will stand on to use it: the cheapest one to reach. */
   private chestAccess(chest: GridPos): GridPos {
     const options = DIRECTIONS.map((d) => addPos(chest, d)).filter((p) => this.stepCost(p) < Infinity);
     if (options.length === 0) throw new Error(`Chest at (${chest.x}, ${chest.y}) is walled in`);

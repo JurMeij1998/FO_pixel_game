@@ -69,7 +69,7 @@ const STREET_LIFE: SpawnTable = [
   { creatureId: 'radroach', weight: 2 },
 ];
 
-// Legend plus: ' ' keep terrain, '$' chest, '&' creature (see Prefab).
+// Legend plus: ' ' keep terrain, '$' chest, '&' creature, A-Z a resident (see Prefab).
 // Every building's door is in its bottom wall, with the entrance (a path tile) just below it;
 // flipVertical() turns them around for the other side of the street.
 
@@ -103,25 +103,26 @@ const BRICK_HOUSE: Prefab = {
   chest: { name: 'Cupboard', loot: HOUSE_LOOT },
 };
 
-/** Shelves along the back, a counter, the stockroom crate, and someone looting it. */
-const GENERAL_STORE: Prefab = {
+/**
+ * A small shop, 3 by 4 inside: bookcases along the back, Gus (G) behind his counter, and the
+ * stockroom crate behind it too, through the gap in the counter. You talk to Gus across the
+ * counter from the shop floor. Taking from the crate is stealing from the store. The guard (W)
+ * stands outside, beside the door.
+ */
+export const GENERAL_STORE: Prefab = {
   name: 'general store',
   rows: [
-    '%%%%%%%%%%%',
-    '%]]]]]]]]]%',
-    '%+++++++++%',
-    '%+$+++++++%',
-    '%++]]]++&+%',
-    '%+++++++++%',
-    '%%%%%+%%%%%',
-    '     :     ',
+    '%%%%%',
+    '%]]]%',
+    '%G+$%',
+    '%]+]%',
+    '%+++%',
+    '%%+%%',
+    '  :W ',
   ],
-  entrance: { x: 5, y: 7 },
-  chest: { name: 'Stockroom Crate', loot: STORE_LOOT },
-  creatures: [
-    { creatureId: 'raider', weight: 2 },
-    { creatureId: 'feral_ghoul', weight: 1 },
-  ],
+  entrance: { x: 2, y: 6 },
+  chest: { name: 'Stockroom Crate', loot: STORE_LOOT, owner: 'store' },
+  residents: { G: 'shopkeeper', W: 'guard' },
 };
 
 /** Hay bales, a feed bin, and vermin. Wide doors. */
@@ -176,17 +177,20 @@ const WELL: Prefab = {
   entrance: { x: 2, y: 4 },
 };
 
-/** Buildings that line the street. Each `unique` one appears at most once per village. */
-const STREET_BUILDINGS: Array<{ prefab: Prefab; weight: number; unique?: boolean }> = [
+/**
+ * Buildings that line the street. Each `unique` one appears at most once per village; the
+ * `required` one (the store, for its shopkeeper) exactly once.
+ */
+const STREET_BUILDINGS: Array<{ prefab: Prefab; weight: number; unique?: boolean; required?: boolean }> = [
   { prefab: WOODEN_HOUSE, weight: 4 },
   { prefab: BRICK_HOUSE, weight: 3 },
-  { prefab: GENERAL_STORE, weight: 2, unique: true },
+  { prefab: GENERAL_STORE, weight: 0, unique: true, required: true },
   { prefab: BARN, weight: 1, unique: true },
 ];
 
 export const VILLAGE: Biome = {
   id: 'village',
-  version: 2,
+  version: 4,
   names: ['Dusty Hollow', 'New Plenty', 'Rustwater', 'Cinder Creek', 'Harmony Flats', 'Last Stop'],
   width: 48,
   height: 34,
@@ -213,6 +217,7 @@ export const VILLAGE: Biome = {
 
     const occupied: GridPos[] = [...entries];
     const built = lineStreet(b, rng, streetY, west, east, entries, occupied);
+    if (!built.has(GENERAL_STORE)) throw new Error('No room on the street for the general store');
 
     // A well near the street, a field or two further out, each with a trail from the street.
     // Doors face the street: as drawn (door at the bottom) north of it, flipped south of it.
@@ -281,7 +286,8 @@ function roadToStreet(b: MapBuilder, entry: GridPos, streetY: number, west: numb
 /**
  * Fills both sides of the street with buildings, doors facing it: north of the street the
  * prefabs as drawn, south of it flipped. Spots a road runs through are skipped, and a building
- * with creatures inside only goes where none of them could see an exit. Returns the prefabs used.
+ * with creatures inside only goes where none of them could see an exit. The required buildings
+ * go in first chance they get from a random spot on a random side. Returns the prefabs used.
  */
 function lineStreet(
   b: MapBuilder,
@@ -293,8 +299,12 @@ function lineStreet(
   occupied: GridPos[],
 ): Set<Prefab> {
   const used = new Set<Prefab>();
-  for (const side of ['north', 'south'] as const) {
+  const sides = rng.chance(0.5) ? (['north', 'south'] as const) : (['south', 'north'] as const);
+  // On the first side, the required buildings come after this many others; on the second, straight away.
+  const requiredAfter = rng.int(0, 2);
+  for (const side of sides) {
     let x = west + rng.int(0, 2);
+    let placed = 0;
     while (x < east) {
       const oriented = (prefab: Prefab) => (side === 'north' ? prefab : flipVertical(prefab));
       const topFor = (prefab: Prefab) => (side === 'north' ? streetY - prefab.rows.length : streetY + 2);
@@ -303,11 +313,13 @@ function lineStreet(
       // Only buildings that still fit before the street's end: a wide barn doesn't end the row
       // when a house would have fitted.
       const fits = (prefab: Prefab) => x + prefab.rows[0].length - 1 <= east;
-      const options = STREET_BUILDINGS.filter(
-        (o) => !(o.unique && used.has(o.prefab)) && fits(o.prefab) && safeHere(o.prefab),
+      const missing = STREET_BUILDINGS.filter((o) => o.required && !used.has(o.prefab));
+      const due = missing.length > 0 && (side !== sides[0] || placed >= requiredAfter);
+      const options = (due ? missing : STREET_BUILDINGS).filter(
+        (o) => !(o.unique && used.has(o.prefab)) && o.weight + (due ? 1 : 0) > 0 && fits(o.prefab) && safeHere(o.prefab),
       );
       if (options.length === 0) break;
-      const choice = rng.pickWeighted(options);
+      const choice = due ? options[0] : rng.pickWeighted(options);
       const prefab = oriented(choice.prefab);
       const top = topFor(choice.prefab);
       if (!b.canStamp(prefab, x, top, 1)) {
@@ -316,6 +328,7 @@ function lineStreet(
       }
       b.stamp(prefab, x, top, rng);
       used.add(choice.prefab);
+      placed++;
       occupied.push(prefabCenter(prefab, x, top));
       x += prefab.rows[0].length + rng.int(1, 3);
     }

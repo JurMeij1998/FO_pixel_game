@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { loadSavedGame, startNewGame, startTestArena } from '../state';
+import { loadSavedGame, startNewGame, startTestArena, startTestShop } from '../state';
 
 /**
  * Switching between the menus and the game. The game scenes build themselves from `state`
@@ -24,6 +24,12 @@ export function quitToMenu(from: Phaser.Scene): void {
 /** Starts (or restarts) the test arena; development only. */
 export function playTestArena(from: Phaser.Scene): void {
   startTestArena();
+  startPlaying(from);
+}
+
+/** Starts (or restarts) the test shop; development only. */
+export function playTestShop(from: Phaser.Scene): void {
+  startTestShop();
   startPlaying(from);
 }
 

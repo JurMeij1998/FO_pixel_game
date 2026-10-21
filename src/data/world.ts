@@ -2,7 +2,7 @@ import { generateMap, generatorFingerprint, type ExitRequest } from '../core/gen
 import { GridMap, type MapDef } from '../core/gridMap';
 import { hashSeed } from '../core/random';
 import { BIOMES, type BiomeId } from './biomes';
-import { TEST_ARENA } from './testArena';
+import { TEST_ARENA, TEST_SHOP } from './testArena';
 import { WASTELAND } from './wasteland';
 
 /** A map in the world: drawn by hand, or generated from a biome with the given exits. */
@@ -21,9 +21,12 @@ export const WORLD: Record<string, MapSource> = {
   village: { kind: 'generated', biome: 'village', exits: [{ side: 'north', to: 'wasteland' }] },
   /** For trying out combat UI; development only, see startTestArena() in state.ts. */
   test_arena: { kind: 'fixed', def: TEST_ARENA },
+  /** For trying out dialog and bartering; development only, see startTestShop() in state.ts. */
+  test_shop: { kind: 'fixed', def: TEST_SHOP },
 };
 
 export const TEST_ARENA_MAP = 'test_arena';
+export const TEST_SHOP_MAP = 'test_shop';
 
 export const START_MAP = 'wasteland';
 

@@ -1,7 +1,8 @@
 import type { MapDef } from '../core/gridMap';
 
 // Legend: . dirt   , dry grass   _ floor   # wall   o rock   ~ water
-//         P player start   a-z chests   A-Z creatures   1-9 exits (all defined below)
+//         P player start   a-z chests   A-Z creatures and people   1-9 exits (all defined below)
+// A new game starts inside Rosa's shack (top left), with Rosa (F) beside you.
 export const WASTELAND: MapDef = {
   name: 'Wasteland',
   rows: [
@@ -10,9 +11,9 @@ export const WASTELAND: MapDef = {
     'o.#########....o..,.........~~~o',
     'o.#___a___#.........,.......~~~o',
     'o.#_______#....,.M..........~~~o',
-    'o.#_______#..........oo......~~o',
+    'o.#__FP___#..........oo......~~o',
     'o.####_####..,.......oo.......~o',
-    'o.....P.......................,1',
+    'o.............................,1',
     'o..,..........,......,.........o',
     'o.........oo..........#######..o',
     'o...,.....oo..........#__b__#..o',
@@ -63,6 +64,7 @@ export const WASTELAND: MapDef = {
     R: 'radroach',
     M: 'mole_rat',
     X: 'raider',
+    F: 'rosa',
   },
   exits: {
     '1': { to: 'forest' },

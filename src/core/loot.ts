@@ -7,6 +7,27 @@ import { failure, success, type ActionResult } from './result';
 export interface Lootable {
   readonly name: string;
   readonly contents: ItemContainer;
+  /** The group it belongs to, if any: taking from it is stealing (see GridMap.noticeTheft). */
+  readonly owner?: string;
+}
+
+/**
+ * What the player put into someone else's container during one visit to the loot screen:
+ * taking that back out again isn't stealing.
+ */
+export class OwnStash {
+  private readonly own = new Map<string, number>();
+
+  stored(itemId: string, quantity: number): void {
+    this.own.set(itemId, (this.own.get(itemId) ?? 0) + quantity);
+  }
+
+  /** Records that `quantity` of an item was taken out; returns how many of those weren't the player's own. */
+  took(itemId: string, quantity: number): number {
+    const mine = Math.min(this.own.get(itemId) ?? 0, quantity);
+    this.own.set(itemId, (this.own.get(itemId) ?? 0) - mine);
+    return quantity - mine;
+  }
 }
 
 /** How much of a stack one transfer moves: a single item, half the stack (rounded up), or all of it. */

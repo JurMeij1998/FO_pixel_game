@@ -13,7 +13,8 @@ interface MapState {
   /** The generator a generated map was made with (missing in older saves; null for hand-made maps). */
   generator?: string | null;
   chests: Record<string, { opened: boolean; contents: Entries }>;
-  creatures: Record<string, { hitPoints: number; pos: GridPos; contents: Entries }>;
+  /** `hostile` is missing in older saves; creatures then keep their starting disposition. */
+  creatures: Record<string, { hitPoints: number; pos: GridPos; contents: Entries; hostile?: boolean }>;
 }
 
 /** A saved game, as plain JSON. */
@@ -112,7 +113,7 @@ function mapState(map: GridMap): MapState {
   const state: MapState = { generator: map.generator, chests: {}, creatures: {} };
   for (const chest of map.chests) state.chests[chest.id] = { opened: chest.opened, contents: chest.contents.toData() };
   for (const c of map.creatures) {
-    state.creatures[c.id] = { hitPoints: c.hitPoints, pos: { ...c.pos }, contents: c.contents.toData() };
+    state.creatures[c.id] = { hitPoints: c.hitPoints, pos: { ...c.pos }, contents: c.contents.toData(), hostile: c.hostile };
   }
   return state;
 }
@@ -132,5 +133,7 @@ function applyMapState(map: GridMap, state: MapState): void {
     creature.hitPoints = Math.max(0, Math.min(creature.maxHitPoints, saved.hitPoints));
     creature.pos = { ...saved.pos };
     creature.contents.setData(saved.contents);
+    // Only ever from friendly to hostile: a save can't make a monster friendly.
+    if (saved.hostile === true) creature.hostile = true;
   });
 }

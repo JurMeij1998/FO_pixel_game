@@ -2,7 +2,8 @@
 
 A small top-down pixel-art RPG inspired by Fallout 1/2: grid movement, lootable chests and
 corpses, a weight-limited inventory, turn-based combat with Action Points and line of sight,
-XP and levelling, randomly generated maps, autosave, and synthesised sound effects.
+XP and levelling, a shopkeeper to talk and barter with, randomly generated maps, autosave,
+and synthesised sound effects.
 
 Built with TypeScript, [Phaser 3](https://phaser.io) and Vite.
 
@@ -27,12 +28,18 @@ Nothing in the arena is saved, so your real save is never touched; quitting to t
 goes back to it. Production builds have no way into the arena: the menu entry and the
 `?arena` link only exist in development.
 
+The **Test shop (dev)** entry, or http://localhost:5173/?shop, works the same way for talking,
+bartering, stealing and starting trouble: the village store in a small yard, with the test
+character (and 1000 caps) on the shop floor facing Gus across his counter, the store's crate
+behind it, and the guard outside by the door.
+
 ## Controls
 
 | Key             | Exploring                        | In combat                     |
 | --------------- | -------------------------------- | ----------------------------- |
 | Arrows / WASD   | Move                             | Move (1 AP per tile)          |
-| E / Space       | Interact with the tile you face  | Space: end turn               |
+| E / Space       | Interact with what you face: open a chest, loot a corpse, talk | Space: end turn |
+| Click a person  | Talk, when next to them or across a counter; Ctrl+click attacks them |      |
 | F / click enemy | Click: attack (starts combat)    | Attack the target             |
 | Tab             |                                  | Next target                   |
 | I               | Inventory                        | Inventory (costs 4 AP)        |
@@ -44,6 +51,49 @@ goes back to it. Production builds have no way into the arena: the menu entry an
 | Click (loot)    | Move 1 of a stack; Ctrl+click half (rounded up), Shift+click all |   |
 | Space (loot)    | Take all                         |                               |
 | E / Esc (loot)  | Close the loot screen            |                               |
+| Up/Down, Enter (talk) | Pick a reply and answer (or click it, or press its number); Esc walks away | |
+| Click (barter)  | Sell (left) or buy (right) 1; Ctrl+click half, Shift+click all |     |
+
+## Talking and trading
+
+People are creatures that start out **friendly** (`core/creature.ts`): they stay put, don't
+notice you as a threat, and talk. Face one (or the counter in front of them) and press E or
+Space, or click them. What they say appears as a subtitle in a green-bordered box at the
+bottom of the screen, with your replies underneath; `>` marks the one selected. Conversations
+are small graphs of lines and replies (`core/dialog.ts`); a reply can lead to another line,
+open the barter screen, or end the conversation. Every conversation ends with `*Attack*`.
+
+A new game starts in **Rosa**'s shack, with her right beside you. She found you out cold by
+her door, tells you to take the gear in her footlocker, and answers questions: where you are,
+what's dangerous around here, and what a mole rat, a radroach or a raider is. She's next
+to defenseless: attack her and she fights back with what she has, a slap for 1 damage at
+poor odds, until one of you is down or you get away. Killing her earns no XP.
+
+Every village has a small general store with **Gus** behind the counter: "if you break
+anything, you buy it!" He sells ammo, two stimpaks and a leather jacket, and buys what you
+bring with his own (limited) caps. On the barter screen a click buys or sells at once. Prices
+depend on Charisma (`core/barter.ts`): you buy at 100% of an item's value at Charisma 10, up
+to 136% at 1, and sell for 55% at Charisma 10, down to 28% at 1.
+
+A **guard** stands outside the store: friendly, as long as you behave. People belong to a
+group (Gus and the guard to the store), and the whole group turns hostile when you:
+
+- choose `*Attack*` in a conversation, or Ctrl+click a friendly person;
+- take anything from the stockroom crate behind the counter, which belongs to the store
+  (opening it is fine, and so is taking back something you put in yourself; the loot
+  screen closes the moment you're caught).
+
+A Ctrl+click that can't become an attack (no AP, an empty gun, no line of sight) does
+nothing, so a misclick doesn't start a fight; only being out of range still does, so
+`*Attack*` across the counter with a knife starts the fight and you close in.
+
+Then the fight is on, and the guard joins in even if he can't see you. He's a crack shot
+with his 10mm pistol (85% base to hit, against a raider's 50%); Gus only has his fists. Once
+hostile, people stay that way: clicking them attacks, and they won't talk any more. Killed,
+they leave their goods on their corpse. Hostility, and what Gus has left, are saved. The
+guard sees further than any monster, so a village whose store you've turned against you can
+greet you with gunfire as you arrive: the rule that nothing attacks on arrival only holds
+for creatures that start out hostile.
 
 ## Maps and biomes
 
@@ -55,15 +105,16 @@ exit to a randomly generated village.
 
 Generated maps are rebuilt from a seed (the world seed, which is new for every game, plus the
 map id), so the same game always gets the same forest and saves only store what changed:
-looted chests and dead creatures.
+looted chests, dead creatures, who has turned hostile, and what traders have left.
 
 A biome's generator draws onto a `MapBuilder` (`core/generation/`), which turns it into an
 ordinary ASCII `MapDef`, so generated maps are parsed, saved and drawn like hand-made ones.
 Afterwards it carves paths so every exit, chest and creature can be reached. The toolkit:
 
 - `MapBuilder`: paint tiles, stamp prefabs, place chests, creatures and exits.
-- `Prefab`: a hand-drawn structure in the map legend, with `$` for its chest and `&` for its
-  creatures (a logging camp, a hunter's cabin, ...). `flipVertical()` turns one around, e.g.
+- `Prefab`: a hand-drawn structure in the map legend, with `$` for its chest, `&` for its
+  creatures and capital letters for its residents, particular people who are always there
+  (a logging camp, a hunter's cabin, the general store with Gus and the guard, ...). `flipVertical()` turns one around, e.g.
   for houses on the other side of a street; `builder.lock()` keeps roads free of buildings.
 - `LootTable` / `SpawnTable`: what a chest can contain, which creatures can appear.
 - `terrain.ts`: scatter, cellular smoothing (for groves and caves), blobs, borders, winding
@@ -74,8 +125,8 @@ sometimes a pond, a raider-held logging camp, a hunter's cabin, campsites and hi
 stashes, and mole rats, radroaches and wild dogs kept out of sight of where you arrive.
 
 The village (`data/biomes/village.ts`) is abandoned and overgrown: a main street with wooden
-and brick houses on both sides (doors facing the street), a general store being looted by a
-raider, a barn with hay and vermin, fenced fields with mole rats, a well, and feral ghouls,
+and brick houses on both sides (doors facing the street), a general store where Gus still
+keeps shop, a barn with hay and vermin, fenced fields with mole rats, a well, and feral ghouls,
 wild dogs and radroaches roaming the streets.
 
 **Adding a biome** (village, plains, caves...):
@@ -133,6 +184,11 @@ of sight (water doesn't): enemies can't spot or shoot you through them, nor you 
 they walk around cover to get a clear shot. Get far enough away, or out of range behind
 cover, and enemies lose track of you; kill them and their corpses can be looted.
 
+Your shots don't pass through people: anyone standing in your line of fire takes the bullet
+instead (hit or miss, at their own odds), and the HUD warns you ("Gus is in the way"). Hit a
+friendly bystander and they turn hostile, with their group. Enemies aren't that careful:
+their shots fly past whoever is in between and hit you. Melee isn't affected.
+
 During a fight an AP gauge floats above you (`ui/apGauge.ts`): the AP left in a 3x5 pixel
 font (`gfx/pixelFont.ts`) inside a round seal, with a bar of pips sweeping out of it. Its
 light green border pulses and a glint sweeps across it every few seconds. Spending AP counts
@@ -150,12 +206,15 @@ src/
     items.ts      Item definitions (weight, value, weapon/armor stats)
     container.ts  ItemContainer: stacks of items (backpack, chest)
     character.ts  Character: skills, levels, equipment slots, magazines
-    creature.ts   Creature definitions and instances
+    creature.ts   Creature and people definitions (people: dialog, group, trade) and instances
+    dialog.ts     Conversations: lines, replies and what they lead to
+    barter.ts     Buying and selling, with prices based on Charisma
     fighter.ts    The Attack and Fighter interfaces shared by player and creatures
     combat.ts     Turn-based combat rules and enemy AI; emits events for the scene
     loot.ts       Moving items between containers, honouring carry weight
     grid.ts       Grid positions, directions and distance
-    gridMap.ts    Parses ASCII maps into tiles, chests, creatures and exits; line of sight
+    gridMap.ts    Parses ASCII maps into tiles, chests, creatures and exits; line of sight; who
+                  you can talk to, provoking groups and noticing theft
     random.ts     Seeded random numbers, so generated maps can be rebuilt from a seed
     result.ts     ActionResult: success or failure plus a message for the log
     save.ts       Game state (all visited maps) to and from plain JSON
@@ -164,8 +223,8 @@ src/
   gfx/        Procedurally generated placeholder pixel art
   audio/      Synthesised sound effects
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting
-  scenes/     Phaser scenes: Boot, Menu, World, Hud, Inventory, Loot, Character, Pause,
-              GameOver, Controls; flow.ts switches between menus and the game
+  scenes/     Phaser scenes: Boot, Menu, World, Hud, Inventory, Loot, Dialog, Barter,
+              Character, Pause, GameOver, Controls; flow.ts switches between menus and the game
   state.ts    The running game (player + map), loaded from the save if there is one
   storage.ts  localStorage access for the save
   main.ts     Phaser game config

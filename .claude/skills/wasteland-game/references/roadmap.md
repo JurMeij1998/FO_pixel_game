@@ -35,5 +35,10 @@ Roughly in the order discussed with the user:
 - **More biomes:** plains and caves (`smooth()` suits cave walls).
 - **Touch controls** and mobile: an on-screen D-pad and action buttons, tap to attack and
   interact; package with Capacitor or as a PWA (Tauri or Electron for desktop).
-- **A trader NPC with dialogue**, giving Charisma and item values a use.
+- **More people.** So far: Gus the village shopkeeper (dialog, Charisma-based barter), the
+  store's guard (both turn hostile on attack or theft), and Rosa in the starting shack, who
+  explains the area. Likely next: dialog that depends on state (quests, reputation), traders
+  restocking over time, theft that needs a witness, creatures tracking ammo (the guard's
+  pistol never runs dry), people taking sides in fights with monsters, and keeping the store
+  out of a provoked guard's sight of the village entrances (today he can see some of them).
 - **Real sprite art** (a sprite sheet) replacing the generated placeholders.

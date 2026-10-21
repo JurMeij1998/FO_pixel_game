@@ -31,6 +31,15 @@ export function playabilityProblems(map: GridMap): string[] {
     for (const chest of map.chests) {
       if (!DIRECTIONS.some((d) => reached(addPos(chest, d)))) problems.push(`from ${way.to}: chest ${chest.name} unreachable`);
     }
+    for (const person of map.creatures.filter((c) => c.canTalk)) {
+      // Someone has to be able to talk to them: from next to them, or across a counter.
+      const spots = [...canReach].map((key) => {
+        const [x, y] = key.split(',').map(Number);
+        return { x, y };
+      });
+      const talkable = spots.some((spot) => DIRECTIONS.some((d) => map.personFacing(spot, d) === person));
+      if (!talkable) problems.push(`from ${way.to}: no one can talk to ${person.id}`);
+    }
     visitor.pos = arrival;
     for (const spotter of Combat.spotters(map, visitor)) problems.push(`${spotter.id} can see the arrival from ${way.to}`);
   }

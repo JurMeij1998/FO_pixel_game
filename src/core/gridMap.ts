@@ -70,8 +70,8 @@ const EXIT_MARKER = /^[1-9]$/;
  * there are four kinds of markers:
  *   P    the player start
  *   a-z  a chest, whose contents are listed under that letter in `chests`
- *   A-Z  a creature (except P), whose type is given under that letter in `creatures`;
- *        the same letter can be used many times
+ *   A-Z  a creature or person (except P), whose type is given under that letter in
+ *        `creatures`; the same letter can be used many times
  *   1-9  an exit to another map, given under that digit in `exits`
  * A marker stands on the ground of a neighbouring tile: the first walkable one of left,
  * right, above and below.
@@ -79,11 +79,18 @@ const EXIT_MARKER = /^[1-9]$/;
 export interface MapDef {
   name: string;
   rows: string[];
-  chests: Record<string, { name: string; contents: Array<[itemId: string, quantity: number]> }>;
+  chests: Record<string, ChestDef>;
   /** Marker letter to creature id. */
   creatures?: Record<string, string>;
   /** Marker digit to the id of the map it leads to. */
   exits?: Record<string, { to: string }>;
+}
+
+export interface ChestDef {
+  name: string;
+  contents: Array<[itemId: string, quantity: number]>;
+  /** The group it belongs to (see CreatureDef.group): taking from it is stealing from them. */
+  owner?: string;
 }
 
 export interface Chest {
@@ -93,6 +100,7 @@ export interface Chest {
   y: number;
   contents: ItemContainer;
   opened: boolean;
+  owner?: string;
 }
 
 /** A walkable tile that takes the player to another map. */
@@ -162,7 +170,8 @@ export class GridMap {
         } else if (CHEST_MARKER.test(char)) {
           const chest = def.chests[char];
           if (!chest) throw new Error(`Map '${def.name}': no chest defined for '${char}'`);
-          chests.push({ id: char, name: chest.name, x, y, contents: new ItemContainer(chest.contents), opened: false });
+          const contents = new ItemContainer(chest.contents);
+          chests.push({ id: char, name: chest.name, x, y, contents, opened: false, owner: chest.owner });
         } else if (CREATURE_MARKER.test(char)) {
           const creatureId = def.creatures?.[char];
           if (!creatureId) throw new Error(`Map '${def.name}': no creature defined for '${char}'`);
@@ -240,6 +249,45 @@ export class GridMap {
     return seen;
   }
 
+  /**
+   * The person someone at `from` talks to when facing `step`: one right in front of them, or
+   * one standing behind a counter (a shelf) in front of them, as in a shop. Only people who
+   * will talk: alive, friendly, and with a dialog.
+   */
+  personFacing(from: GridPos, step: GridPos): Creature | undefined {
+    const front = addPos(from, step);
+    const here = this.livingCreatureAt(front.x, front.y);
+    if (here) return here.canTalk ? here : undefined;
+    if (this.tileAt(front.x, front.y) !== 'shelf') return undefined;
+    const behind = addPos(front, step);
+    const person = this.livingCreatureAt(behind.x, behind.y);
+    return person?.canTalk ? person : undefined;
+  }
+
+  /**
+   * Turns a creature hostile, and with it every living, still friendly member of its group.
+   * Returns everyone who turned hostile (empty if they all already were).
+   */
+  provoke(creature: Creature): Creature[] {
+    const group = creature.def.group;
+    const angered = this.creatures.filter(
+      (c) => !c.isDead && !c.hostile && (c === creature || (group !== undefined && c.def.group === group)),
+    );
+    for (const c of angered) c.hostile = true;
+    return angered;
+  }
+
+  /**
+   * Taking something that belongs to a group (`owner`, e.g. a chest's) is stealing: if any of
+   * that group is alive and still friendly, they all turn hostile. Returns who did (empty for
+   * nothing owned, or an owner with no one left to care).
+   */
+  noticeTheft(owner: string | undefined): Creature[] {
+    if (owner === undefined) return [];
+    const witness = this.creatures.find((c) => !c.isDead && !c.hostile && c.def.group === owner);
+    return witness ? this.provoke(witness) : [];
+  }
+
   livingCreatureAt(x: number, y: number): Creature | undefined {
     return this.creatures.find((c) => !c.isDead && c.pos.x === x && c.pos.y === y);
   }
@@ -261,10 +309,21 @@ export class GridMap {
    * tried and either being clear is enough; that keeps sight symmetric.
    */
   hasLineOfSight(a: GridPos, b: GridPos): boolean {
-    return this.isLineClear(a, b) || this.isLineClear(b, a);
+    return this.clearLine(a, b) !== null || this.clearLine(b, a) !== null;
   }
 
-  private isLineClear(from: GridPos, to: GridPos): boolean {
+  /**
+   * The tiles a shot from `from` to `to` passes over, nearest to the shooter first, end tiles
+   * left out; null if there's no line of sight. It's the line hasLineOfSight found clear (from
+   * the shooter's end if that one is), so a shot only ever crosses tiles you can see along.
+   */
+  lineOfFire(from: GridPos, to: GridPos): GridPos[] | null {
+    return this.clearLine(from, to) ?? this.clearLine(to, from)?.reverse() ?? null;
+  }
+
+  /** The tiles strictly between two tiles on a Bresenham line, or null if something blocks sight. */
+  private clearLine(from: GridPos, to: GridPos): GridPos[] | null {
+    const between: GridPos[] = [];
     const dx = Math.abs(to.x - from.x);
     const dy = -Math.abs(to.y - from.y);
     const stepX = from.x < to.x ? 1 : -1;
@@ -286,11 +345,13 @@ export class GridMap {
       }
       // A diagonal step squeezes between two tiles; if both block sight, so does the gap.
       const diagonal = x !== previousX && y !== previousY;
-      if (diagonal && this.blocksSight(previousX, y) && this.blocksSight(x, previousY)) return false;
+      if (diagonal && this.blocksSight(previousX, y) && this.blocksSight(x, previousY)) return null;
       const reachedEnd = x === to.x && y === to.y;
-      if (!reachedEnd && this.blocksSight(x, y)) return false;
+      if (reachedEnd) break;
+      if (this.blocksSight(x, y)) return null;
+      between.push({ x, y });
     }
-    return true;
+    return between;
   }
 
   /** Corpses don't block; living creatures do. The player's own tile is not checked here. */

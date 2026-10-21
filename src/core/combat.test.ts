@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Character } from './character';
 import { Combat } from './combat';
+import { Creature, getCreatureDef } from './creature';
 import { GridMap } from './gridMap';
 
 // rng() returning 0 means every roll succeeds: always hit, always critical, minimum damage.
@@ -318,5 +319,330 @@ describe('Combat', () => {
     expect(combat.target).not.toBe(first);
     combat.cycleTarget();
     expect(combat.target).toBe(first);
+  });
+});
+
+describe('Combat with people', () => {
+  // Gus (G) two tiles from the player; the guard (W) out of sight behind a wall.
+  function store(rng: () => number = ALWAYS) {
+    const map = GridMap.parse({
+      name: 'store',
+      rows: ['#########', '#P.G#..W#', '#...#...#', '#.......#', '#########'],
+      chests: {},
+      creatures: { G: 'shopkeeper', W: 'guard' },
+    });
+    const player = new Character('Tester', {
+      strength: 5,
+      perception: 5,
+      endurance: 5,
+      charisma: 5,
+      intelligence: 5,
+      agility: 5,
+      luck: 5,
+    });
+    player.pos = { ...map.playerStart };
+    player.backpack.add('knife');
+    player.equip('knife', 'primary');
+    const [gus, guard] = map.creatures;
+    return { map, player, gus, guard, rng };
+  }
+
+  it("don't start a fight while they're friendly, even in plain sight", () => {
+    const { map, player } = store();
+    expect(Combat.spotters(map, player)).toEqual([]);
+  });
+
+  it('bring the whole group into the fight once provoked, the guard even out of sight', () => {
+    const { map, player, gus, guard, rng } = store();
+    const combat = new Combat(map, player, rng);
+    expect(combat.participants).toEqual([]);
+    combat.join(map.provoke(gus));
+    expect(combat.participants).toEqual([gus, guard]);
+    expect(combat.target).toBe(gus); // the nearest
+    expect(map.hasLineOfSight(guard.pos, player.pos)).toBe(false);
+  });
+
+  it('never fight while still friendly', () => {
+    const { map, player, gus, rng } = store();
+    const combat = new Combat(map, player, rng);
+    combat.join([gus]); // not provoked
+    expect(combat.participants).toEqual([]);
+    player.pos = { x: 2, y: 1 }; // right next to Gus
+    expect(() => combat.attack(gus)).toThrow(/still friendly/);
+  });
+
+  it('call people by their name in messages', () => {
+    const { map, player, gus, rng } = store();
+    const combat = new Combat(map, player, rng);
+    combat.join(map.provoke(gus));
+    player.pos = { x: 2, y: 1 };
+    const result = combat.attack(gus);
+    expect(result.ok && result.events[0].type === 'attack' && result.events[0].message).toMatch(/^You critically hit Gus for/);
+    const events = combat.endTurn();
+    const gusSwings = events.find((e) => e.type === 'attack' && e.attacker === gus);
+    expect(gusSwings?.type === 'attack' && gusSwings.message).toMatch(/^Gus (critically )?hits you/);
+  });
+
+  it('give the guard a far better shot than a raider', () => {
+    const { map, player, guard } = store();
+    const combat = new Combat(map, player);
+    const raider = new Creature('raider@7,1', getCreatureDef('raider'), { ...guard.pos });
+    expect(combat.hitChance(guard, player)).toBeGreaterThan(combat.hitChance(raider, player) + 30);
+    expect(guard.attack.ranged).toBe(true);
+    expect(guard.contents.count('10mm_pistol')).toBe(1);
+  });
+});
+
+describe('Line of fire', () => {
+  // The player, then Gus, then the guard, in a row; a radroach further down, in the open.
+  function lineUp(rng: () => number, weapon: '10mm_pistol' | 'spear' = '10mm_pistol') {
+    const map = GridMap.parse({
+      name: 'range',
+      rows: ['#########', '#P.G.W..#', '#.......#', '#R......#', '#########'],
+      chests: {},
+      creatures: { G: 'shopkeeper', W: 'guard', R: 'radroach' },
+    });
+    const player = new Character('Shooter', {
+      strength: 5,
+      perception: 5,
+      endurance: 5,
+      charisma: 5,
+      intelligence: 5,
+      agility: 10,
+      luck: 5,
+    });
+    player.pos = { ...map.playerStart };
+    player.backpack.add(weapon);
+    player.equip(weapon, 'primary');
+    if (weapon === '10mm_pistol') {
+      player.backpack.add('ammo_10mm', 12);
+      player.reload();
+    }
+    const [gus, guard, roach] = ['shopkeeper', 'guard', 'radroach'].map((id) => map.creatures.find((c) => c.def.id === id)!);
+    return { map, player, gus, guard, roach, combat: new Combat(map, player, rng) };
+  }
+
+  it('lists the tiles a shot crosses, nearest the shooter first', () => {
+    const { map } = lineUp(ALWAYS);
+    expect(map.lineOfFire({ x: 1, y: 1 }, { x: 5, y: 1 })).toEqual([
+      { x: 2, y: 1 },
+      { x: 3, y: 1 },
+      { x: 4, y: 1 },
+    ]);
+    expect(map.lineOfFire({ x: 5, y: 1 }, { x: 1, y: 1 })![0]).toEqual({ x: 4, y: 1 });
+    expect(map.lineOfFire({ x: 1, y: 1 }, { x: 1, y: 0 })).toEqual([]); // next to each other
+  });
+
+  it("stops your shot at whoever is in the way: Gus catches the bullet meant for the guard", () => {
+    const { map, gus, guard, combat } = lineUp(ALWAYS);
+    combat.join(map.provoke(guard));
+    expect(combat.inTheWay(guard)).toBe(gus);
+    const result = combat.attack(guard);
+    if (!result.ok || result.events[0].type !== 'attack') throw new Error('expected an attack');
+    const shot = result.events[0];
+    expect(shot.target).toBe(gus);
+    expect(shot.message).toMatch(/^Gus is in the way! You critically hit Gus for/);
+    expect(gus.hitPoints).toBeLessThan(gus.maxHitPoints);
+    expect(guard.hitPoints).toBe(guard.maxHitPoints);
+    expect(combat.target).toBe(guard); // still the one you're aiming at
+  });
+
+  it('lets the shot miss the one in the way, without flying on to the target', () => {
+    const { map, gus, guard, combat } = lineUp(NEVER);
+    combat.join(map.provoke(guard));
+    const result = combat.attack(guard);
+    if (!result.ok || result.events[0].type !== 'attack') throw new Error('expected an attack');
+    expect(result.events[0].message).toBe('Gus is in the way! You miss Gus.');
+    expect(gus.hitPoints).toBe(gus.maxHitPoints);
+    expect(guard.hitPoints).toBe(guard.maxHitPoints);
+  });
+
+  it('turns a friendly bystander you hit against you, with their group', () => {
+    const { gus, guard, combat } = lineUp(ALWAYS);
+    guard.hostile = true; // only the guard is after you; Gus is still friendly
+    combat.join([guard]);
+    const result = combat.attack(guard);
+    if (!result.ok || result.events[0].type !== 'attack') throw new Error('expected an attack');
+    expect(result.events[0].message).toMatch(/Gus turns hostile!$/);
+    expect(gus.hostile).toBe(true);
+    expect(combat.participants).toContain(gus);
+  });
+
+  it('leaves a friendly bystander friendly when the shot misses them', () => {
+    const { gus, guard, combat } = lineUp(NEVER);
+    guard.hostile = true; // only the guard is after you
+    combat.join([guard]);
+    combat.attack(guard);
+    expect(gus.hostile).toBe(false);
+    expect(combat.participants).not.toContain(gus);
+  });
+
+  it('turns the group against you when a friendly bystander is killed, and pays the XP', () => {
+    const { player, gus, guard, combat } = lineUp(ALWAYS);
+    guard.hostile = true;
+    combat.join([guard]);
+    gus.hitPoints = 1;
+    const result = combat.attack(guard);
+    if (!result.ok || result.events[0].type !== 'attack') throw new Error('expected an attack');
+    expect(result.events[0].killed).toBe(true);
+    expect(gus.isDead).toBe(true);
+    expect(player.experience).toBe(gus.def.experience);
+    expect(combat.livingEnemies).toContain(guard);
+    expect(combat.livingEnemies).not.toContain(gus);
+  });
+
+  it('brings a hostile bystander into the fight, even one too far away to have seen you', () => {
+    const map = GridMap.parse({
+      name: 'long range',
+      rows: ['############', '#P.....R..X#', '############'],
+      chests: {},
+      creatures: { R: 'radroach', X: 'raider' },
+    });
+    const player = new Character('Sniper', {
+      strength: 5,
+      perception: 5,
+      endurance: 5,
+      charisma: 5,
+      intelligence: 5,
+      agility: 10,
+      luck: 5,
+    });
+    player.pos = { ...map.playerStart };
+    player.backpack.add('hunting_rifle');
+    player.equip('hunting_rifle', 'primary');
+    player.backpack.add('ammo_223', 5);
+    player.reload();
+    const [roach, raider] = map.creatures;
+    const combat = new Combat(map, player, NEVER);
+    expect(combat.participants).toEqual([]); // both too far away to notice you
+    combat.join([raider]);
+    expect(combat.inTheWay(raider)).toBe(roach);
+    combat.attack(raider); // misses the radroach in the way
+    expect(combat.participants).toContain(roach);
+  });
+
+  it("follows the line of sight's other way round when the shooter's own line is blocked, nearest first", () => {
+    // From (0,0) to (3,4) the shooter's Bresenham line runs through (2,2), a wall; the line
+    // from the target's end is clear, and passes the radroach before the raider.
+    const map = GridMap.parse({
+      name: 'corner',
+      rows: ['P......', '.......', '.R#....', '..X....', '...M...'],
+      chests: {},
+      creatures: { R: 'radroach', X: 'raider', M: 'mole_rat' },
+    });
+    const player = new Character('Shooter', {
+      strength: 5,
+      perception: 5,
+      endurance: 5,
+      charisma: 5,
+      intelligence: 5,
+      agility: 10,
+      luck: 5,
+    });
+    player.pos = { ...map.playerStart };
+    player.backpack.add('10mm_pistol');
+    player.equip('10mm_pistol', 'primary');
+    const [roach, , moleRat] = map.creatures;
+    expect(map.lineOfFire({ x: 0, y: 0 }, { x: 3, y: 4 })).toEqual([
+      { x: 1, y: 1 },
+      { x: 1, y: 2 },
+      { x: 2, y: 3 },
+    ]);
+    expect(new Combat(map, player).inTheWay(moleRat)).toBe(roach);
+  });
+
+  it("doesn't stop melee, not even a spear reaching past someone", () => {
+    const { map, player, gus, guard, combat } = lineUp(ALWAYS, 'spear');
+    player.pos = { x: 1, y: 1 };
+    gus.pos = { x: 2, y: 1 };
+    guard.pos = { x: 3, y: 1 }; // two tiles away, Gus in between: within the spear's reach
+    combat.join(map.provoke(guard));
+    expect(combat.inTheWay(guard)).toBeNull();
+    const result = combat.attack(guard);
+    if (!result.ok || result.events[0].type !== 'attack') throw new Error('expected an attack');
+    expect(result.events[0].target).toBe(guard);
+    expect(gus.hitPoints).toBe(gus.maxHitPoints);
+  });
+
+  it("doesn't protect you: the guard's shots fly past Gus and hit you", () => {
+    const { map, player, gus, guard, combat } = lineUp(ALWAYS);
+    combat.join(map.provoke(guard)); // Gus walks up first and stands between you and the guard
+    gus.hitPoints = 1;
+    const before = player.hitPoints;
+    const events = combat.endTurn();
+    const guardShot = events.find((e) => e.type === 'attack' && e.attacker === guard);
+    expect(guardShot?.type === 'attack' && guardShot.target).toBe(player);
+    expect(player.hitPoints).toBeLessThan(before);
+    expect(gus.hitPoints).toBe(1); // the guard's bullets went past him
+  });
+});
+
+describe('Someone nearly defenseless', () => {
+  // Rosa (F) right next to the player, a radroach (R) out of sight behind the wall.
+  function shack(rng: () => number = ALWAYS) {
+    const map = GridMap.parse({
+      name: 'shack',
+      rows: ['#######', '#FP.#R#', '#...#.#', '#######'],
+      chests: {},
+      creatures: { F: 'rosa', R: 'radroach' },
+    });
+    const player = new Character('Tester', {
+      strength: 5,
+      perception: 5,
+      endurance: 5,
+      charisma: 5,
+      intelligence: 5,
+      agility: 5,
+      luck: 5,
+    });
+    player.pos = { ...map.playerStart };
+    player.backpack.add('knife');
+    player.equip('knife', 'primary');
+    const [rosa, roach] = map.creatures;
+    return { map, player, rosa, roach, rng };
+  }
+
+  it("doesn't start a fight while friendly, but does once she's been provoked", () => {
+    const { map, player, rosa } = shack();
+    expect(Combat.spotters(map, player)).toEqual([]);
+    map.provoke(rosa);
+    expect(Combat.spotters(map, player)).toEqual([rosa]);
+  });
+
+  it('takes on the fight: it goes on after your turn, until she is down or you get away', () => {
+    const { map, player, rosa, rng } = shack();
+    map.provoke(rosa);
+    const combat = new Combat(map, player, rng);
+    expect(combat.attack(rosa).ok).toBe(true);
+    expect(rosa.isDead).toBe(false); // the knife does 1-6; she has 12 HP
+    expect(combat.outcome).toBeNull();
+    combat.endTurn();
+    combat.startPlayerTurn();
+    expect(combat.outcome).toBeNull();
+    expect(combat.isPlayerTurn).toBe(true);
+  });
+
+  it('fights back with nothing more than a slap', () => {
+    const { map, player, rosa, rng } = shack();
+    map.provoke(rosa);
+    const combat = new Combat(map, player, rng);
+    const before = player.hitPoints;
+    const events = combat.endTurn();
+    const slaps = events.filter((e) => e.type === 'attack' && e.attacker === rosa);
+    expect(slaps).toHaveLength(1); // 4 AP per slap, 5 AP a turn
+    expect(before - player.hitPoints).toBeLessThanOrEqual(2); // 1 damage, 2 on a critical
+    expect(combat.hitChance(rosa, player)).toBeLessThan(30);
+  });
+
+  it('gives no XP, and says none', () => {
+    const { map, player, rosa, rng } = shack();
+    map.provoke(rosa);
+    rosa.hitPoints = 1;
+    const combat = new Combat(map, player, rng);
+    const result = combat.attack(rosa);
+    if (!result.ok || result.events[0].type !== 'attack') throw new Error('expected an attack');
+    expect(result.events[0].killed).toBe(true);
+    expect(result.events[0].message).not.toMatch(/XP/);
+    expect(player.experience).toBe(0);
   });
 });

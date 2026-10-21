@@ -24,6 +24,23 @@ Recipes for the common additions. Each lists where the pieces live and what is e
    derived from `MAX_SIGHT_RANGE` in `creature.ts`: add a larger `sightRange` there too.
 4. Mention its XP in the README's levelling section.
 
+## Person (someone you can talk to)
+
+1. Add a `CreatureDef` to `src/core/creature.ts` like Gus or the guard: `friendly: true`,
+   `properName` if they have a name, a `group` if others should side with them, a `dialog`
+   (nodes of text and replies; a reply has a `next` node and/or an `action`, `barter`,
+   `attack` or `leave`; a line may have no replies), combat stats for when they're provoked
+   (someone defenseless, like Rosa, gets a pitiful attack: they still take on the fight),
+   and `loot`. For a trader add `trader: true`: `loot` is then also their stock, with
+   `bottle_caps` as their money. `validateDialog` throws at startup on a broken graph.
+   *Attack* is added to every line automatically.
+2. Draw a 16x16 sprite keyed by the id in `SPRITES`.
+3. Place them: a letter in a hand-made map's `creatures`, or a capital letter in a prefab's rows
+   mapped in its `residents`. Behind a counter, the counter (`]`) goes between them and the
+   shop floor so the player can talk across it. Give a chest `owner: '<group>'` to make taking
+   from it theft. `playabilityProblems` checks someone can reach a talking spot.
+4. A new dialog action needs a case in `DialogScene.answer()`.
+
 ## Tile
 
 1. Add the name to `TileType` and a free **symbol** (not a letter or digit, and not `$`/`&`,

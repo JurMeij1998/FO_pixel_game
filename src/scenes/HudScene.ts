@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { isMuted } from '../audio/sfx';
 import { COMBAT_BAR_HEIGHT, GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM, HUD_TOP } from '../config';
+import { capitalize } from '../core/creature';
 import { state } from '../state';
 import { MESSAGE_EVENT } from '../ui/messages';
 import { COLORS, SMALL_TEXT, TEXT } from '../ui/theme';
@@ -38,11 +39,11 @@ export class HudScene extends Phaser.Scene {
     this.game.events.on(MESSAGE_EVENT, this.addMessage, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(MESSAGE_EVENT, this.addMessage, this));
 
-    if (state.sandbox) this.addMessage('Test arena: nothing here is saved. Esc, then Quit, to leave.');
+    if (state.sandbox) this.addMessage(`${state.map.name}: nothing here is saved. Esc, then Quit, to leave.`);
     else this.addMessage(
       state.loadedFromSave
         ? 'Welcome back to the wasteland. (Your game saves automatically.)'
-        : 'You leave the shelter behind and step into the wasteland.',
+        : "You wake up in a stranger's shack. Face the woman and press E to talk.",
     );
   }
 
@@ -70,7 +71,9 @@ export class HudScene extends Phaser.Scene {
     let targetInfo = 'No target';
     if (target) {
       const problem = combat.isPlayerTurn ? combat.attackProblem(target) : null;
-      const odds = problem?.message ?? `${combat.hitChance(p, target)}% to hit`;
+      const inTheWay = problem ? null : combat.inTheWay(target);
+      const blocked = inTheWay && `${capitalize(inTheWay.theName)} is in the way`;
+      const odds = problem?.message ?? blocked ?? `${combat.hitChance(p, target)}% to hit`;
       targetInfo = `Target: ${target.name} ${target.hitPoints}/${target.maxHitPoints} HP, ${odds}`;
     }
     this.combatText.setText(`COMBAT - ${turn}   ${targetInfo}`);
