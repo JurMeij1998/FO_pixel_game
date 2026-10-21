@@ -21,8 +21,8 @@ What they changed, so it isn't undone by accident:
 - **AP gauge:** placed on whole pixels; starts from max AP, so an opening attack shows its
   "-N"; returns to straight above once an obstacle has gone (`STAY_BONUS` < `PREFERENCE_STEP`);
   the seal texture leaves the ring to the glow; the camera can scroll a tile above the map in
-  combat, so the gauge fits above the top row. (The combat ribbon now sits inside the status
-  bar, in the top right corner, so it no longer takes room below it.)
+  combat, so the gauge fits above the top row. (There's no top bar any more: the HUD is the
+  message log, the health bar and a floating combat label.)
 
 ## Planned features
 

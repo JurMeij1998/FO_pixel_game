@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GLYPH_HEIGHT, GLYPH_WIDTH, glyphTextureKey, plainGlyphKey } from '../gfx/pixelFont';
 import { SEAL_SIZE, SEAL_TEXTURE } from '../gfx/textures';
 import { choosePlacement, placementOffsets, type Offset, type Rect } from './gaugePlacement';
+import { GLOW_COLOR, glowColor } from './glow';
 
 /** Everything the gauge needs to know each frame. Positions are in world pixels. */
 export interface ApGaugeState {
@@ -33,10 +34,7 @@ const GAP = 5;
 
 const COLOR = {
   plate: 0x0a140c,
-  border: 0x3cd070,
-  /** The border's colour at the top of its pulse, and the glint that sweeps across it. */
-  borderPulse: 0x9dffb0,
-  borderShine: 0xffffff,
+  border: GLOW_COLOR.border,
   edge: 0x000000,
   number: 0xd8ffb0,
   empty: 0xff6a4d,
@@ -48,11 +46,7 @@ const COLOR = {
   refillDelta: 0x7dff9a,
 };
 
-/** How long one slow pulse of the border takes, and how often a glint sweeps across it. */
-const PULSE_MS = 1600;
-const SHINE_EVERY_MS = 2600;
-/** How long the glint takes to cross, and how wide it is (in diagonal pixels). */
-const SHINE_MS = 700;
+/** How wide the border's glint is, in diagonal (world) pixels; see ui/glow.ts. */
 const SHINE_WIDTH = 2.5;
 
 /** Milliseconds per step when the number counts towards a new value, and for a pip's flash. */
@@ -220,17 +214,12 @@ export class ApGauge {
    * few seconds sweeps a white glint diagonally across it, from the seal to the bar's end.
    */
   private drawGlow(): void {
-    const pulse = (Math.sin((this.time / PULSE_MS) * Math.PI * 2) + 1) / 2;
-    const base = mixColor(COLOR.border, COLOR.borderPulse, pulse * 0.75);
     const { left, top } = this.corner();
-    const sinceShine = this.time % SHINE_EVERY_MS;
-    // Position of the glint along the diagonal (x + y), travelling past the whole gauge.
-    const sweep = sinceShine < SHINE_MS ? -SHINE_WIDTH + (sinceShine / SHINE_MS) * (this.width + this.height + 2 * SHINE_WIDTH) : null;
+    const span = this.width + this.height;
     this.glow.clear();
     for (const p of this.borderPixels) {
-      const diagonal = p.x - left + (p.y - top);
-      const shine = sweep === null ? 0 : Math.max(0, 1 - Math.abs(diagonal - sweep) / SHINE_WIDTH);
-      this.glow.fillStyle(mixColor(base, COLOR.borderShine, shine), 1).fillRect(p.x, p.y, 1, 1);
+      const color = glowColor(this.time, p.x - left + (p.y - top), span, SHINE_WIDTH);
+      this.glow.fillStyle(color, 1).fillRect(p.x, p.y, 1, 1);
     }
   }
 
@@ -311,12 +300,3 @@ function numberWidth(digits: number): number {
   return digits * ADVANCE - 1;
 }
 
-/** Blends two 0xRRGGBB colours; t = 0 gives a, t = 1 gives b. */
-function mixColor(a: number, b: number, t: number): number {
-  const channel = (shift: number) => {
-    const from = (a >> shift) & 0xff;
-    const to = (b >> shift) & 0xff;
-    return Math.round(from + (to - from) * t) << shift;
-  };
-  return channel(16) | channel(8) | channel(0);
-}

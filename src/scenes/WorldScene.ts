@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
-import { HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
+import { HUD_BOTTOM, TILE_SIZE, WORLD_ZOOM } from '../config';
 import { Combat, INVENTORY_AP_COST, type AttackEvent, type CombatEvent } from '../core/combat';
 import { capitalize, listNames, type Creature } from '../core/creature';
 import type { DialogData } from './DialogScene';
@@ -50,7 +50,7 @@ export class WorldScene extends Phaser.Scene {
   private readonly chestImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly creatureImages = new Map<Creature, Phaser.GameObjects.Image>();
   private targetMarker!: Phaser.GameObjects.Graphics;
-  /** The thin health bars floating over every living hostile creature. */
+  /** The thin health bars floating over the creatures you're fighting. */
   private enemyBars!: Phaser.GameObjects.Graphics;
   private apGauge!: ApGauge;
   /** Whether the camera bounds currently leave the extra room combat needs at the top. */
@@ -452,13 +452,13 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
-   * Lets the camera scroll past the map edges by the HUD's height, so the HUD never hides a tile.
-   * In combat it can scroll a tile further at the top, so the AP gauge (always above the player)
-   * still has room when the player is on the top row.
+   * Lets the camera scroll past the bottom of the map by the message log's height, so the log
+   * never hides a tile. In combat it can scroll a tile past the top, so the AP gauge (always
+   * above the player) still has room when the player is on the top row.
    */
   private setCameraBounds(): void {
     const map = state.map;
-    const top = HUD_TOP / WORLD_ZOOM + (this.combatBounds ? TILE_SIZE : 0);
+    const top = this.combatBounds ? TILE_SIZE : 0;
     const bottom = HUD_BOTTOM / WORLD_ZOOM;
     this.cameras.main.setBounds(0, -top, map.width * TILE_SIZE, map.height * TILE_SIZE + top + bottom);
   }
@@ -496,22 +496,21 @@ export class WorldScene extends Phaser.Scene {
     return rects;
   }
 
-  /** The part of the world on screen, not counting what the HUD covers at the top and bottom. */
+  /** The part of the world on screen, not counting the message log at the bottom. */
   private visibleWorld(): Rect {
     const view = this.cameras.main.worldView;
-    const top = HUD_TOP / WORLD_ZOOM;
     const bottom = HUD_BOTTOM / WORLD_ZOOM;
-    return { x: view.x, y: view.y + top, width: view.width, height: view.height - top - bottom };
+    return { x: view.x, y: view.y, width: view.width, height: view.height - bottom };
   }
 
   /**
-   * A thin bar over every living hostile creature, red for the health it has left and black,
-   * from the right, for what it has lost. Redrawn every frame, so it follows creatures mid-step.
+   * A thin bar over every creature you're in combat with, red for the health it has left and
+   * black, from the right, for what it has lost. None outside combat, nor over creatures that
+   * haven't joined the fight. Redrawn every frame, so it follows creatures mid-step.
    */
   private drawEnemyBars(): void {
     this.enemyBars.clear();
-    for (const creature of state.map.creatures) {
-      if (creature.isDead || !creature.hostile) continue;
+    for (const creature of state.combat?.livingEnemies ?? []) {
       const image = this.imageFor(creature);
       const bar = enemyBar(image.x, image.y, TILE_SIZE, creature.hitPoints, creature.maxHitPoints);
       this.enemyBars

@@ -9,8 +9,7 @@ export const TILE_SIZE = 16;
 export const WORLD_ZOOM = 3;
 
 /**
- * Screen pixels the HUD covers at the top (status bar) and bottom (the message log, across the
- * left half; the health bar sits on the map in the bottom right).
+ * Screen pixels the HUD covers at the bottom: the message log, across the left half. The rest
+ * of the HUD (the health bar, the combat label) sits straight on the map.
  */
-export const HUD_TOP = 36;
 export const HUD_BOTTOM = 72;
