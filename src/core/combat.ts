@@ -1,5 +1,5 @@
 import type { Character } from './character';
-import type { Creature } from './creature';
+import { capitalize, listNames, type Creature } from './creature';
 import type { AttackSound, Fighter } from './fighter';
 import { addPos, DIRECTIONS, distance, samePos, type GridPos } from './grid';
 import type { GridMap } from './gridMap';
@@ -33,6 +33,8 @@ export type CombatEvent =
       /** The level the player reached with this kill, if they levelled up. */
       newLevel: number | null;
     };
+
+export type AttackEvent = Extract<CombatEvent, { type: 'attack' }>;
 
 export type AttackProblemCode = 'notYourTurn' | 'targetDead' | 'noAP' | 'outOfRange' | 'noLineOfSight' | 'empty';
 export interface AttackProblem {
@@ -77,11 +79,26 @@ export class Combat {
     this.target = this.nearestEnemy();
   }
 
-  /** Living creatures that can see the player. If there are any, combat should start. */
+  /** Living hostile creatures that can see the player. If there are any, combat should start. */
   static spotters(map: GridMap, player: Character): Creature[] {
     return map.creatures.filter(
-      (c) => !c.isDead && distance(c.pos, player.pos) <= c.def.sightRange && map.hasLineOfSight(c.pos, player.pos),
+      (c) =>
+        !c.isDead &&
+        c.hostile &&
+        distance(c.pos, player.pos) <= c.def.sightRange &&
+        map.hasLineOfSight(c.pos, player.pos),
     );
+  }
+
+  /**
+   * Brings creatures into the fight whether or not they can see the player, such as a guard
+   * called in when the shopkeeper is attacked. Only hostile ones take part.
+   */
+  join(creatures: Creature[]): void {
+    for (const creature of creatures) {
+      if (creature.hostile && !creature.isDead && !this.participants.includes(creature)) this.participants.push(creature);
+    }
+    this.ensureTarget();
   }
 
   get isPlayerTurn(): boolean {
@@ -106,14 +123,14 @@ export class Combat {
   /** Why the player can't attack this target right now, or null if they can. */
   attackProblem(target: Creature): AttackProblem | null {
     if (!this.isPlayerTurn) return problem('notYourTurn', "It isn't your turn.");
-    if (target.isDead) return problem('targetDead', `The ${target.name} is already dead.`);
+    if (target.isDead) return problem('targetDead', `${capitalize(target.theName)} is already dead.`);
     const attack = this.player.attack;
     // Kept short: the HUD shows these next to the target.
     if (this.actionPoints < attack.apCost) return problem('noAP', `Not enough AP (attack costs ${attack.apCost}).`);
     if (distance(this.player.pos, target.pos) > attack.range) {
-      return problem('outOfRange', `The ${target.name} is out of range.`);
+      return problem('outOfRange', `${capitalize(target.theName)} is out of range.`);
     }
-    if (!this.canSee(this.player, target)) return problem('noLineOfSight', `You can't see the ${target.name} from here.`);
+    if (!this.canSee(this.player, target)) return problem('noLineOfSight', `You can't see ${target.theName} from here.`);
     if (attack.ammo && this.player.loadedRounds() === 0) return problem('empty', 'Empty! Press R to reload.');
     return null;
   }
@@ -131,17 +148,51 @@ export class Combat {
     return done([{ type: 'move', fighter: this.player, to }]);
   }
 
+  /**
+   * Attacks a creature. Attacking a friendly one turns it (and its group) hostile first; the
+   * map does that (GridMap.provoke), since it happens outside combat too, so the target must
+   * be hostile by now.
+   */
   attack(target: Creature): CombatAction {
     const blocked = this.attackProblem(target);
     if (blocked) return refused(blocked.message, blocked.code);
+    if (!target.hostile) throw new Error(`${target.name} is still friendly; provoke them first`);
     const attack = this.player.attack;
     if (attack.ammo) this.player.spendRound();
 
     this.actionPoints -= attack.apCost;
     if (!this.participants.includes(target)) this.participants.push(target);
     this.target = target;
-    // A killed target stays selected until the scene has shown the kill; see ensureTarget().
-    return done([this.resolveAttack(this.player, target)]);
+
+    // Your shot stops at the first creature in its way: it hits them (at their own odds) or
+    // misses, but never flies on through them to the target.
+    const inTheWay = this.inTheWay(target);
+    if (!inTheWay) return done([this.resolveAttack(this.player, target)]); // the target stays selected until its death is shown; see ensureTarget()
+    const event = this.resolveAttack(this.player, inTheWay);
+    event.message = `${capitalize(inTheWay.theName)} is in the way! ${event.message}`;
+    if (event.hit && !inTheWay.hostile) {
+      // Shooting a friendly bystander turns them (and their group) against you.
+      const angered = this.map.provoke(inTheWay);
+      this.join(angered);
+      if (angered.length > 0) event.message += ` ${capitalize(listNames(angered))} turn${angered.length > 1 ? '' : 's'} hostile!`;
+    }
+    // A hostile one who wasn't in the fight yet (out of their sight, say) is now.
+    this.join([inTheWay]);
+    return done([event]);
+  }
+
+  /**
+   * The first living creature between the player and a target, which a ranged attack would hit
+   * instead. Melee attacks (even a spear's reach) aren't stopped. Enemies' shots don't check
+   * this: they always fly on to the player.
+   */
+  inTheWay(target: Creature): Creature | null {
+    if (!this.player.attack.ranged) return null;
+    for (const tile of this.map.lineOfFire(this.player.pos, target.pos) ?? []) {
+      const creature = this.map.livingCreatureAt(tile.x, tile.y);
+      if (creature) return creature;
+    }
+    return null;
   }
 
   reload(): ActionResult {
@@ -217,11 +268,11 @@ export class Combat {
     }
   }
 
-  private resolveAttack(attacker: Fighter, target: Fighter): CombatEvent {
+  private resolveAttack(attacker: Fighter, target: Fighter): AttackEvent {
     const attack = attacker.attack;
     const { ranged, sound } = attack;
-    const subject = attacker === this.player ? 'You' : `The ${attacker.name}`;
-    const object = target === this.player ? 'you' : `the ${target.name}`;
+    const subject = attacker === this.player ? 'You' : capitalize((attacker as Creature).theName);
+    const object = target === this.player ? 'you' : (target as Creature).theName;
 
     if (this.rng() * 100 >= this.hitChance(attacker, target)) {
       const message = `${subject} ${attacker === this.player ? 'miss' : 'misses'} ${object}.`;
@@ -249,12 +300,12 @@ export class Combat {
 
     const verb = attacker === this.player ? 'hit' : 'hits';
     let message = `${subject} ${critical ? `critically ${verb}` : verb} ${object} for ${damage}.`;
-    if (killed) message += target === this.player ? ' You die.' : ` The ${target.name} dies.`;
+    if (killed) message += target === this.player ? ' You die.' : ` ${capitalize((target as Creature).theName)} dies.`;
 
     let newLevel: number | null = null;
-    if (killed && attacker === this.player) {
-      // The player only ever attacks creatures.
-      const experience = (target as Creature).def.experience;
+    // The player only ever attacks creatures. Some (Rosa) aren't worth any XP.
+    const experience = killed && attacker === this.player ? (target as Creature).def.experience : 0;
+    if (experience > 0) {
       message += ` You gain ${experience} XP.`;
       if (this.player.gainExperience(experience) > 0) newLevel = this.player.level;
     }

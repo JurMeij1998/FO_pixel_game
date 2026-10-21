@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
 import { COMBAT_BAR_HEIGHT, HUD_BOTTOM, HUD_TOP, TILE_SIZE, WORLD_ZOOM } from '../config';
-import { Combat, INVENTORY_AP_COST, type CombatEvent } from '../core/combat';
-import type { Creature } from '../core/creature';
+import { Combat, INVENTORY_AP_COST, type AttackEvent, type CombatEvent } from '../core/combat';
+import { capitalize, listNames, type Creature } from '../core/creature';
+import type { DialogData } from './DialogScene';
 import type { Fighter } from '../core/fighter';
 import { addPos, type GridPos } from '../core/grid';
 import type { Exit } from '../core/gridMap';
@@ -13,9 +14,9 @@ import { ApGauge } from '../ui/apGauge';
 import type { Rect } from '../ui/gaugePlacement';
 import { postMessage } from '../ui/messages';
 import { FONT } from '../ui/theme';
+import { modifiersOf } from '../ui/widgets';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
-type AttackEvent = Extract<CombatEvent, { type: 'attack' }>;
 
 const STEP: Record<Direction, GridPos> = {
   up: { x: 0, y: -1 },
@@ -80,13 +81,17 @@ export class WorldScene extends Phaser.Scene {
         .image(toPixel(creature.pos.x), toPixel(creature.pos.y), creature.def.id)
         .setDepth(DEPTH.creature)
         .setInteractive({ useHandCursor: true })
-        .on('pointerdown', () => this.attack(creature));
+        .on('pointerdown', (pointer: Phaser.Input.Pointer) => this.clickCreature(creature, modifiersOf(pointer).ctrl));
       this.creatureImages.set(creature, image);
       if (creature.isDead) this.showCorpse(image);
     }
 
     const start = state.player.pos;
     this.player = this.add.image(toPixel(start.x), toPixel(start.y), 'player_down').setDepth(DEPTH.player);
+    // Start facing whoever is right there to talk to (Rosa at the start of a game, Gus in the
+    // test shop), so E talks to them straight away.
+    const towardsSomeone = (['up', 'down', 'left', 'right'] as const).find((d) => state.map.personFacing(start, STEP[d]));
+    this.face(towardsSomeone ?? 'down');
     this.targetMarker = this.add.graphics().setDepth(DEPTH.marker);
     this.apGauge = new ApGauge(this, state.player.maxActionPoints, DEPTH.gauge);
 
@@ -204,7 +209,7 @@ export class WorldScene extends Phaser.Scene {
     const spotters = Combat.spotters(state.map, state.player);
     if (spotters.length === 0) return;
     this.enterCombat(new Combat(state.map, state.player));
-    const names = spotters.map((c) => `a ${c.name}`).join(' and ');
+    const names = spotters.map((c) => (c.def.properName ? c.name : `a ${c.name}`)).join(' and ');
     postMessage(this, `Combat! You are spotted by ${names}.`);
   }
 
@@ -213,6 +218,47 @@ export class WorldScene extends Phaser.Scene {
     this.input.keyboard!.resetKeys(); // don't keep walking (and spending AP) on a held key
     this.cameras.main.shake(150, 0.004);
     playSound('combatStart');
+  }
+
+  /**
+   * A click on a creature. Hostile ones are attacked. Friendly people are talked to; Ctrl+click
+   * attacks them instead, which turns them (and their group) hostile.
+   */
+  private clickCreature(creature: Creature, ctrl: boolean): void {
+    if (creature.isDead) return;
+    if (creature.hostile) this.attack(creature);
+    else if (ctrl) this.attackFriendly(creature);
+    else this.talkByClick(creature);
+  }
+
+  /**
+   * Turns a friendly person and their group hostile, starts the fight, and takes the first swing.
+   * If the swing can't happen (no AP, an empty gun, no line of sight) nothing happens at all, so
+   * a misclick doesn't start a fight. Out of range is the exception: choosing *Attack* across
+   * the counter with a knife declares the fight, and you close in on your turn.
+   */
+  private attackFriendly(person: Creature): void {
+    if (this.busy || person.isDead) return;
+    const problem = (state.combat ?? new Combat(state.map, state.player)).attackProblem(person);
+    if (problem && problem.code !== 'outOfRange') {
+      postMessage(this, problem.message);
+      if (problem.code === 'empty') playSound('dryFire');
+      return;
+    }
+    this.fightWith(state.map.provoke(person));
+    this.attack(person);
+  }
+
+  /**
+   * Starts a fight with (or adds to the current one) creatures that have just turned hostile,
+   * whether or not they can see the player: a guard comes running when the shopkeeper is attacked.
+   */
+  private fightWith(angered: Creature[]): void {
+    if (angered.length === 0) return;
+    postMessage(this, `${capitalize(listNames(angered))} turn${angered.length > 1 ? '' : 's'} hostile!`);
+    const combat = state.combat ?? new Combat(state.map, state.player);
+    combat.join(angered);
+    if (!state.combat) this.enterCombat(combat);
   }
 
   /** Attacks a creature; outside combat a successful attack starts a fight. */
@@ -497,6 +543,11 @@ export class WorldScene extends Phaser.Scene {
       postMessage(this, "There's no time for that now.");
       return;
     }
+    const person = state.map.personFacing(state.player.pos, STEP[this.facing]);
+    if (person) {
+      this.talkTo(person);
+      return;
+    }
     const { x, y } = addPos(state.player.pos, STEP[this.facing]);
     const chest = state.map.chestAt(x, y);
     if (chest) {
@@ -514,8 +565,37 @@ export class WorldScene extends Phaser.Scene {
     postMessage(this, 'There is nothing there.');
   }
 
+  private talkTo(person: Creature): void {
+    this.input.keyboard!.resetKeys(); // a key held while talking shouldn't walk off afterwards
+    const data: DialogData = { person, onAttack: () => this.attackFriendly(person) };
+    this.openOverlay('Dialog', data);
+  }
+
+  /** Clicking a person talks to them if they're within talking distance (next to you, or across a counter). */
+  private talkByClick(person: Creature): void {
+    if (this.busy) return;
+    if (state.combat) {
+      postMessage(this, "There's no time for that now.");
+      return;
+    }
+    for (const direction of ['up', 'down', 'left', 'right'] as const) {
+      if (state.map.personFacing(state.player.pos, STEP[direction]) === person) {
+        this.face(direction);
+        this.talkTo(person);
+        return;
+      }
+    }
+    postMessage(this, `You need to get closer to talk to ${person.theName}.`);
+  }
+
   private openLoot(lootable: Lootable): void {
-    this.openOverlay('Loot', { lootable });
+    // Taking from something that isn't yours can start a fight once the loot screen closes.
+    this.openOverlay('Loot', { lootable, onTheft: (angered: Creature[]) => this.caughtStealing(angered) });
+  }
+
+  private caughtStealing(angered: Creature[]): void {
+    postMessage(this, "You've been caught stealing!");
+    this.fightWith(angered);
   }
 
   /** Pauses the world and shows a screen on top of it; the screen resumes the world when it closes. */

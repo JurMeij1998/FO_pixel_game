@@ -51,16 +51,46 @@ describe('village biome', () => {
     expect(onStreet.length).toBeGreaterThan(5);
   });
 
-  it('builds a proper village: several homes, and usually a store and a barn', () => {
-    const villages = SEEDS.map((seed) => Object.values(generateMap(VILLAGE, seed, EXITS).chests).map((c) => c.name));
-    for (const chests of villages) {
+  it('builds a proper village: several homes, always one store with its shopkeeper, usually a barn', () => {
+    const villages = SEEDS.map((seed) => GridMap.parse(generateMap(VILLAGE, seed, EXITS), 'village'));
+    for (const map of villages) {
+      const chests = map.chests.map((c) => c.name);
       const homes = chests.filter((n) => n === 'Dresser' || n === 'Cupboard').length;
-      expect(homes).toBeGreaterThanOrEqual(4);
-      expect(chests.filter((n) => n === 'Stockroom Crate').length).toBeLessThanOrEqual(1);
+      expect(homes).toBeGreaterThanOrEqual(3);
+      expect(chests.filter((n) => n === 'Stockroom Crate').length).toBe(1);
       expect(chests.filter((n) => n === 'Feed Bin').length).toBeLessThanOrEqual(1);
+      const people = map.creatures.filter((c) => !c.hostile).map((c) => c.def.id);
+      expect(people.sort()).toEqual(['guard', 'shopkeeper']);
+      expect(map.chests.find((c) => c.name === 'Stockroom Crate')?.owner).toBe('store');
     }
-    expect(villages.filter((c) => c.includes('Stockroom Crate')).length).toBeGreaterThan(SEEDS.length / 2);
-    expect(villages.filter((c) => c.includes('Feed Bin')).length).toBeGreaterThan(SEEDS.length / 3);
+    expect(villages.filter((map) => map.chests.some((c) => c.name === 'Feed Bin')).length).toBeGreaterThan(SEEDS.length / 3);
+    // The store isn't always the first building in its row.
+    const storeX = villages.map((map) => map.creatures.find((c) => c.def.id === 'shopkeeper')!.pos.x);
+    expect(new Set(storeX).size).toBeGreaterThan(5);
+  });
+
+  it('puts the shopkeeper behind the counter, facing the shop floor, and the guard by the door', () => {
+    for (const seed of SEEDS.slice(0, 10)) {
+      const map = GridMap.parse(generateMap(VILLAGE, seed, EXITS), 'village');
+      const gus = map.creatures.find((c) => c.def.id === 'shopkeeper')!;
+      const guard = map.creatures.find((c) => c.def.id === 'guard')!;
+      const reachable = map.reachableFrom(map.arrivalFrom('wasteland'));
+      // Whichever side of the street the store is on, there's a spot on the shop floor two
+      // tiles from Gus, with the counter in between, from where you talk to him.
+      const spots = [1, -1].filter((dy) => {
+        const customer = { x: gus.pos.x, y: gus.pos.y + 2 * dy };
+        return (
+          map.tileAt(gus.pos.x, gus.pos.y + dy) === 'shelf' &&
+          reachable.has(`${customer.x},${customer.y}`) &&
+          map.personFacing(customer, { x: 0, y: -dy }) === gus
+        );
+      });
+      expect(spots).toHaveLength(1);
+      // The guard stands on the path to the door, just outside.
+      const besideTheDoorPath = [-1, 1].some((dx) => map.tileAt(guard.pos.x + dx, guard.pos.y) === 'path');
+      expect(besideTheDoorPath).toBe(true);
+      expect(reachable.has(`${guard.pos.x},${guard.pos.y}`)).toBe(true);
+    }
   });
 });
 

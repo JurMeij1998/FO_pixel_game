@@ -123,7 +123,7 @@ export interface ClickModifiers {
   ctrl: boolean;
 }
 
-function modifiersOf(pointer: Phaser.Input.Pointer): ClickModifiers {
+export function modifiersOf(pointer: Phaser.Input.Pointer): ClickModifiers {
   const event = pointer.event as MouseEvent | TouchEvent;
   return { shift: event.shiftKey, ctrl: event.ctrlKey || event.metaKey };
 }

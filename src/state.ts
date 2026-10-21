@@ -3,7 +3,7 @@ import type { Combat } from './core/combat';
 import type { GridMap } from './core/gridMap';
 import { loadGame, saveGame, type GameData } from './core/save';
 import { testCharacter } from './data/testArena';
-import { buildKnownMap, buildMap, START_MAP, TEST_ARENA_MAP } from './data/world';
+import { buildKnownMap, buildMap, START_MAP, TEST_ARENA_MAP, TEST_SHOP_MAP } from './data/world';
 import { clearSave, readSave, writeSave } from './storage';
 
 function newGame() {
@@ -80,12 +80,22 @@ export function startNewGame(): void {
  * A sandbox: nothing is autosaved, so the real save is never touched.
  */
 export function startTestArena(): void {
+  startSandbox(TEST_ARENA_MAP, testCharacter());
+}
+
+/** Drops the test character, with caps to spend, into the test shop. A sandbox, like the arena. */
+export function startTestShop(): void {
   const player = testCharacter();
+  player.backpack.add('bottle_caps', 1000);
+  startSandbox(TEST_SHOP_MAP, player);
+}
+
+function startSandbox(mapId: string, player: Character): void {
   const worldSeed = Math.floor(Math.random() * 2 ** 31);
-  const map = buildMap(TEST_ARENA_MAP, worldSeed);
+  const map = buildMap(mapId, worldSeed);
   player.pos = { ...map.playerStart };
   Object.assign(state, {
-    ...toState({ player, worldSeed, maps: { [TEST_ARENA_MAP]: map }, currentMap: TEST_ARENA_MAP }),
+    ...toState({ player, worldSeed, maps: { [mapId]: map }, currentMap: mapId }),
     combat: null,
     loadedFromSave: false,
     sandbox: true,

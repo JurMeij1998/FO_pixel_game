@@ -58,10 +58,9 @@ their volume. Sound stays silent until the first click or key press (browser aut
 
 **Maps are ASCII art (`MapDef`), hand-made or generated.** Tiles use symbol characters
 (`.` dirt, `#` wall, `^` tree, `%` wooden wall, ...) because letters and digits are markers:
-`P` player start, `a-z` chests, `A-Z` creatures (except P), `1-9` exits. A marker stands on its
-first walkable neighbour's ground. `BLOCKING` and `OPAQUE` in `core/gridMap.ts` decide
-walkability and sight. Creature ids are their spawn tile (`radroach@8,14`) so editing a map
-elsewhere doesn't shift saved ids. Line of sight is a Bresenham line tried in both directions
+`P` player start, `a-z` chests, `A-Z` creatures and people (except P), `1-9` exits. A marker
+stands on its first walkable neighbour's ground. `BLOCKING` and `OPAQUE` in `core/gridMap.ts`
+decide walkability and sight. Creature ids are their spawn tile (`radroach@8,14`) so editing a map elsewhere doesn't shift saved ids. Line of sight is a Bresenham line tried in both directions
 (so it's symmetric) and blocked through the gap where two blocking tiles touch diagonally.
 
 **Generated maps: `Biome` → `MapBuilder` → an ordinary `MapDef`.** A biome (`data/biomes/`)
@@ -86,8 +85,31 @@ quietly (private windows). Autosave runs after steps, closed screens, swaps and 
 fights, but never during combat, so "load last save" after death returns to just before the
 fight, and never in the sandbox.
 
+**People are creatures that start friendly.** Gus and the guard are ordinary `Creature`s
+with `friendly`, a `group`, a `dialog` and (for Gus) `trader`, because they must be able to
+fight, die and be looted once provoked. (A first version kept NPCs as a separate non-fighting
+class; it was replaced as soon as they had to turn hostile.) `Creature.hostile` is the switch:
+only hostile creatures spot you (`Combat.spotters`) or take part in fights, and `Combat.attack`
+refuses a friendly target. `GridMap.provoke()` turns a creature and its living group hostile;
+`GridMap.noticeTheft(owner)` does the same when you take from a chest whose `owner` is that
+group. The scene then calls `Combat.join()`, which brings them in even out of sight. Hostility
+only goes one way and is saved per creature. You talk to someone you face, or across a counter
+(`shelf`) in front of them: `GridMap.personFacing()`. Lines live in the definition as a small
+dialog graph (`core/dialog.ts`, checked at startup); `Conversation.replies` always appends
+`*Attack*`, and puts "Leave." first on a line with no replies so Enter never attacks by
+accident. A trader's stock is their pack (`contents`), so killing them leaves it on the corpse.
+Barter rules (`core/barter.ts`) price by Charisma; selling always pays less than buying.
+The player's ranged shots stop at the first creature on `GridMap.lineOfFire()` (the same line
+line of sight uses), via `Combat.inTheWay()`; enemies' shots deliberately ignore bystanders.
+Rosa (starting shack) is next to defenseless but still a full combatant once provoked: a
+"harmless" creature that never fights was tried and rejected, since a fight that ends the
+moment you attack someone makes no sense to the user. Weak people get weak attacks instead.
+Prefabs place residents (particular people) with capital letters mapped in `residents`; paths
+are routed around them since they don't move until a fight.
+
 **UI structure.** The world is drawn at integer zoom 3 (`WORLD_ZOOM`) for crisp pixels. HUD,
-menus and overlays are separate 1:1 scenes; overlays pause the World while open.
+menus and overlays are separate 1:1 scenes; overlays pause the World while open. Dialog
+sleeps while the barter screen is open and wakes when it closes, so the conversation goes on.
 `ui/widgets.ts` has `ListView` (pooled rows, click modifiers) and `MenuList` (keyboard and
 mouse, ignores key auto-repeat so a held key from the previous screen can't pick an option).
 The AP gauge (`ui/apGauge.ts`) lives in world space: the AP number in a round pixel seal with a
@@ -100,7 +122,9 @@ lootable corpse or exit.
 hand, loaded pistol in the other hand) into a small room (`data/testArena.ts`) where combat
 starts on arrival, with obstacles placed to stress floating UI. `state.sandbox` turns autosave
 off so the real save is never touched. It's gated by `import.meta.env.DEV`, so production
-builds strip it. Use it to iterate on combat and UI.
+builds strip it. Use it to iterate on combat and UI. Likewise `?shop` (or "Test shop (dev)")
+opens the village store in a yard (Gus across the counter, the store's crate, the guard by the
+door) with 1000 caps to spend: for dialog, barter, theft and provoking.
 
 ## Working conventions
 

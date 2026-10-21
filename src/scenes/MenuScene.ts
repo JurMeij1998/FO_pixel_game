@@ -3,7 +3,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { loadSavedGame, savedGameSummary, startNewGame } from '../state';
 import { COLORS, DIM_TEXT, SMALL_TEXT, TITLE_TEXT } from '../ui/theme';
 import { MenuList } from '../ui/widgets';
-import { playTestArena, showControls, startPlaying } from './flow';
+import { playTestArena, playTestShop, showControls, startPlaying } from './flow';
 
 /** The title screen: continue the saved game, start a new one, or look up the controls. */
 export class MenuScene extends Phaser.Scene {
@@ -45,8 +45,13 @@ export class MenuScene extends Phaser.Scene {
         },
       },
       { label: 'Controls', onSelect: () => showControls(this) },
-      // Development builds only (npm run dev): a quick way into a fight to try out combat UI.
-      ...(import.meta.env.DEV ? [{ label: 'Test arena (dev)', onSelect: () => playTestArena(this) }] : []),
+      // Development builds only (npm run dev): quick ways into a fight, or a shop, to try out UI.
+      ...(import.meta.env.DEV
+        ? [
+            { label: 'Test arena (dev)', onSelect: () => playTestArena(this) },
+            { label: 'Test shop (dev)', onSelect: () => playTestShop(this) },
+          ]
+        : []),
     ]);
 
     this.add

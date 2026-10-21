@@ -73,8 +73,109 @@ const GHOUL_PALETTE = {
   C: '#3e3428', // rag shade
 };
 
-// Creature sprites are keyed by creature id (see core/creature.ts).
+const SHOPKEEPER_PALETTE = {
+  k: '#1a1a1a', // outline and eyes
+  s: '#d8a47c', // skin
+  b: '#b0aca0', // grey beard
+  w: '#d8d0b8', // shirt
+  a: '#7a5a30', // apron
+  A: '#5e4422', // apron pocket
+  p: '#3a4a5a', // trousers
+  g: '#3a3a3a', // boots
+};
+
+const GUARD_PALETTE = {
+  k: '#1a1a1a', // outline and eyes
+  h: '#4a5a32', // helmet
+  H: '#5e7040', // helmet highlight
+  s: '#c89070', // skin
+  v: '#5a5a52', // armored vest
+  V: '#74746a', // vest plates
+  c: '#3a4a5a', // shirt sleeves and trousers
+  g: '#2a2a2a', // boots
+  x: '#888888', // pistol
+};
+
+const ROSA_PALETTE = {
+  k: '#1a1a1a', // outline and eyes
+  h: '#8a3a1e', // auburn hair
+  H: '#a8502a', // hair highlight
+  s: '#e0b088', // skin
+  r: '#c84848', // lips
+  d: '#4a7a5a', // dress
+  D: '#3a6048', // dress shade
+  a: '#d8d0b8', // apron
+  g: '#4a3424', // shoes
+};
+
+// Creature sprites (people included) are keyed by creature id (see core/creature.ts).
 export const SPRITES: Record<string, PixelSprite> = {
+  // Rosa, who takes you in at the start: long auburn hair, a green dress and an apron.
+  rosa: {
+    palette: ROSA_PALETTE,
+    rows: [
+      '................',
+      '.....kkkkkk.....',
+      '....khHHHHhk....',
+      '...khhssssshk...',
+      '...khskssksshk..',
+      '...khssrrsshk...',
+      '...khhssssshhk..',
+      '...khkdddddkhk..',
+      '..kskddaaddkhk..',
+      '..kskdDaaDdksk..',
+      '...kkdDaaDdkk...',
+      '....kddaadddk...',
+      '...kddddddddk...',
+      '...kkkkkkkkkk...',
+      '.....kgk.kgk....',
+      '.....kkk.kkk....',
+    ],
+  },
+  // The store's guard: helmet, armored vest, 10mm pistol in hand.
+  guard: {
+    palette: GUARD_PALETTE,
+    rows: [
+      '................',
+      '.....kkkkkk.....',
+      '....khHHHHhk....',
+      '...khhhhhhhhk...',
+      '....kssssssk....',
+      '....kskssksk....',
+      '....kssssssk....',
+      '...kkvVVVVvkk...',
+      '..kckvVvvVvkck..',
+      '..kskvVVVVvksx..',
+      '...kkvvvvvvkkx..',
+      '....kcckkcck....',
+      '....kcckkcck....',
+      '....kggkkggk....',
+      '....kkk..kkk....',
+      '................',
+    ],
+  },
+  // Gus, the village shopkeeper: bald, bearded, in his apron.
+  shopkeeper: {
+    palette: SHOPKEEPER_PALETTE,
+    rows: [
+      '................',
+      '.....kkkkkk.....',
+      '....kssssssk....',
+      '....kssssssk....',
+      '....kskssksk....',
+      '....kssssssk....',
+      '....kbbbbbbk....',
+      '...kkwbbbbwkk...',
+      '..kwkwaaaawkwk..',
+      '..kskwaaaawksk..',
+      '...kkaaaaaakk...',
+      '....kaaAAaak....',
+      '....kppkkppk....',
+      '....kggkkggk....',
+      '....kkk..kkk....',
+      '................',
+    ],
+  },
   feral_ghoul: {
     palette: GHOUL_PALETTE,
     rows: [
