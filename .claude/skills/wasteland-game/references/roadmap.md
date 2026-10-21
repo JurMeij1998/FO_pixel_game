@@ -43,3 +43,15 @@ Roughly in the order discussed with the user:
   pistol never runs dry), people taking sides in fights with monsters, and keeping the store
   out of a provoked guard's sight of the village entrances (today he can see some of them).
 - **Real sprite art** (a sprite sheet) replacing the generated placeholders.
+- **Doors, locks and lockpicking.** Doors as a tile or map object that opens and closes
+  (blocks walking and sight while closed), some of them locked. A new Lockpick skill (a
+  fourth entry in `SKILLS`, taggable, raised with skill points) gives the chance to pick a
+  lock; maybe keys as items. Door state (open, locked, picked) is saved per map like chests.
+  Locked doors could guard loot rooms, and picking an owned door could count as theft.
+- **Weapon deterioration and maintenance.** Weapons wear with use and work worse as they do
+  (lower damage or hit chance, guns jamming), until repaired at a weapon workbench using scrap
+  metal or other materials. Needs a per-weapon condition, which items don't have today:
+  identical items share one stack (`ItemContainer`), so a weapon's condition has to live
+  somewhere else, e.g. per equipped slot like the loaded rounds, or stacks split by condition.
+- **Difficulty levels** (easy, medium, hard), chosen when starting a new game and stored in
+  the save. Likely knobs: damage taken and dealt, enemy hit chance, loot amounts and prices.
