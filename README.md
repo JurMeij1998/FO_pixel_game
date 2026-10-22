@@ -49,7 +49,7 @@ behind it, and the guard outside by the door.
 | M               | Sound on/off                     | Sound on/off                  |
 | Esc             | Pause menu / close a screen      | Pause menu                    |
 | Click (loot)    | Move 1 of a stack; Ctrl+click half (rounded up), Shift+click all |   |
-| Space (loot)    | Take all                         |                               |
+| Space (loot)    | Take all and close               |                               |
 | Esc (loot, barter) | Close the screen              |                               |
 | Up/Down, Enter (talk) | Pick a reply and answer (or click it, or press its number); Esc walks away | |
 | Click (barter)  | Sell (left) or buy (right) 1; Ctrl+click half, Shift+click all |     |

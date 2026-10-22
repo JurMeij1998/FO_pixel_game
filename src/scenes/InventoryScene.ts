@@ -7,7 +7,7 @@ import { state } from '../state';
 import { describeItem, stackRows } from '../ui/format';
 import { ListCursor } from '../ui/listCursor';
 import { quickAction } from '../ui/quickAction';
-import { COLORS, HEADER_TEXT, SMALL_TEXT, TEXT } from '../ui/theme';
+import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
 import { addButton, bindCursorKeys, closeOverlay, drawPanel, ListView, PANEL } from '../ui/widgets';
 
 type Selection = { kind: 'backpack'; itemId: string } | { kind: 'slot'; slot: EquipSlot } | null;
@@ -63,7 +63,6 @@ export class InventoryScene extends Phaser.Scene {
     this.stats = this.add.text(RIGHT, 215, '', TEXT);
     this.details = this.add.text(RIGHT, 300, '', { ...TEXT, wordWrap: { width: 400 } });
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
-    this.add.text(LEFT, 548, 'W/S A/D: choose   E: use / equip / unequip   Tab, I or Esc: close', SMALL_TEXT);
 
     this.actionButtons = [];
     for (let i = 0; i < MAX_ACTIONS; i++) {
