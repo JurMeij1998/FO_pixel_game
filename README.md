@@ -50,10 +50,11 @@ behind it, and the guard outside by the door.
 | Esc             | Pause menu / close a screen      | Pause menu                    |
 | Click (loot)    | Move 1 of a stack; Ctrl+click half (rounded up), Shift+click all |   |
 | Space (loot)    | Take all                         |                               |
-| E / Esc (loot)  | Close the loot screen            |                               |
+| Esc (loot, barter) | Close the screen              |                               |
 | Up/Down, Enter (talk) | Pick a reply and answer (or click it, or press its number); Esc walks away | |
 | Click (barter)  | Sell (left) or buy (right) 1; Ctrl+click half, Shift+click all |     |
 | W/S, A/D (screens) | Inventory, loot, barter: move the `>` cursor up/down a list, and between the lists (arrow keys too) | |
+| E (screens)     | Inventory: use, equip (first free hand, else primary), wear or unequip the selected item. Loot, barter: move it to the other side (take/store, buy/sell); Shift+E the whole stack | |
 
 ## Talking and trading
 

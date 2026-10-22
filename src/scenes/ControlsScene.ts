@@ -3,7 +3,9 @@ import { CONTROL_ROWS } from '../ui/controls';
 import { HEADER_TEXT, SMALL_TEXT, TEXT } from '../ui/theme';
 import { addButton, drawPanel, PANEL } from '../ui/widgets';
 
-const COLUMNS = [16, 30, 26];
+/** Characters per column; at 16px Courier (9.6 px a character) the table fits the panel. */
+const COLUMNS = [22, 36, 26];
+const TABLE_TEXT = { ...TEXT, fontSize: '16px' };
 
 /** A table of every key binding, opened from the main menu or the pause menu. */
 export class ControlsScene extends Phaser.Scene {
@@ -23,8 +25,8 @@ export class ControlsScene extends Phaser.Scene {
 
     const left = PANEL.x + 30;
     const row = (cells: string[]) => cells.map((cell, i) => cell.padEnd(COLUMNS[i])).join('');
-    this.add.text(left, 100, row(['KEY', 'EXPLORING', 'IN COMBAT']), HEADER_TEXT);
-    this.add.text(left, 134, CONTROL_ROWS.map(row).join('\n'), { ...TEXT, lineSpacing: 10 });
+    this.add.text(left, 100, row(['KEY', 'EXPLORING', 'IN COMBAT']), { ...HEADER_TEXT, fontSize: '16px' });
+    this.add.text(left, 130, CONTROL_ROWS.map(row).join('\n'), { ...TABLE_TEXT, lineSpacing: 4 });
     this.add.text(left, PANEL.y + PANEL.height - 36, 'Esc or Enter to go back', SMALL_TEXT);
 
     const keyboard = this.input.keyboard!;

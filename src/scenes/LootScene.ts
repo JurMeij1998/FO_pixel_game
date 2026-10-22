@@ -6,17 +6,18 @@ import type { ActionResult } from '../core/result';
 import { state } from '../state';
 import { stackRows } from '../ui/format';
 import { postMessage } from '../ui/messages';
-import { COLORS, HEADER_TEXT, SMALL_TEXT, TEXT } from '../ui/theme';
+import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
 import { ListCursor } from '../ui/listCursor';
 import { amountFor } from '../ui/trade';
-import { addButton, bindCursorKeys, closeOverlay, drawPanel, ListView, PANEL, showCursor } from '../ui/widgets';
+import { addButton, bindCursorKeys, closeOverlay, drawPanel, ListView, PANEL, showCursor, type ClickModifiers } from '../ui/widgets';
 
 const LEFT = PANEL.x + 30;
 const RIGHT = PANEL.x + 470;
 
 /**
  * Two-column transfer screen between the backpack and a chest or corpse; see amountFor() for
- * what a click moves. W/S and A/D move a cursor through the two lists.
+ * what a click moves. W/S and A/D move a cursor through the two lists, and E moves the item
+ * it's on to the other side (Shift+E the whole stack). Esc closes it.
  */
 export class LootScene extends Phaser.Scene {
   private lootable!: Lootable;
@@ -51,20 +52,9 @@ export class LootScene extends Phaser.Scene {
 
     this.yourHeader = this.add.text(LEFT, 90, '', HEADER_TEXT);
     this.add.text(RIGHT, 90, 'CONTENTS', HEADER_TEXT);
-    this.add.text(LEFT, 500, 'Click: move 1   Ctrl+click: half   Shift+click: all', SMALL_TEXT);
 
-    this.yourItems = new ListView(this, LEFT, 122, 36, 15, (itemId, modifiers) => {
-      this.cursor.focus(0, itemId);
-      const quantity = transferQuantity(player.backpack.count(itemId), amountFor(modifiers));
-      const result = storeItem(player, this.lootable.contents, itemId, quantity);
-      if (result.ok) this.stash.stored(itemId, quantity);
-      this.apply(result);
-    });
-    this.containerItems = new ListView(this, RIGHT, 122, 36, 15, (itemId, modifiers) => {
-      this.cursor.focus(1, itemId);
-      const quantity = transferQuantity(this.lootable.contents.count(itemId), amountFor(modifiers));
-      this.take(() => takeItem(player, this.lootable.contents, itemId, quantity));
-    });
+    this.yourItems = new ListView(this, LEFT, 122, 36, 15, (itemId, modifiers) => this.move(0, itemId, modifiers));
+    this.containerItems = new ListView(this, RIGHT, 122, 36, 15, (itemId, modifiers) => this.move(1, itemId, modifiers));
 
     addButton(this, RIGHT, 500, 'Take all (Space)', () => this.take(() => takeAll(player, this.lootable.contents)));
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
@@ -73,13 +63,33 @@ export class LootScene extends Phaser.Scene {
     bindCursorKeys(this, this.cursor, () => this.refresh());
     const keyboard = this.input.keyboard!;
     keyboard.on('keydown-ESC', () => this.close());
-    keyboard.on('keydown-E', () => this.close());
+    // Not on key repeat, so holding the E that opened the chest doesn't also empty it.
+    keyboard.on('keydown-E', (event: KeyboardEvent) => {
+      const key = this.cursor.selectedKey;
+      if (!event.repeat && key) this.move(this.cursor.activeColumn, key, { shift: event.shiftKey, ctrl: false });
+    });
     keyboard.on('keydown-SPACE', (event: KeyboardEvent) => {
       // Ignore auto-repeat, so holding the Space that opened the chest doesn't also loot it.
       if (!event.repeat) this.take(() => takeAll(player, this.lootable.contents));
     });
 
     this.refresh();
+  }
+
+  /** Moves an item to the other side: from your pack (column 0) into the chest, or out of it. */
+  private move(column: number, itemId: string, modifiers: ClickModifiers): void {
+    const player = state.player;
+    const contents = this.lootable.contents;
+    this.cursor.focus(column, itemId);
+    if (column === 0) {
+      const quantity = transferQuantity(player.backpack.count(itemId), amountFor(modifiers));
+      const result = storeItem(player, contents, itemId, quantity);
+      if (result.ok) this.stash.stored(itemId, quantity);
+      this.apply(result);
+    } else {
+      const quantity = transferQuantity(contents.count(itemId), amountFor(modifiers));
+      this.take(() => takeItem(player, contents, itemId, quantity));
+    }
   }
 
   /**

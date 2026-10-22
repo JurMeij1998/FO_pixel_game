@@ -6,7 +6,8 @@ import type { ActionResult } from '../core/result';
 import { state } from '../state';
 import { describeItem, stackRows } from '../ui/format';
 import { ListCursor } from '../ui/listCursor';
-import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
+import { quickAction } from '../ui/quickAction';
+import { COLORS, HEADER_TEXT, SMALL_TEXT, TEXT } from '../ui/theme';
 import { addButton, bindCursorKeys, closeOverlay, drawPanel, ListView, PANEL } from '../ui/widgets';
 
 type Selection = { kind: 'backpack'; itemId: string } | { kind: 'slot'; slot: EquipSlot } | null;
@@ -23,7 +24,8 @@ const RIGHT = PANEL.x + 490;
 
 /**
  * Fallout-style inventory: backpack on the left, equipment and item details on the right.
- * W/S move the selection up and down, A/D between the backpack and the equipment.
+ * W/S move the selection up and down, A/D between the backpack and the equipment, and E does
+ * the obvious thing with it (ui/quickAction.ts): use, equip, wear or unequip.
  */
 export class InventoryScene extends Phaser.Scene {
   private backpack!: ListView;
@@ -61,6 +63,7 @@ export class InventoryScene extends Phaser.Scene {
     this.stats = this.add.text(RIGHT, 215, '', TEXT);
     this.details = this.add.text(RIGHT, 300, '', { ...TEXT, wordWrap: { width: 400 } });
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
+    this.add.text(LEFT, 548, 'W/S A/D: choose   E: use / equip / unequip   Tab, I or Esc: close', SMALL_TEXT);
 
     this.actionButtons = [];
     for (let i = 0; i < MAX_ACTIONS; i++) {
@@ -69,6 +72,12 @@ export class InventoryScene extends Phaser.Scene {
 
     bindCursorKeys(this, this.cursor, () => this.select());
     const keyboard = this.input.keyboard!;
+    keyboard.on('keydown-E', (event: KeyboardEvent) => {
+      const row = this.selection;
+      if (event.repeat || !row) return;
+      const action = quickAction(state.player, row);
+      this.report(action.run(), action.sound);
+    });
     // The keys that open it close it again (not on key repeat, or holding one would flicker it).
     for (const key of ['TAB', 'I']) {
       keyboard.on(`keydown-${key}`, (event: KeyboardEvent) => !event.repeat && closeOverlay(this));
@@ -98,9 +107,12 @@ export class InventoryScene extends Phaser.Scene {
 
   private runAction(index: number): void {
     const action = this.actions[index];
-    if (!action) return;
-    const result = action.run();
-    if (result.ok && action.sound) playSound(action.sound);
+    if (action) this.report(action.run(), action.sound);
+  }
+
+  /** Shows what an action did, with its sound if it worked. */
+  private report(result: ActionResult, sound?: SoundName): void {
+    if (result.ok && sound) playSound(sound);
     this.feedback.setText(result.message).setColor(result.ok ? COLORS.text : COLORS.warn);
     this.refresh();
   }
