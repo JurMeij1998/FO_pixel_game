@@ -608,7 +608,8 @@ export class WorldScene extends Phaser.Scene {
       this.openLoot(chest);
       return;
     }
-    const corpse = state.map.corpseAt(x, y);
+    // A corpse in front of you, or else one you're standing on.
+    const corpse = state.map.corpseToLoot(state.player.pos, STEP[this.facing]);
     if (corpse) {
       this.openLoot(corpse);
       return;

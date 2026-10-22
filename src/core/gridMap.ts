@@ -298,6 +298,15 @@ export class GridMap {
     return corpses.find((c) => !c.contents.isEmpty) ?? corpses[0];
   }
 
+  /**
+   * The corpse someone at `from` loots when facing `step`: the one in front of them, or else
+   * one they're standing on (corpses don't block, so you can step onto them).
+   */
+  corpseToLoot(from: GridPos, step: GridPos): Creature | undefined {
+    const front = addPos(from, step);
+    return this.corpseAt(front.x, front.y) ?? this.corpseAt(from.x, from.y);
+  }
+
   blocksSight(x: number, y: number): boolean {
     const tile = this.tileAt(x, y);
     return tile === null || OPAQUE.has(tile);

@@ -38,7 +38,7 @@ behind it, and the guard outside by the door.
 | Key             | Exploring                        | In combat                     |
 | --------------- | -------------------------------- | ----------------------------- |
 | Arrows / WASD   | Move                             | Move (1 AP per tile)          |
-| E / Space       | Interact with what you face: open a chest, loot a corpse, talk | Space: end turn |
+| E / Space       | Interact with what you face: open a chest, loot a corpse (also one you stand on), talk | Space: end turn |
 | Click a person  | Talk, when next to them or across a counter; Ctrl+click attacks them |      |
 | F / click enemy | Click: attack (starts combat)    | Attack the target             |
 | T               |                                  | Next target                   |
