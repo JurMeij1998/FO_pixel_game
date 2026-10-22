@@ -5,13 +5,13 @@ import { SPECIAL_KEYS, type Special } from './stats';
 
 /**
  * Character creation, before a new game starts: a name, a gender, the S.P.E.C.I.A.L. stats and
- * the difficulty. Every stat starts at 5 and there are 8 more points to spend; lowering a stat
- * below 5 frees its points for others. Pure, so it can be tested; the creation screen edits a
- * CharacterBuild and hands it to the new game.
+ * the difficulty. Every stat starts at 5 and there are 5 more points to spend (40 in all, as in
+ * Fallout); lowering a stat below 5 frees its points for others. Pure, so it can be tested;
+ * the creation screen edits a CharacterBuild and hands it to the new game.
  */
 
 export const BASE_STAT = 5;
-export const EXTRA_POINTS = 8;
+export const EXTRA_POINTS = 5;
 export const MIN_STAT = 1;
 export const MAX_STAT = 10;
 export const MAX_NAME_LENGTH = 16;
@@ -30,7 +30,7 @@ export function newBuild(): CharacterBuild {
   return { name: 'Wanderer', gender: 'male', special, difficulty: 'normal' };
 }
 
-/** Points still to spend: the 8 extra ones, plus any freed by lowering stats below 5. */
+/** Points still to spend: the extra ones, plus any freed by lowering stats below 5. */
 export function pointsLeft(special: Special): number {
   const spent = SPECIAL_KEYS.reduce((sum, key) => sum + special[key] - BASE_STAT, 0);
   return EXTRA_POINTS - spent;
@@ -73,9 +73,20 @@ export function checkBuild(build: CharacterBuild): ActionResult {
   return success('Ready.');
 }
 
+/**
+ * A new character starts a bit beaten up, so the first stimpaks are worth having: on this
+ * share of their maximum HP (18 of 30 for an average build).
+ */
+export const STARTING_HEALTH = 0.6;
+
+export function startingHitPoints(maxHitPoints: number): number {
+  return Math.max(1, Math.round(maxHitPoints * STARTING_HEALTH));
+}
+
 /** The character a build makes, before the starting gear is handed out. */
 export function createCharacter(build: CharacterBuild): Character {
   const character = new Character(build.name.trim(), { ...build.special });
   character.gender = build.gender;
+  character.hitPoints = startingHitPoints(character.maxHitPoints);
   return character;
 }

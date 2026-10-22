@@ -17,7 +17,6 @@ function newGame(build: CharacterBuild = newBuild()) {
   player.equip('knife', 'primary');
   player.taggedSkills.add('smallGuns');
   player.taggedSkills.add('meleeWeapons');
-  player.hitPoints = 18; // start a bit beaten up, so the stimpaks are useful
 
   // A fresh seed per new game, so every game gets its own generated maps.
   const worldSeed = Math.floor(Math.random() * 2 ** 31);
@@ -81,6 +80,9 @@ export function resetToDefaultGame(): void {
 export function startNewGame(build: CharacterBuild): void {
   clearSave();
   Object.assign(state, { ...newGame(build), combat: null, loadedFromSave: false, sandbox: false });
+  // Saved straight away: otherwise quitting before the first step would lose both the new
+  // character and (already cleared) the old save.
+  autosave();
 }
 
 /**

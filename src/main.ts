@@ -14,10 +14,12 @@ import { LootScene } from './scenes/LootScene';
 import { MenuScene } from './scenes/MenuScene';
 import { PauseScene } from './scenes/PauseScene';
 import { WorldScene } from './scenes/WorldScene';
+import { isTextEntry } from './ui/creationKeys';
 
-// M toggles sound on every screen, so it is handled once here rather than in each scene.
+// M toggles sound on every screen, so it is handled once here rather than in each scene; not
+// while typing a name, where M is a letter.
 window.addEventListener('keydown', (event) => {
-  if (event.code === 'KeyM' && !event.repeat) toggleMuted();
+  if (event.code === 'KeyM' && !event.repeat && !isTextEntry()) toggleMuted();
 });
 
 new Phaser.Game({

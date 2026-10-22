@@ -49,6 +49,16 @@ export function skillPointsPerLevel(special: Special): number {
   return 5 + 2 * special.intelligence;
 }
 
+export const SPECIAL_NAMES: Record<keyof Special, string> = {
+  strength: 'Strength',
+  perception: 'Perception',
+  endurance: 'Endurance',
+  charisma: 'Charisma',
+  intelligence: 'Intelligence',
+  agility: 'Agility',
+  luck: 'Luck',
+};
+
 export type Skill = 'smallGuns' | 'meleeWeapons' | 'unarmed';
 export const SKILLS: readonly Skill[] = ['smallGuns', 'meleeWeapons', 'unarmed'];
 export const SKILL_NAMES: Record<Skill, string> = {
@@ -93,6 +103,6 @@ export const SPECIAL_EFFECTS: Record<keyof Special, string> = {
 /** What each skill is for, for the character sheet. */
 export const SKILL_EFFECTS: Record<Skill, string> = {
   smallGuns: 'Your chance to hit with pistols and rifles. Based on Agility.',
-  meleeWeapons: 'Your chance to hit with knives, spears and other blades. Based on Strength and Agility.',
+  meleeWeapons: 'Your chance to hit with knives, spears and other hand-held weapons. Based on Strength and Agility.',
   unarmed: 'Your chance to hit with your fists. Based on Strength and Agility.',
 };

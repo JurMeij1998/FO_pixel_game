@@ -4,31 +4,33 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import {
   checkBuild,
   eraseFromName,
+  EXTRA_POINTS,
   lowerStat,
   newBuild,
   pointsLeft,
   raiseStat,
+  startingHitPoints,
   typeIntoName,
   type CharacterBuild,
 } from '../core/creation';
 import { DIFFICULTIES, DIFFICULTY_LEVELS } from '../core/difficulty';
-import { carryCapacity, maxActionPoints, maxHitPoints, skillPointsPerLevel, SPECIAL_EFFECTS, SPECIAL_KEYS, type Special } from '../core/stats';
-import { startNewGame } from '../state';
+import {
+  carryCapacity,
+  maxActionPoints,
+  maxHitPoints,
+  skillPointsPerLevel,
+  SPECIAL_EFFECTS,
+  SPECIAL_KEYS,
+  SPECIAL_NAMES,
+  type Special,
+} from '../core/stats';
+import { savedGameSummary, startNewGame } from '../state';
+import { creationKeyAction, setTextEntry } from '../ui/creationKeys';
 import { ListCursor } from '../ui/listCursor';
 import { RepeatGuard } from '../ui/repeatGuard';
 import { COLORS, HEADER_TEXT, TEXT, TITLE_TEXT } from '../ui/theme';
 import { addButton } from '../ui/widgets';
-import { startPlaying } from './flow';
-
-const SPECIAL_NAMES: Record<keyof Special, string> = {
-  strength: 'Strength',
-  perception: 'Perception',
-  endurance: 'Endurance',
-  charisma: 'Charisma',
-  intelligence: 'Intelligence',
-  agility: 'Agility',
-  luck: 'Luck',
-};
+import { quitToMenu, startPlaying } from './flow';
 
 /** The rows the cursor walks, top to bottom. */
 const ROWS = ['name', 'gender', ...SPECIAL_KEYS, 'difficulty', 'start'] as const;
@@ -49,11 +51,12 @@ const START_Y = DIFFICULTY_Y + 50;
 
 /**
  * Character creation, between choosing "New game" and the game itself: a name (typed), a
- * gender (how you look), the S.P.E.C.I.A.L. stats (5 each, with 8 more points; lowering one
+ * gender (how you look), the S.P.E.C.I.A.L. stats (5 each, with 5 more points; lowering one
  * frees its points) and the difficulty. Up/Down (or W/S) choose a row, Left/Right (or A/D)
  * change it; on the name row you just type, so W/S/A/D are letters there and the arrow keys
- * move on. Enter moves on, and on Start begins the game; Esc goes back to the menu. The rules
- * are in core/creation.ts.
+ * move on. Enter moves on, and on Start begins the game (asking once first if that overwrites
+ * a save); Esc goes back to the menu. The rules are in core/creation.ts, the keys in
+ * ui/creationKeys.ts.
  */
 export class CreationScene extends Phaser.Scene {
   private build!: CharacterBuild;
@@ -66,6 +69,9 @@ export class CreationScene extends Phaser.Scene {
   private derived!: Phaser.GameObjects.Text;
   private portrait!: Phaser.GameObjects.Image;
   private feedback!: Phaser.GameObjects.Text;
+  /** Whether starting overwrites a saved game, and whether the player was warned about it. */
+  private overwritesSave = false;
+  private warnedOverwrite = false;
 
   constructor() {
     super('Creation');
@@ -77,6 +83,8 @@ export class CreationScene extends Phaser.Scene {
     this.cursor = new ListCursor([[...ROWS]]);
     this.rowTexts.clear();
     this.valueTexts.clear();
+    this.overwritesSave = savedGameSummary() !== null;
+    this.warnedOverwrite = false;
 
     this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.panel).setOrigin(0);
     this.add.rectangle(30, 30, GAME_WIDTH - 60, GAME_HEIGHT - 60).setOrigin(0).setStrokeStyle(2, COLORS.border);
@@ -106,9 +114,15 @@ export class CreationScene extends Phaser.Scene {
     this.feedback = this.add.text(LEFT, GAME_HEIGHT - 70, '', TEXT);
 
     const guard = new RepeatGuard(); // a key held from the menu doesn't act here
+    // Phaser's keyboard queue can hand the same event over twice in a frame; a letter must be
+    // typed once.
+    const handled = new WeakSet<KeyboardEvent>();
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
+      if (handled.has(event)) return;
+      handled.add(event);
       if (guard.allow(event.key, event.repeat)) this.onKey(event);
     });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => setTextEntry(false));
 
     this.refresh();
   }
@@ -118,27 +132,27 @@ export class CreationScene extends Phaser.Scene {
   }
 
   private onKey(event: KeyboardEvent): void {
-    const onName = this.row === 'name';
-    const key = event.key;
-    const letter = key.length === 1 ? key.toLowerCase() : '';
-    if (key === 'Escape') {
-      this.scene.start('Menu');
-    } else if (key === 'Enter') {
-      if (event.repeat) return;
-      if (this.row === 'start') this.start();
-      else this.move(1);
-    } else if (key === 'ArrowUp' || (!onName && letter === 'w')) {
-      this.move(-1);
-    } else if (key === 'ArrowDown' || (!onName && letter === 's')) {
-      this.move(1);
-    } else if (key === 'ArrowLeft' || (!onName && letter === 'a')) {
-      this.adjust(-1);
-    } else if (key === 'ArrowRight' || (!onName && letter === 'd')) {
-      this.adjust(1);
-    } else if (onName && key === 'Backspace') {
-      if (eraseFromName(this.build)) this.refresh();
-    } else if (onName && key.length === 1) {
-      if (typeIntoName(this.build, key)) this.refresh();
+    const action = creationKeyAction(this.row === 'name', event);
+    switch (action.kind) {
+      case 'back':
+        quitToMenu(this);
+        break;
+      case 'confirm':
+        if (this.row === 'start') this.start();
+        else this.move(1);
+        break;
+      case 'move':
+        this.move(action.delta);
+        break;
+      case 'adjust':
+        this.adjust(action.delta);
+        break;
+      case 'erase':
+        if (eraseFromName(this.build)) this.refresh();
+        break;
+      case 'type':
+        if (typeIntoName(this.build, action.char)) this.refresh();
+        break;
     }
   }
 
@@ -195,6 +209,13 @@ export class CreationScene extends Phaser.Scene {
       this.refresh();
       return;
     }
+    // Ask once before overwriting an existing save.
+    if (this.overwritesSave && !this.warnedOverwrite) {
+      this.warnedOverwrite = true;
+      this.feedback.setText('This overwrites your saved game. Start again to confirm.').setColor(COLORS.warn);
+      this.refresh();
+      return;
+    }
     playSound('menuSelect');
     startNewGame(this.build);
     startPlaying(this);
@@ -232,12 +253,13 @@ export class CreationScene extends Phaser.Scene {
       this.rowTexts.get(row)!.setText(`${selected ? '>' : ' '} ${title}`).setColor(color);
       this.valueTexts.get(row)?.setText(value).setColor(color);
     };
+    setTextEntry(this.row === 'name'); // M types an M here instead of muting
     const typing = this.row === 'name' ? '_' : '';
     label('name', 'Name', `${build.name}${typing}`);
     label('gender', 'Gender', build.gender === 'male' ? 'Male' : 'Female');
     for (const key of SPECIAL_KEYS) label(key, SPECIAL_NAMES[key], String(build.special[key]));
     label('difficulty', 'Difficulty', DIFFICULTIES[build.difficulty].name);
-    label('start', '[ Start the game ]');
+    label('start', this.warnedOverwrite ? '[ Overwrite your save and start ]' : '[ Start the game ]');
 
     const left = pointsLeft(build.special);
     this.pointsText.setText(`Points left: ${left}`).setColor(left > 0 ? COLORS.bright : COLORS.dim);
@@ -250,12 +272,12 @@ export class CreationScene extends Phaser.Scene {
     const s = build.special;
     this.derived.setText(
       [
-        `Hit Points    ${maxHitPoints(s)}`,
-        `Action Points ${maxActionPoints(s)}`,
-        `Carry Weight  ${carryCapacity(s)} lb`,
-        `Armor Class   ${s.agility}`,
-        `Critical      ${s.luck}%`,
-        `Skill points  ${skillPointsPerLevel(s)} per level`,
+        `Max Hit Points ${maxHitPoints(s)} (you start on ${startingHitPoints(maxHitPoints(s))})`,
+        `Action Points  ${maxActionPoints(s)}`,
+        `Carry Weight   ${carryCapacity(s)} lb`,
+        `Armor Class    ${s.agility}`,
+        `Critical       ${s.luck}%`,
+        `Skill points   ${skillPointsPerLevel(s)} per level`,
       ].join('\n'),
     );
   }
@@ -270,7 +292,7 @@ export class CreationScene extends Phaser.Scene {
       case 'difficulty':
         return [`DIFFICULTY: ${DIFFICULTIES[this.build.difficulty].name.toUpperCase()}`, DIFFICULTIES[this.build.difficulty].description];
       case 'start':
-        return ['READY?', 'Every stat starts at 5, with 8 more points to spend. Lower a stat to free its points.'];
+        return ['READY?', `Every stat starts at 5, with ${EXTRA_POINTS} more points to spend. Lower a stat to free its points.`];
     }
   }
 }

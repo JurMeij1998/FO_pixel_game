@@ -78,9 +78,12 @@ export class Combat {
     private readonly map: GridMap,
     private readonly player: Character,
     /** Returns values in [0, 1); injectable so tests are deterministic. */
-    private readonly rng: () => number = Math.random,
-    /** How dangerous enemies are to the player: their hit chance and damage (core/difficulty.ts). */
-    private readonly difficulty: Difficulty = 'normal',
+    private readonly rng: () => number,
+    /**
+     * How dangerous enemies are to the player: their hit chance and damage (core/difficulty.ts).
+     * Required, so a fight started somewhere new can't quietly ignore the chosen difficulty.
+     */
+    private readonly difficulty: Difficulty,
   ) {
     this.recruitSpotters();
     this.actionPoints = player.maxActionPoints;
@@ -304,8 +307,10 @@ export class Combat {
     const critical = this.rng() * 100 < attacker.critChance;
     let damage = attack.damageMin + Math.floor(this.rng() * (attack.damageMax - attack.damageMin + 1));
     if (critical) damage *= 2;
-    damage = Math.max(1, Math.round((damage * (100 - target.damageResist)) / 100));
-    if (target === this.player) damage = Math.max(1, Math.round(damage * DIFFICULTIES[this.difficulty].damageTaken));
+    // Damage resistance, then (for hits on the player) the difficulty, rounded once at the end:
+    // rounding in between would make easy and hard change nothing on small hits.
+    const difficulty = target === this.player ? DIFFICULTIES[this.difficulty].damageTaken : 1;
+    damage = Math.max(1, Math.round(((damage * (100 - target.damageResist)) / 100) * difficulty));
     const before = target.hitPoints;
     target.hitPoints = Math.max(0, target.hitPoints - damage);
     const killed = target.hitPoints === 0;

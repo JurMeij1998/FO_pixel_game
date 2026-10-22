@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { loadSavedGame, state } from '../state';
+import { loadSavedGame, savedGameSummary, state } from '../state';
 import { COLORS, TEXT, TITLE_TEXT } from '../ui/theme';
 import { MenuList } from '../ui/widgets';
 import { playTestArena, quitToMenu, showCharacterCreation, startPlaying } from './flow';
@@ -24,9 +24,9 @@ export class GameOverScene extends Phaser.Scene {
       ...(state.sandbox ? [{ label: 'Restart test arena', onSelect: () => playTestArena(this) }] : []),
       {
         label: 'Load last save',
+        disabled: savedGameSummary() === null,
         onSelect: () => {
           if (loadSavedGame()) startPlaying(this);
-          else showCharacterCreation(this); // no save to go back to
         },
       },
       { label: 'New game', onSelect: () => showCharacterCreation(this) },

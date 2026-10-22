@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Combat } from './core/combat';
-import { newBuild } from './core/creation';
-import { autosave, loadSavedGame, savedGameSummary, startNewGame, startTestArena, state, travelTo } from './state';
+import { newBuild, raiseStat } from './core/creation';
+import {
+  autosave,
+  loadSavedGame,
+  resetToDefaultGame,
+  savedGameSummary,
+  startNewGame,
+  startTestArena,
+  state,
+  travelTo,
+} from './state';
 
 // Tests run in Node, which has no localStorage: give it a minimal in-memory one.
 const store = new Map<string, string>();
@@ -20,9 +29,36 @@ describe('game state', () => {
     startNewGame(newBuild());
   });
 
-  it('has no saved game until something is saved', () => {
+  it('has no saved game before one is started (and the default game behind the menu writes none)', () => {
+    store.clear();
+    resetToDefaultGame();
     expect(savedGameSummary()).toBeNull();
     expect(loadSavedGame()).toBe(false);
+  });
+
+  it('saves a new game straight away, with the character made for it', () => {
+    const build = newBuild();
+    build.name = 'Vera';
+    build.gender = 'female';
+    build.difficulty = 'hard';
+    for (let i = 0; i < 5; i++) raiseStat(build, 'endurance');
+    startNewGame(build);
+    // Quitting before the first step: the new game is still there to continue.
+    resetToDefaultGame();
+    expect(savedGameSummary()).toBe('Vera, level 1, Wasteland');
+    expect(loadSavedGame()).toBe(true);
+    expect(state.player.gender).toBe('female');
+    expect(state.difficulty).toBe('hard');
+    expect(state.player.special.endurance).toBe(10);
+    // A bit beaten up: 60% of the maximum.
+    expect(state.player.hitPoints).toBe(Math.round(state.player.maxHitPoints * 0.6));
+  });
+
+  it("leaves the save alone when the menu's default game is put in memory", () => {
+    state.player.gainExperience(100);
+    autosave();
+    resetToDefaultGame();
+    expect(savedGameSummary()).toBe('Wanderer, level 2, Wasteland');
   });
 
   it('loads what was autosaved, replacing the running game', () => {
@@ -37,10 +73,12 @@ describe('game state', () => {
     expect(state.loadedFromSave).toBe(true);
   });
 
-  it('throws the save away on a new game', () => {
+  it('replaces the save on a new game', () => {
+    state.player.gainExperience(100);
     autosave();
+    expect(savedGameSummary()).toBe('Wanderer, level 2, Wasteland');
     startNewGame(newBuild());
-    expect(savedGameSummary()).toBeNull();
+    expect(savedGameSummary()).toBe('Wanderer, level 1, Wasteland');
   });
 
   it("doesn't autosave during combat", () => {

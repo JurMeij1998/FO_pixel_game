@@ -22,8 +22,7 @@ export class MenuScene extends Phaser.Scene {
     this.add.text(centerX, 215, 'a post-nuclear pixel RPG', DIM_TEXT).setOrigin(0.5);
 
     const summary = savedGameSummary();
-    let confirmingNewGame = false;
-    const menu = new MenuList(this, centerX, 300, [
+    new MenuList(this, centerX, 300, [
       {
         label: summary ? `Continue (${summary})` : 'Continue',
         disabled: !summary,
@@ -31,18 +30,8 @@ export class MenuScene extends Phaser.Scene {
           if (loadSavedGame()) startPlaying(this);
         },
       },
-      {
-        label: 'New game',
-        onSelect: () => {
-          // Ask once before overwriting an existing save.
-          if (summary && !confirmingNewGame) {
-            confirmingNewGame = true;
-            menu.setLabel(1, 'Overwrite your save? Choose again');
-            return;
-          }
-          showCharacterCreation(this);
-        },
-      },
+      // Character creation asks before its new game overwrites the save.
+      { label: 'New game', onSelect: () => showCharacterCreation(this) },
       { label: 'Controls', onSelect: () => showControls(this) },
       // Development builds only (npm run dev): quick ways into a fight, or a shop, to try out UI.
       ...(import.meta.env.DEV

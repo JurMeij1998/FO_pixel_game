@@ -10,30 +10,33 @@ import {
   newBuild,
   pointsLeft,
   raiseStat,
+  startingHitPoints,
   typeIntoName,
 } from './creation';
 import { SPECIAL_KEYS } from './stats';
 
 describe('character creation', () => {
-  it('starts every stat at 5, with 8 points to spend', () => {
+  it('starts every stat at 5, with 5 points to spend: 40 in all, as in Fallout', () => {
     const build = newBuild();
     for (const key of SPECIAL_KEYS) expect(build.special[key]).toBe(BASE_STAT);
     expect(pointsLeft(build.special)).toBe(EXTRA_POINTS);
+    expect(EXTRA_POINTS).toBe(5);
     expect(build.difficulty).toBe('normal');
   });
 
   it('spends points on raising stats, up to 10', () => {
     const build = newBuild();
+    lowerStat(build, 'charisma'); // a spare point, to show the cap
     for (let i = 0; i < 5; i++) expect(raiseStat(build, 'agility')).toBe(true);
     expect(build.special.agility).toBe(10);
-    expect(raiseStat(build, 'agility')).toBe(false); // the maximum
-    expect(pointsLeft(build.special)).toBe(3);
+    expect(raiseStat(build, 'agility')).toBe(false); // the maximum, though a point is left
+    expect(pointsLeft(build.special)).toBe(1);
   });
 
   it("can't raise a stat once the points are spent", () => {
     const build = newBuild();
-    for (let i = 0; i < 4; i++) raiseStat(build, 'strength');
-    for (let i = 0; i < 4; i++) raiseStat(build, 'luck');
+    for (let i = 0; i < 3; i++) raiseStat(build, 'strength');
+    for (let i = 0; i < 2; i++) raiseStat(build, 'luck');
     expect(pointsLeft(build.special)).toBe(0);
     expect(raiseStat(build, 'charisma')).toBe(false);
     expect(build.special.charisma).toBe(5);
@@ -69,10 +72,10 @@ describe('character creation', () => {
 
   it('is ready to play only with a name and every point spent', () => {
     const build = newBuild();
-    expect(checkBuild(build)).toMatchObject({ ok: false, message: 'You still have 8 points to spend.' });
-    for (let i = 0; i < 7; i++) raiseStat(build, 'intelligence');
-    expect(checkBuild(build).ok).toBe(false); // intelligence stops at 10: 5 spent
-    for (let i = 0; i < 3; i++) raiseStat(build, 'endurance');
+    expect(checkBuild(build)).toMatchObject({ ok: false, message: 'You still have 5 points to spend.' });
+    for (let i = 0; i < 4; i++) raiseStat(build, 'intelligence');
+    expect(checkBuild(build)).toMatchObject({ ok: false, message: 'You still have 1 point to spend.' });
+    raiseStat(build, 'endurance');
     expect(checkBuild(build).ok).toBe(true);
     build.name = '   ';
     expect(checkBuild(build)).toMatchObject({ ok: false, message: 'Give your character a name.' });
@@ -89,5 +92,16 @@ describe('character creation', () => {
     expect(character.special.endurance).toBe(6);
     build.special.endurance = 9; // later changes to the build don't reach the character
     expect(character.special.endurance).toBe(6);
+  });
+
+  it('starts the character a bit beaten up: 60% of their maximum HP', () => {
+    expect(startingHitPoints(30)).toBe(18); // an average build, as before character creation
+    expect(startingHitPoints(45)).toBe(27);
+    expect(startingHitPoints(1)).toBe(1);
+    const tough = newBuild();
+    for (let i = 0; i < 5; i++) raiseStat(tough, 'endurance');
+    const character = createCharacter(tough);
+    expect(character.hitPoints).toBe(startingHitPoints(character.maxHitPoints));
+    expect(character.hitPoints).toBeLessThan(character.maxHitPoints);
   });
 });
