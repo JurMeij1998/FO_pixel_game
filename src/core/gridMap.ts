@@ -92,8 +92,15 @@ export interface MapDef {
   creatures?: Record<string, string>;
   /** Marker digit to the id of the map it leads to. */
   exits?: Record<string, { to: string }>;
-  /** Locked doors (`/` tiles), by position ("x,y"), with the Lockpick skill each lock needs (see core/locks.ts). */
-  locks?: Record<string, number>;
+  /** Doors (`/` tiles) that are locked or belong to someone, by position ("x,y"). */
+  doors?: Record<string, DoorDef>;
+}
+
+export interface DoorDef {
+  /** Locked, needing this much Lockpick skill (see core/locks.ts). */
+  lock?: number;
+  /** The group whose house it is (see CreatureDef.group): picking its lock is a crime against them. */
+  owner?: string;
 }
 
 export interface ChestDef {
@@ -117,6 +124,11 @@ export interface Chest {
   lock: number | null;
 }
 
+/** Picking the lock of something owned (a chest, a door) is a crime against its owner. */
+export interface Owned {
+  owner?: string;
+}
+
 /** A door in a doorway (a `/` tile). Closed, it blocks walking and sight. Doors start closed. */
 export interface Door {
   x: number;
@@ -124,6 +136,7 @@ export interface Door {
   open: boolean;
   /** The Lockpick skill its lock needs, or null if it isn't (or no longer) locked. */
   lock: number | null;
+  owner?: string;
 }
 
 /** A walkable tile that takes the player to another map. */
@@ -190,7 +203,10 @@ export class GridMap {
         const tile = LEGEND[char];
         if (tile) {
           tileRow.push(tile);
-          if (tile === 'door') doors.push({ x, y, open: false, lock: def.locks?.[tileKey({ x, y })] ?? null });
+          if (tile === 'door') {
+            const door = def.doors?.[tileKey({ x, y })];
+            doors.push({ x, y, open: false, lock: door?.lock ?? null, owner: door?.owner });
+          }
           continue;
         }
 
@@ -227,8 +243,8 @@ export class GridMap {
     for (const digit of Object.keys(def.exits ?? {})) {
       if (!placedExits.has(digit)) throw new Error(`Map '${def.name}': exit '${digit}' is not placed`);
     }
-    for (const at of Object.keys(def.locks ?? {})) {
-      if (!doors.some((d) => tileKey(d) === at)) throw new Error(`Map '${def.name}': lock at (${at}) is not on a door`);
+    for (const at of Object.keys(def.doors ?? {})) {
+      if (!doors.some((d) => tileKey(d) === at)) throw new Error(`Map '${def.name}': door at (${at}) is not on a door tile`);
     }
     return new GridMap(id, def.name, tiles, chests, creatures, exits, playerStart, doors, findBuildings(tiles));
   }
@@ -364,6 +380,14 @@ export class GridMap {
     if (owner === undefined) return [];
     const witness = this.creatures.find((c) => !c.isDead && !c.hostile && c.def.group === owner);
     return witness ? this.provoke(witness) : [];
+  }
+
+  /**
+   * Picking the lock of an owned door or chest is breaking in: its owners (any of them still
+   * alive and friendly) turn hostile, whether or not they see it, as with theft.
+   */
+  noticeLockpicking(thing: Owned): Creature[] {
+    return this.noticeTheft(thing.owner);
   }
 
   livingCreatureAt(x: number, y: number): Creature | undefined {

@@ -111,8 +111,9 @@ const BRICK_HOUSE: Prefab = {
  * A small shop, 3 by 4 inside: bookcases along the back, Gus (G) behind his counter, and the
  * stockroom crate behind it too, through the gap in the counter. You talk to Gus across the
  * counter from the shop floor. Taking from the crate is stealing from the store, and it's
- * locked with a good lock. The guard (W) stands outside, beside the door; the shop is open,
- * so the door isn't locked.
+ * locked with a good lock: picking it is breaking in, and turns the store against you too.
+ * The guard (W) stands outside, beside the door; the shop is open, so the door isn't locked
+ * (but it is the store's).
  */
 export const GENERAL_STORE: Prefab = {
   name: 'general store',
@@ -127,6 +128,7 @@ export const GENERAL_STORE: Prefab = {
   ],
   entrance: { x: 2, y: 6 },
   chest: { name: 'Stockroom Crate', loot: STORE_LOOT, owner: 'store', lock: LOCKS.good },
+  owner: 'store',
   residents: { G: 'shopkeeper', W: 'guard' },
 };
 

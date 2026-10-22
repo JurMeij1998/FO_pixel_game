@@ -44,7 +44,8 @@ Roughly in the order discussed with the user:
   out of a provoked guard's sight of the village entrances (today he can see some of them).
 - **Real sprite art** (a sprite sheet) replacing the generated placeholders.
 - **More from doors and locks** (`core/locks.ts`, `core/buildings.ts`): keys as items;
-  picking an owned lock in sight of its owner counting as a crime; closing doors in combat
+  picking an owned lock (which, like theft, always turns the owners hostile) only counting
+  when someone can see you; owners for houses once villages have residents; closing doors in combat
   (today only walking into one opens it there); people opening doors outside combat (they
   stand still until a fight); lockpicks as an item that helps, as in Fallout.
 - **Weapon deterioration and maintenance.** Weapons wear with use and work worse as they do

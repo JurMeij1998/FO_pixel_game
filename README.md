@@ -115,8 +115,10 @@ so come back once you've put skill points into Lockpick. Lockpick starts at 10% 
 Perception + Agility (20% for an average character).
 
 On the wasteland, the shed with the metal locker has a simple lock, and in the village Gus's
-stockroom crate has a good one (picking it is fine; taking from it is still stealing). Some
-village houses and hunter's cabins in the forest are locked up too. People and raiders open
+stockroom crate has a good one. Picking the lock of something that belongs to someone (a
+chest's or door's `owner`, or a prefab's) is breaking in: like stealing, it turns the owners
+hostile, Gus and the guard for the store. Some village houses and hunter's cabins in the
+forest are locked up too; nobody lives there any more. People and raiders open
 unlocked doors to come after you in a fight; animals and ghouls are kept out by a closed one.
 
 ## Maps and biomes

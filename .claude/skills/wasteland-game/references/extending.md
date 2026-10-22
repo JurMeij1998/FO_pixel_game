@@ -38,7 +38,9 @@ Recipes for the common additions. Each lists where the pieces live and what is e
 3. Place them: a letter in a hand-made map's `creatures`, or a capital letter in a prefab's rows
    mapped in its `residents`. Behind a counter, the counter (`]`) goes between them and the
    shop floor so the player can talk across it. Give a chest `owner: '<group>'` to make taking
-   from it theft. `playabilityProblems` checks someone can reach a talking spot.
+   from it (or picking its lock) theft, and their house the same `owner` (a prefab's `owner`,
+   or a hand-made map's `doors` entry) to make picking its door's lock a crime too.
+   `playabilityProblems` checks someone can reach a talking spot.
 4. A new dialog action needs a case in `DialogScene.answer()`.
 
 ## Tile
@@ -70,6 +72,8 @@ Recipes for the common additions. Each lists where the pieces live and what is e
      and doors around a floor make it a building with a roof (`core/buildings.ts`): give a
      building a door, not a gap, or it has no roof. `doorLock: { lock, chance }` locks its
      doors with that chance; `chest.lock` always locks the chest (`LOCKS` in core/locks.ts).
+     `owner` (a group) makes the building someone's: picking its doors' locks turns that
+     group hostile, as `chest.owner` does for the chest (taking from it, or picking it).
    - `LootTable` / `rollLoot`, `SpawnTable`.
    - `terrain.ts`: `scatter`, `smooth` (cellular automaton; groves, caves), `blob`, `border`,
      `windingPath`, `findSpot`, `findOpenTile`, `farFrom`, `hasRoomAround`, and

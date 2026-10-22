@@ -72,7 +72,7 @@ export const WASTELAND: MapDef = {
     '1': { to: 'forest' },
     '2': { to: 'village' },
   },
-  locks: {
-    '25,12': LOCKS.simple,
+  doors: {
+    '25,12': { lock: LOCKS.simple },
   },
 };

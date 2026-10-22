@@ -45,8 +45,8 @@ export const TEST_ARENA: MapDef = {
   exits: {
     '1': { to: 'wasteland' },
   },
-  locks: {
-    '17,11': LOCKS.good,
+  doors: {
+    '17,11': { lock: LOCKS.good },
   },
 };
 
@@ -69,7 +69,7 @@ const LOCKED_SHACK: Prefab = {
  * The village store in a small yard, for trying out talking, bartering, stealing and
  * provoking. It's stamped from the same prefab as in the village (GENERAL_STORE), so it can't
  * drift from it: Gus behind his counter, the store's crate behind it (a good lock, which the
- * test character can pick), the guard by the door. Left of the store, a shack with a hard lock
+ * test character can pick, but which turns Gus and the guard hostile), the guard by the door. Left of the store, a shack with a hard lock
  * the test character can't pick, to see that refusal. You start on the shop floor facing Gus
  * across the counter. Only reachable in development; never saved.
  */

@@ -7,7 +7,7 @@ import { capitalize, listNames, type Creature } from '../core/creature';
 import type { DialogData } from './DialogScene';
 import type { Fighter } from '../core/fighter';
 import { addPos, type GridPos } from '../core/grid';
-import type { Chest, Door, Exit } from '../core/gridMap';
+import type { Chest, Door, Exit, Owned } from '../core/gridMap';
 import { lockedMessage, pickLock } from '../core/locks';
 import type { Lootable } from '../core/loot';
 import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey } from '../gfx/textures';
@@ -768,6 +768,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** Opens a chest, picking its lock first if it has one (and you can). */
+  /**
+   * Opens a chest, picking its lock first if it has one (and you can). Picking someone's lock
+   * turns them hostile; then there's no time to look inside.
+   */
   private openChest(chest: Chest): void {
     if (chest.lock !== null) {
       const picked = pickLock(chest.name.toLowerCase(), chest, state.player);
@@ -777,6 +781,10 @@ export class WorldScene extends Phaser.Scene {
         return;
       }
       playSound('lockPick');
+      if (this.caughtPicking(chest)) {
+        this.chestImages.get(chest.id)?.setTexture(chestTexture(chest));
+        return;
+      }
       autosave();
     }
     chest.opened = true;
@@ -785,7 +793,7 @@ export class WorldScene extends Phaser.Scene {
     this.openLoot(chest);
   }
 
-  /** E at a door: pick its lock and open it, open it, or close it. */
+  /** E at a door: pick its lock and open it (picking someone's lock turns them hostile), open it, or close it. */
   private useDoor(door: Door): void {
     if (door.lock !== null) {
       const picked = pickLock('door', door, state.player);
@@ -798,7 +806,7 @@ export class WorldScene extends Phaser.Scene {
       // Once the tumblers have given, the door swings open.
       state.map.openDoor(door);
       this.time.delayedCall(450, () => this.showDoor(door));
-      autosave();
+      if (!this.caughtPicking(door)) autosave();
       return;
     }
     const result = door.open ? state.map.closeDoor(door, state.player.pos) : state.map.openDoor(door);
@@ -836,6 +844,19 @@ export class WorldScene extends Phaser.Scene {
   private openLoot(lootable: Lootable): void {
     // Taking from something that isn't yours can start a fight once the loot screen closes.
     this.openOverlay('Loot', { lootable, onTheft: (angered: Creature[]) => this.caughtStealing(angered) });
+  }
+
+  /**
+   * After picking a lock: if it's someone's, they (and their group) turn hostile and the fight
+   * starts. Returns whether it did. No autosave before it, so "load last save" goes back to
+   * before you picked it.
+   */
+  private caughtPicking(thing: Owned): boolean {
+    const angered = state.map.noticeLockpicking(thing);
+    if (angered.length === 0) return false;
+    postMessage(this, "You've been caught breaking in!");
+    this.fightWith(angered);
+    return true;
   }
 
   private caughtStealing(angered: Creature[]): void {

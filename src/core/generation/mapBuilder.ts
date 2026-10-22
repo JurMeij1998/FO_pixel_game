@@ -1,5 +1,5 @@
 import { addPos, DIRECTIONS, type GridPos } from '../grid';
-import { isBlockingTile, LEGEND, type MapDef, type TileType } from '../gridMap';
+import { isBlockingTile, LEGEND, type DoorDef, type MapDef, type TileType } from '../gridMap';
 import { hashSeed, Random } from '../random';
 import { rollCreature, rollLoot, type LootTable, type SpawnTable } from './tables';
 
@@ -21,6 +21,8 @@ export interface Prefab {
   chest?: { name: string; loot: LootTable; owner?: string; lock?: number };
   /** With this chance, every door (`/`) of the prefab is locked, needing `lock` Lockpick skill. */
   doorLock?: { lock: number; chance: number };
+  /** The group the building belongs to (e.g. the store's): picking its doors' locks is a crime against them. */
+  owner?: string;
   creatures?: SpawnTable;
   /** Letter in the rows to the creature id of the person standing there, e.g. the shopkeeper. */
   residents?: Record<string, string>;
@@ -65,8 +67,8 @@ export class MapBuilder {
     owner?: string;
     lock?: number;
   }> = [];
-  /** Locked doors, by position ("x,y"), with the Lockpick skill each needs. */
-  private readonly locks = new Map<string, number>();
+  /** Doors that are locked or owned, by position ("x,y"). */
+  private readonly doors = new Map<string, DoorDef>();
   /** Residents stay where they are (until a fight), so paths go around them, not through. */
   private readonly creatures: Array<{ pos: GridPos; creatureId: string; resident: boolean }> = [];
   private readonly exits: Array<{ pos: GridPos; side: Side; to: string }> = [];
@@ -181,8 +183,14 @@ export class MapBuilder {
         this.locked[pos.y][pos.x] = true;
       });
     });
-    if (prefab.doorLock && doors.length > 0 && rng.chance(prefab.doorLock.chance)) {
-      for (const door of doors) this.locks.set(`${door.x},${door.y}`, prefab.doorLock.lock);
+    const lock = prefab.doorLock && doors.length > 0 && rng.chance(prefab.doorLock.chance) ? prefab.doorLock.lock : undefined;
+    if (lock !== undefined || prefab.owner) {
+      for (const door of doors) {
+        this.doors.set(`${door.x},${door.y}`, {
+          ...(lock !== undefined && { lock }),
+          ...(prefab.owner && { owner: prefab.owner }),
+        });
+      }
     }
     const entrance = addPos({ x, y }, prefab.entrance);
     this.landmarks.push(entrance);
@@ -264,7 +272,7 @@ export class MapBuilder {
         ...(chest.lock !== undefined && { lock: chest.lock }),
       };
     });
-    if (this.locks.size > 0) def.locks = Object.fromEntries(this.locks);
+    if (this.doors.size > 0) def.doors = Object.fromEntries(this.doors);
     // One letter per creature type, skipping P (the player start).
     const letters = 'ABCDEFGHIJKLMNOQRSTUVWXYZ';
     const letterFor = new Map<string, string>();

@@ -106,7 +106,9 @@ describe('village buildings', () => {
       const store = map.buildingAt(gus.pos.x, gus.pos.y)!;
       expect(store).toBeDefined();
       const storeDoors = map.doors.filter((d) => [...store.interior].some((k) => isNextTo(k, d)));
-      expect(storeDoors.map((d) => d.lock)).toEqual([null]);
+      expect(storeDoors.map((d) => [d.lock, d.owner])).toEqual([[null, 'store']]);
+      // Picking the crate's lock is breaking into the store.
+      expect(map.noticeLockpicking(crate).map((c) => c.def.id).sort()).toEqual(['guard', 'shopkeeper']);
     }
   });
 

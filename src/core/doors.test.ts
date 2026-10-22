@@ -42,7 +42,7 @@ describe('doors', () => {
   });
 
   it("don't open while locked", () => {
-    const map = GridMap.parse({ name: 'hut', rows: HUT, chests: {}, locks: { '2,2': LOCKS.average } });
+    const map = GridMap.parse({ name: 'hut', rows: HUT, chests: {}, doors: { '2,2': { lock: LOCKS.average } } });
     const door = map.doorAt(2, 2)!;
     expect(door.lock).toBe(LOCKS.average);
     expect(map.openDoor(door)).toMatchObject({ ok: false, message: 'The door is locked.' });
@@ -51,7 +51,39 @@ describe('doors', () => {
   });
 
   it('reject a lock that is not on a door', () => {
-    expect(() => GridMap.parse({ name: 'hut', rows: HUT, chests: {}, locks: { '1,1': 25 } })).toThrow(/not on a door/);
+    expect(() => GridMap.parse({ name: 'hut', rows: HUT, chests: {}, doors: { '1,1': { lock: 25 } } })).toThrow(/not on a door/);
+  });
+
+  describe('belonging to someone', () => {
+    // A house with a locked door, and its owners: a shopkeeper inside, a guard outside.
+    const owned = () =>
+      GridMap.parse({
+        name: 'house',
+        rows: ['.%%%%.', '.%G+%.', '.%/%%.', '..PW..', '......'],
+        chests: {},
+        creatures: { G: 'shopkeeper', W: 'guard' },
+        doors: { '2,2': { lock: LOCKS.simple, owner: 'store' } },
+      });
+
+    it('turn their owners hostile when you pick the lock, as theft does', () => {
+      const map = owned();
+      const door = map.doorAt(2, 2)!;
+      expect(door.owner).toBe('store');
+      const angered = map.noticeLockpicking(door);
+      expect(angered.map((c) => c.def.id).sort()).toEqual(['guard', 'shopkeeper']);
+      expect(map.creatures.every((c) => c.hostile)).toBe(true);
+    });
+
+    it('are anyone\'s to pick once the owners are dead', () => {
+      const map = owned();
+      for (const c of map.creatures) c.hitPoints = 0;
+      expect(map.noticeLockpicking(map.doorAt(2, 2)!)).toEqual([]);
+    });
+
+    it('anger no one when they belong to no one', () => {
+      const map = GridMap.parse({ name: 'hut', rows: HUT, chests: {}, doors: { '2,2': { lock: LOCKS.simple } } });
+      expect(map.noticeLockpicking(map.doorAt(2, 2)!)).toEqual([]);
+    });
   });
 
   it('give chests their lock', () => {
@@ -77,7 +109,7 @@ describe('doors', () => {
         rows: ['#####', '#.X.#', '##/##', '#...#', '#.P.#', '#####'],
         chests: {},
         creatures: { X: creatureId },
-        locks: locked ? { '2,2': LOCKS.simple } : undefined,
+        doors: locked ? { '2,2': { lock: LOCKS.simple } } : undefined,
       });
       const p = player(map);
       const combat = new Combat(map, p, () => 0.99, 'normal'); // every attack misses
