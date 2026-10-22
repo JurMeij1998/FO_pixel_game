@@ -64,7 +64,10 @@ export class LootScene extends Phaser.Scene {
     addButton(this, RIGHT, 500, 'Take all (Space)', () => this.takeAllAndClose());
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
 
-    this.cursor = new ListCursor(this.keys(), 1);
+    // Opening someone else's chest isn't stealing, but taking from it is: there the cursor starts
+    // hidden, so an E pressed out of habit (E used to close this screen) does nothing until you
+    // choose an item. Anywhere else E takes the first item straight away.
+    this.cursor = new ListCursor(this.keys(), 1, { hidden: this.lootable.owner !== undefined });
     bindCursorKeys(this, this.cursor, () => this.refresh());
     const keyboard = this.input.keyboard!;
     keyboard.on('keydown-ESC', () => this.close());
@@ -83,6 +86,7 @@ export class LootScene extends Phaser.Scene {
 
   /** Moves an item to the other side: from your pack (column 0) into the chest, or out of it. */
   private move(column: number, itemId: string, modifiers: ClickModifiers): void {
+    if (this.closed) return; // caught stealing this very frame: the screen is on its way out
     const player = state.player;
     const contents = this.lootable.contents;
     this.cursor.focus(column, itemId);
@@ -102,6 +106,7 @@ export class LootScene extends Phaser.Scene {
    * If nothing could be taken (it's empty, or it's all too heavy) the screen stays open, saying why.
    */
   private takeAllAndClose(): void {
+    if (this.closed) return;
     const result = this.take(() => takeAll(state.player, this.lootable.contents));
     if (!result.ok || this.closed) return; // refused, or caught stealing (already closed)
     // Emptying it says so on closing; otherwise say what was left behind.

@@ -86,4 +86,30 @@ describe('ListCursor', () => {
     expect(cursor.selectedKey).toBeNull();
     expect(cursor.moveRow(1)).toBe(false);
   });
+
+  it('can start hidden: nothing selected until the first move, which only shows it', () => {
+    const cursor = new ListCursor([PACK, CHEST], 1, { hidden: true });
+    expect(cursor.selectedKey).toBeNull();
+    expect(cursor.moveRow(1)).toBe(true); // shows it...
+    expect(cursor.selectedKey).toBe('rope'); // ...where it was, without moving down
+    cursor.moveRow(1);
+    expect(cursor.selectedKey).toBe('ammo_10mm');
+  });
+
+  it('shows a hidden cursor on a column move too, or a click', () => {
+    const sideways = new ListCursor([PACK, CHEST], 1, { hidden: true });
+    sideways.moveColumn(-1);
+    expect([sideways.activeColumn, sideways.selectedKey]).toEqual([1, 'rope']); // shown, not moved
+    const clicked = new ListCursor([PACK, CHEST], 1, { hidden: true });
+    clicked.focus(0, 'stimpak');
+    expect([clicked.activeColumn, clicked.selectedKey]).toEqual([0, 'stimpak']);
+  });
+
+  it('starts hidden in another column when the one it was given is empty, still hidden', () => {
+    const cursor = new ListCursor([PACK, []], 1, { hidden: true });
+    expect(cursor.activeColumn).toBe(0);
+    expect(cursor.selectedKey).toBeNull();
+    cursor.moveRow(1);
+    expect(cursor.selectedKey).toBe('knife');
+  });
 });

@@ -122,9 +122,11 @@ export class WorldScene extends Phaser.Scene {
     for (const key of ['TAB', 'I']) {
       keyboard.on(`keydown-${key}`, (event: KeyboardEvent) => !event.repeat && this.openInventory());
     }
-    keyboard.on('keydown-C', () => this.openCharacterSheet());
+    // Not on key repeat: holding C would open and close the sheet over and over, and an Esc held
+    // a moment too long after closing a screen would open the pause menu.
+    keyboard.on('keydown-C', (event: KeyboardEvent) => !event.repeat && this.openCharacterSheet());
     keyboard.on('keydown-R', () => this.reload());
-    keyboard.on('keydown-ESC', () => this.openOverlay('Pause'));
+    keyboard.on('keydown-ESC', (event: KeyboardEvent) => !event.repeat && this.openOverlay('Pause'));
     keyboard.on('keydown-Q', () => {
       if (this.busy) return; // a swap mid-animation would autosave or play the wrong weapon's sound
       postMessage(this, state.player.swapWeapons().message);
