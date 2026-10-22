@@ -66,6 +66,27 @@ describe('buildings', () => {
     expect(house.buildings.map((b) => b.id)).toEqual(['1,1', '4,1']);
   });
 
+  it('roof a door between two rooms like the wall it is in, leaving only the front uncovered', () => {
+    // Room A (left) has the way in at the bottom; room B (right) is only reached through A.
+    const house = map(['#######', '#__/__#', '##/####', '...P...']);
+    const [a, b] = house.buildings.map((building) => new Set(building.roof.map(tileKey)));
+    // The inner door, and the back wall above it, are under both roofs: no holes.
+    for (const roof of [a, b]) {
+      expect(roof.has('3,1')).toBe(true);
+      expect(roof.has('3,0')).toBe(true);
+    }
+    // A's front wall, with the door out, stays visible.
+    for (const front of ['1,2', '2,2', '3,2']) expect(a.has(front)).toBe(false);
+    // B has no door out, so its whole bottom wall is roofed.
+    expect(b.has('4,2')).toBe(true);
+  });
+
+  it('know which way each door turns', () => {
+    const house = map(['.%%%..', '.%+/P.', '.%/%..', '......']);
+    expect(house.doorAt(3, 1)!.leftToRight).toBe(false); // in the wall on the right
+    expect(house.doorAt(2, 2)!.leftToRight).toBe(true); // in the bottom wall
+  });
+
   it('are hidden under their roof until the player steps inside', () => {
     const town = map(['.%%%%.', '.%++%.', '.%%/%.', '..P...']);
     expect(town.isHidden(2, 1)).toBe(true);

@@ -1,4 +1,4 @@
-import { findBuildings, tileKey, type Building } from './buildings';
+import { findBuildings, inWallLeftToRight, tileKey, type Building } from './buildings';
 import { ItemContainer } from './container';
 import { Creature, getCreatureDef } from './creature';
 import { addPos, DIRECTIONS, samePos, type GridPos } from './grid';
@@ -137,6 +137,8 @@ export interface Door {
   /** The Lockpick skill its lock needs, or null if it isn't (or no longer) locked. */
   lock: number | null;
   owner?: string;
+  /** Whether it sits in a wall running left to right (else up and down): how its sprite is turned. */
+  leftToRight: boolean;
 }
 
 /** A walkable tile that takes the player to another map. */
@@ -205,7 +207,7 @@ export class GridMap {
           tileRow.push(tile);
           if (tile === 'door') {
             const door = def.doors?.[tileKey({ x, y })];
-            doors.push({ x, y, open: false, lock: door?.lock ?? null, owner: door?.owner });
+            doors.push({ x, y, open: false, lock: door?.lock ?? null, owner: door?.owner, leftToRight: true });
           }
           continue;
         }
@@ -243,6 +245,8 @@ export class GridMap {
     for (const digit of Object.keys(def.exits ?? {})) {
       if (!placedExits.has(digit)) throw new Error(`Map '${def.name}': exit '${digit}' is not placed`);
     }
+    // Which way a door's wall runs is only known once the whole map is read.
+    for (const door of doors) door.leftToRight = inWallLeftToRight(tiles, door);
     for (const at of Object.keys(def.doors ?? {})) {
       if (!doors.some((d) => tileKey(d) === at)) throw new Error(`Map '${def.name}': door at (${at}) is not on a door tile`);
     }

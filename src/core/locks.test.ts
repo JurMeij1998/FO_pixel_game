@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Character } from './character';
-import { describeLock, isLocked, lockedMessage, LOCKS, pickLock, type Lockable } from './locks';
+import { describeLock, lockedMessage, LOCKS, pickLock, type Lockable } from './locks';
 
 function picker(perception = 5, agility = 5): Character {
   return new Character('Picker', { strength: 5, perception, endurance: 5, charisma: 5, intelligence: 5, agility, luck: 5 });
@@ -20,7 +20,7 @@ describe('locks', () => {
     const crate: Lockable = { lock: LOCKS.simple };
     const result = pickLock('crate', crate, picker(10, 10)); // 30%
     expect(result).toMatchObject({ ok: true, message: 'You pick the lock on the crate.' });
-    expect(isLocked(crate)).toBe(false);
+    expect(crate.lock).toBeNull();
   });
 
   it("don't open with less, however often you try, and say what it takes", () => {

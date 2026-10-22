@@ -11,13 +11,16 @@ export interface Building {
   /** The tiles inside, as "x,y" keys. */
   interior: ReadonlySet<string>;
   /**
-   * What the roof covers: the inside and the walls around it, except the front: the doors and
-   * the rest of the wall they're in stay visible, so a door sits in a wall, not in the roof.
+   * What the roof covers: the inside and the walls around it, except the front: a door that
+   * leads outside, and the rest of the wall it's in, stay visible, so the door sits in a wall,
+   * not in the roof. A door between two rooms is under both rooms' roofs, like the wall it's in.
    */
   roof: GridPos[];
   /** What the roof is made of, after the walls: wooden shingles on a wooden house, tin on a brick one. */
   material: 'wood' | 'brick';
 }
+
+type Tiles = readonly (readonly TileType[])[];
 
 const WALLS: ReadonlySet<TileType> = new Set<TileType>(['wall', 'woodWall']);
 /** Bigger than this, it's a walled yard rather than a building. */
@@ -26,12 +29,21 @@ const MAX_INTERIOR = 200;
 export const tileKey = (p: GridPos): string => `${p.x},${p.y}`;
 
 /**
+ * Whether the door at `p` sits in a wall running left to right (a wall on its left or right),
+ * rather than one running up and down. Its sprite is drawn for the first and turned for the second.
+ */
+export function inWallLeftToRight(tiles: Tiles, p: GridPos): boolean {
+  const isWall = (x: number) => WALLS.has(tiles[p.y]?.[x] as TileType);
+  return isWall(p.x - 1) || isWall(p.x + 1);
+}
+
+/**
  * Every area that only walls and doors separate from the rest of the map, and that has at least
  * one door. Inside, anything goes (floor, counters, hay, a chest); the edge of the map doesn't
  * count as a wall, so open ground walled in by rocks or trees isn't a building. Without a door
  * there's no way in, so a walled-in well isn't one either.
  */
-export function findBuildings(tiles: readonly (readonly TileType[])[]): Building[] {
+export function findBuildings(tiles: Tiles): Building[] {
   const height = tiles.length;
   const width = tiles[0]?.length ?? 0;
   const tileAt = (p: GridPos) => tiles[p.y]?.[p.x];
@@ -40,7 +52,7 @@ export function findBuildings(tiles: readonly (readonly TileType[])[]): Building
     return tile !== undefined && tile !== 'door' && !WALLS.has(tile);
   };
   const seen = new Set<string>();
-  const buildings: Building[] = [];
+  const areas: Array<{ id: string; area: GridPos[]; interior: Set<string>; doors: GridPos[] }> = [];
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -65,28 +77,32 @@ export function findBuildings(tiles: readonly (readonly TileType[])[]): Building
         }
       }
       if (touchesEdge || doors.length === 0 || area.length > MAX_INTERIOR) continue;
-      buildings.push({ id: tileKey(start), interior, ...roofOver(area, doors, tileAt) });
+      areas.push({ id: tileKey(start), area, interior, doors });
     }
   }
-  return buildings;
+
+  // A door leads outside when one of its sides is ground that's in no building.
+  const indoors = new Set(areas.flatMap((a) => [...a.interior]));
+  const leadsOutside = (door: GridPos) =>
+    DIRECTIONS.some((d) => {
+      const side = addPos(door, d);
+      return inside(side) && !indoors.has(tileKey(side));
+    });
+  return areas.map(({ id, area, interior, doors }) => ({
+    id,
+    interior,
+    ...roofOver(area, doors.filter(leadsOutside), tiles),
+  }));
 }
 
 /**
- * The inside plus every wall touching it, corners included, but not the walls in line with a
- * door (its row, for a door in a wall running left to right; its column otherwise); and which
- * wall material wins.
+ * The inside plus every wall and door touching it, corners included, but not the front: the
+ * walls and doors in line with a door leading outside (its row, for a door in a wall running
+ * left to right; its column otherwise). And which wall material wins.
  */
-function roofOver(
-  area: GridPos[],
-  doors: GridPos[],
-  tileAt: (p: GridPos) => TileType | undefined,
-): Pick<Building, 'roof' | 'material'> {
-  const isWall = (p: GridPos) => WALLS.has(tileAt(p)!);
+function roofOver(area: GridPos[], frontDoors: GridPos[], tiles: Tiles): Pick<Building, 'roof' | 'material'> {
   const inFront = (q: GridPos) =>
-    doors.some((d) => {
-      const leftToRight = isWall({ x: d.x - 1, y: d.y }) || isWall({ x: d.x + 1, y: d.y });
-      return leftToRight ? q.y === d.y : q.x === d.x;
-    });
+    frontDoors.some((d) => (inWallLeftToRight(tiles, d) ? q.y === d.y : q.x === d.x));
   const covered = new Map(area.map((p) => [tileKey(p), p]));
   let wood = 0;
   let brick = 0;
@@ -94,12 +110,12 @@ function roofOver(
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         const q = { x: p.x + dx, y: p.y + dy };
-        const tile = tileAt(q);
-        if (!tile || !WALLS.has(tile) || covered.has(tileKey(q))) continue;
+        const tile = tiles[q.y]?.[q.x];
+        if (!tile || !(WALLS.has(tile) || tile === 'door') || covered.has(tileKey(q))) continue;
         if (inFront(q)) continue;
         covered.set(tileKey(q), q);
         if (tile === 'woodWall') wood++;
-        else brick++;
+        else if (tile === 'wall') brick++;
       }
     }
   }

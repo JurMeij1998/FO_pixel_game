@@ -339,6 +339,20 @@ describe('doors, locks and roofs in saves', () => {
     expect(loaded.entered.size).toBe(0);
   });
 
+  it('open a door on anyone saved standing in that doorway (from before it had a door)', () => {
+    const game = freshGame();
+    const map = game.maps.wasteland;
+    const shack = map.doors.find((d) => d.lock === null)!;
+    const roach = map.creatures.find((c) => c.def.id === 'radroach')!;
+    roach.hitPoints = 0; // died in the doorway
+    roach.pos = { x: shack.x, y: shack.y };
+    const json = saveJson(game);
+    delete json.maps.wasteland.doors;
+    const loaded = loadGame(json, buildKnownMap, 'wasteland').maps.wasteland;
+    expect(loaded.doorAt(shack.x, shack.y)!.open).toBe(true);
+    expect(loaded.doors.filter((d) => d.open)).toHaveLength(1);
+  });
+
   it("ignore entered buildings the map doesn't have (any more)", () => {
     const json = saveJson(freshGame());
     json.maps.wasteland.entered = ['99,99', 42];

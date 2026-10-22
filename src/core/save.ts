@@ -162,4 +162,9 @@ function applyMapState(map: GridMap, state: MapState): void {
     // Only ever from friendly to hostile: a save can't make a monster friendly.
     if (saved.hostile === true) creature.hostile = true;
   });
+  // A creature (or corpse) saved before a doorway got its door stands in it: the door must be
+  // open, or it would be shut on them, blocking sight and the way, and never open again.
+  for (const door of map.doors) {
+    if (map.creatures.some((c) => c.pos.x === door.x && c.pos.y === door.y)) door.open = true;
+  }
 }

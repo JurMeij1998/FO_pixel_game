@@ -26,6 +26,15 @@ describe('doors', () => {
     expect(map.hasLineOfSight({ x: 2, y: 3 }, { x: 2, y: 1 })).toBe(true);
   });
 
+  it('hide you from whoever is behind them, until opened', () => {
+    // A raider inside the hut, the player right outside its door.
+    const map = GridMap.parse({ name: 'hut', rows: ['.%%%%.', '.%X+%.', '.%/%%.', '..P...'], chests: {}, creatures: { X: 'raider' } });
+    const p = player(map);
+    expect(Combat.spotters(map, p)).toEqual([]);
+    map.openDoor(map.doorAt(2, 2)!);
+    expect(Combat.spotters(map, p)).toEqual(map.creatures);
+  });
+
   it('count as a way through when checking what can be reached', () => {
     const map = GridMap.parse({ name: 'hut', rows: HUT, chests: {} });
     expect(map.reachableFrom(map.playerStart).has('2,1')).toBe(true);

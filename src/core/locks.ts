@@ -21,10 +21,6 @@ export interface Lockable {
   lock: number | null;
 }
 
-export function isLocked(thing: Lockable): boolean {
-  return thing.lock !== null;
-}
-
 /** "a simple lock", "a good lock"...: the hardest kind it is at least as hard as. */
 export function describeLock(lock: number): string {
   const kinds = Object.entries(LOCKS) as Array<[keyof typeof LOCKS, number]>;

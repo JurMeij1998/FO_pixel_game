@@ -38,6 +38,8 @@ const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, healthBar
 const ROOF_FADE_MS = 300;
 /** A pause after opening a door by walking into it, so a held key doesn't stride straight through. */
 const DOOR_PAUSE_MS = 120;
+/** How long picking a lock takes before the door swings open: the lock-pick sound's length. */
+const PICK_MS = 450;
 const ENEMY_RED = 0xd02020;
 const FADE_MS = 250;
 
@@ -106,10 +108,8 @@ export class WorldScene extends Phaser.Scene {
     for (const exit of map.exits) this.add.image(toPixel(exit.x), toPixel(exit.y), 'signpost').setDepth(DEPTH.prop);
     for (const door of map.doors) {
       // Drawn for a wall running left to right; turned a quarter in one running up and down.
-      const wall = (x: number) => map.tileAt(x, door.y) === 'wall' || map.tileAt(x, door.y) === 'woodWall';
-      const upright = !wall(door.x - 1) && !wall(door.x + 1);
       const image = this.add.image(toPixel(door.x), toPixel(door.y), doorTexture(door)).setDepth(DEPTH.prop);
-      this.doorImages.set(door, image.setAngle(upright ? 90 : 0));
+      this.doorImages.set(door, image.setAngle(door.leftToRight ? 0 : 90));
     }
     for (const creature of map.creatures) {
       const image = this.add
@@ -259,9 +259,15 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
     this.input.keyboard!.resetKeys(); // the key held to open it shouldn't count as held while the door swings
-    this.showDoor(door);
-    autosave();
+    this.doorOpened(door);
     void this.run(() => this.wait(DOOR_PAUSE_MS));
+  }
+
+  /** Shows a door the player just opened; whoever is behind it may now see them. */
+  private doorOpened(door: Door): void {
+    this.showDoor(door);
+    this.checkForCombat();
+    autosave(); // not if a fight just started: autosave skips itself in combat
   }
 
   /** Says why the player can't walk onto a tile, once for as long as the key is held against it. */
@@ -281,7 +287,9 @@ export class WorldScene extends Phaser.Scene {
       const to = addPos(state.player.pos, STEP[direction]);
       if (state.map.exitAt(to.x, to.y) || state.map.isClosedDoor(to.x, to.y)) {
         this.explainBump(to, () => {
-          if (state.map.isClosedDoor(to.x, to.y)) playSound('locked');
+          // The rattle only for a lock; a door you're just out of AP to open stays quiet.
+          const door = state.map.doorAt(to.x, to.y);
+          if (door && door.lock !== null) playSound('locked');
           postMessage(this, result.message);
         });
       }
@@ -579,9 +587,12 @@ export class WorldScene extends Phaser.Scene {
       const overhead = withBar ? ENEMY_BAR_GAP + ENEMY_BAR_HEIGHT : 0;
       return { x: image.x - TILE_SIZE / 2, y: image.y - TILE_SIZE / 2 - overhead, width: TILE_SIZE, height: TILE_SIZE + overhead };
     };
-    const rects = [...map.chests.map((c) => tile(c.x, c.y)), ...map.exits.map((e) => tile(e.x, e.y))];
+    // Nothing under a roof you haven't looked beneath: dodging it would give away what's there.
+    const visible = (p: GridPos) => !map.isHidden(p.x, p.y);
+    const rects = [...map.chests.filter(visible).map((c) => tile(c.x, c.y)), ...map.exits.map((e) => tile(e.x, e.y))];
     const fighting = new Set(this.creaturesWithBars());
     for (const creature of map.creatures) {
+      if (!visible(creature.pos)) continue;
       if (!creature.isDead) rects.push(around(this.imageFor(creature), fighting.has(creature)));
       else if (!creature.contents.isEmpty) rects.push(tile(creature.pos.x, creature.pos.y)); // lootable corpse
     }
@@ -763,7 +774,8 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
     const person = state.map.personFacing(state.player.pos, STEP[this.facing]);
-    if (person) {
+    // Not someone under a roof you haven't looked beneath (from an open doorway, say).
+    if (person && !state.map.isHidden(person.pos.x, person.pos.y)) {
       this.talkTo(person);
       return;
     }
@@ -773,9 +785,10 @@ export class WorldScene extends Phaser.Scene {
       this.openChest(chest);
       return;
     }
-    // A door in front of you, unless a corpse lies in the doorway: that's what you'd reach for.
+    // A door in front of you, unless a corpse with something on it lies in the doorway: that's
+    // what you'd reach for. (An emptied one leaves you the door, which then says it's in the way.)
     const door = state.map.doorAt(x, y);
-    if (door && !state.map.corpseAt(x, y)) {
+    if (door && !(state.map.corpseAt(x, y)?.contents.isEmpty === false)) {
       this.useDoor(door);
       return;
     }
@@ -788,7 +801,6 @@ export class WorldScene extends Phaser.Scene {
     postMessage(this, 'There is nothing there.');
   }
 
-  /** Opens a chest, picking its lock first if it has one (and you can). */
   /**
    * Opens a chest, picking its lock first if it has one (and you can). Picking someone's lock
    * turns them hostile; then there's no time to look inside.
@@ -824,10 +836,15 @@ export class WorldScene extends Phaser.Scene {
         return;
       }
       playSound('lockPick');
-      // Once the tumblers have given, the door swings open.
       state.map.openDoor(door);
-      this.time.delayedCall(450, () => this.showDoor(door));
-      if (!this.caughtPicking(door)) autosave();
+      const caught = this.caughtPicking(door);
+      // Once the tumblers have given, the door swings open; input waits for it, so you can't walk
+      // through a door that still looks shut.
+      void this.run(async () => {
+        await this.wait(PICK_MS);
+        if (caught) this.showDoor(door);
+        else this.doorOpened(door);
+      });
       return;
     }
     const result = door.open ? state.map.closeDoor(door, state.player.pos) : state.map.openDoor(door);
@@ -835,8 +852,11 @@ export class WorldScene extends Phaser.Scene {
       postMessage(this, result.message);
       return;
     }
-    this.showDoor(door);
-    autosave();
+    if (door.open) this.doorOpened(door);
+    else {
+      this.showDoor(door);
+      autosave();
+    }
   }
 
   private talkTo(person: Creature): void {
