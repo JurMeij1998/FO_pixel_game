@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { loadSavedGame, savedGameSummary } from '../state';
-import { COLORS, DIM_TEXT, SMALL_TEXT, TITLE_TEXT } from '../ui/theme';
+import { COLORS, DIM_TEXT, TITLE_TEXT } from '../ui/theme';
 import { MenuList } from '../ui/widgets';
 import { playTestArena, playTestShop, showCharacterCreation, showControls, startPlaying } from './flow';
 
@@ -52,9 +52,5 @@ export class MenuScene extends Phaser.Scene {
           ]
         : []),
     ]);
-
-    this.add
-      .text(centerX, GAME_HEIGHT - 40, 'Up/Down to choose, Enter to select, M for sound on/off. The game saves automatically.', SMALL_TEXT)
-      .setOrigin(0.5);
   }
 }
