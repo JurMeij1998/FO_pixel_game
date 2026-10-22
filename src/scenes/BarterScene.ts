@@ -23,6 +23,8 @@ export class BarterScene extends Phaser.Scene {
   private yourItems!: ListView;
   private theirItems!: ListView;
   private cursor!: ListCursor;
+  /** Set once closing; Phaser only stops the scene on the next frame (see LootScene). */
+  private closed = false;
   private yourHeader!: Phaser.GameObjects.Text;
   private theirHeader!: Phaser.GameObjects.Text;
   private feedback!: Phaser.GameObjects.Text;
@@ -35,6 +37,7 @@ export class BarterScene extends Phaser.Scene {
 
   init(data: { trader: Creature }): void {
     this.trader = data.trader;
+    this.closed = false;
   }
 
   create(): void {
@@ -54,7 +57,9 @@ export class BarterScene extends Phaser.Scene {
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
 
     const rows = barterRows(player, stock);
-    this.cursor = new ListCursor(keysOf(rows.yours, rows.theirs), 1);
+    // The cursor starts hidden, so an E pressed out of habit (E used to close this screen) buys or
+    // sells nothing until you choose an item; the first W/S/A/D shows it on the trader's stock.
+    this.cursor = new ListCursor(keysOf(rows.yours, rows.theirs), 1, { hidden: true });
     bindCursorKeys(this, this.cursor, () => this.refresh());
     const keyboard = this.input.keyboard!;
     keyboard.on('keydown-ESC', () => this.close());
@@ -68,6 +73,7 @@ export class BarterScene extends Phaser.Scene {
 
   /** Sells an item from your pack (column 0), or buys one from the trader's stock. */
   private trade(column: number, itemId: string, modifiers: ClickModifiers): void {
+    if (this.closed) return;
     this.cursor.focus(column, itemId);
     this.apply(barterClick(column === 0 ? 'yours' : 'theirs', state.player, this.trader.contents, itemId, modifiers));
   }
@@ -95,6 +101,8 @@ export class BarterScene extends Phaser.Scene {
 
   /** Back to the conversation, which was put to sleep while trading. */
   private close(): void {
+    if (this.closed) return;
+    this.closed = true;
     this.scene.wake('Dialog');
     this.scene.stop();
   }

@@ -99,6 +99,18 @@ describe('GridMap', () => {
     expect(map.corpseToLoot({ x: 3, y: 0 }, right)).toBeUndefined();
   });
 
+  it("doesn't let an emptied corpse in front hide a full one underfoot", () => {
+    const map = GridMap.parse({ name: 'field', rows: ['PXX.'], chests: {}, creatures: { X: 'raider' } });
+    const [underfoot, inFront] = map.creatures;
+    underfoot.hitPoints = 0;
+    inFront.hitPoints = 0;
+    inFront.contents.clear(); // already looted
+    const right = { x: 1, y: 0 };
+    expect(map.corpseToLoot({ x: 1, y: 0 }, right)).toBe(underfoot);
+    underfoot.contents.clear(); // both empty: the one in front, as before
+    expect(map.corpseToLoot({ x: 1, y: 0 }, right)).toBe(inFront);
+  });
+
   it('prefers the corpse that still has loot when several share a tile', () => {
     const map = GridMap.parse({
       name: 'pile',

@@ -39,24 +39,43 @@ describe('E in the inventory', () => {
     expect(player.equippedItem('secondary')?.id).toBe('10mm_pistol');
   });
 
-  it('swaps a weapon into the primary slot when both hands are full', () => {
+  it('with both hands full, swaps out the weapon in hand: the primary one by default', () => {
     const player = survivor();
     player.equip('knife', 'primary');
     player.equip('10mm_pistol', 'secondary');
     expect(weaponSlotFor(player)).toBe('primary');
-    quickAction(player, fromPack('spear')).run();
+    const result = quickAction(player, fromPack('spear')).run();
+    expect(result.message).toBe('Equipped the Spear in your primary hand.');
     expect(player.equippedItem('primary')?.id).toBe('spear');
     expect(player.equippedItem('secondary')?.id).toBe('10mm_pistol');
     expect(player.backpack.count('knife')).toBe(1); // back in the pack
   });
 
+  it('with both hands full and the secondary weapon in hand, swaps out that one', () => {
+    const player = survivor();
+    player.equip('knife', 'primary');
+    player.equip('10mm_pistol', 'secondary');
+    player.swapWeapons(); // the pistol in hand
+    const result = quickAction(player, fromPack('spear')).run();
+    expect(result.message).toBe('Equipped the Spear in your secondary hand.');
+    expect(player.equippedItem('secondary')?.id).toBe('spear');
+    expect(player.equippedItem('primary')?.id).toBe('knife'); // left alone
+    expect(player.attack.name).toBe('Spear'); // and it's what you're holding now
+    expect(player.backpack.count('10mm_pistol')).toBe(1);
+  });
+
   it('fills the secondary slot when only that one is free', () => {
     const player = survivor();
-    player.equip('knife', 'secondary');
-    expect(weaponSlotFor(player)).toBe('primary');
     player.equip('spear', 'primary');
-    player.unequip('secondary');
-    expect(weaponSlotFor(player)).toBe('secondary');
+    const result = quickAction(player, fromPack('knife')).run();
+    expect(result.message).toBe('Equipped the Knife in your secondary hand.');
+    expect(player.equippedItem('secondary')?.id).toBe('knife');
+    expect(player.equippedItem('primary')?.id).toBe('spear');
+  });
+
+  it("keeps a gun's reload hint after saying which hand", () => {
+    const result = quickAction(survivor(), fromPack('10mm_pistol')).run();
+    expect(result.message).toBe("Equipped the 10mm Pistol in your primary hand. It's empty: press R to reload.");
   });
 
   it('wears armour', () => {

@@ -1,7 +1,7 @@
 import type { SoundName } from '../audio/sfx';
 import type { Character, EquipSlot, WeaponSlot } from '../core/character';
 import { getItem } from '../core/items';
-import { failure, type ActionResult } from '../core/result';
+import { failure, success, type ActionResult } from '../core/result';
 
 /**
  * What E does on the inventory screen with the row the cursor is on: the obvious thing for
@@ -17,16 +17,28 @@ export interface QuickAction {
 
 /**
  * The weapon slot a weapon goes in when you just equip it: the first empty one (primary, then
- * secondary), or primary if both hands are full (what was there goes back in the backpack).
+ * secondary), or, with both hands full, the one in hand (that weapon goes back in the
+ * backpack), so you're holding what you just equipped.
  */
 export function weaponSlotFor(player: Character): WeaponSlot {
   if (!player.equippedItem('primary')) return 'primary';
   if (!player.equippedItem('secondary')) return 'secondary';
-  return 'primary';
+  return player.activeWeaponSlot;
+}
+
+/** Equips a weapon (see weaponSlotFor) and says which hand it went in. */
+function equipWeapon(player: Character, itemId: string): ActionResult {
+  const slot = weaponSlotFor(player);
+  const result = player.equip(itemId, slot);
+  if (!result.ok) return result;
+  // "Equipped the Spear." -> "Equipped the Spear in your secondary hand." (keeping any reload hint after it)
+  const hand = `in your ${slot} hand`;
+  return success(result.message.replace(/^(Equipped the [^.]+)\./, `$1 ${hand}.`));
 }
 
 /**
- * E on a row: use a stimpak (or anything else usable), equip a weapon (see weaponSlotFor) or
+ * E on a row: use a stimpak (or anything else usable), equip a weapon (see weaponSlotFor; the
+ * message says which hand) or
  * wear armour from the backpack; unequip what's in an equipment slot. Items with nothing to
  * do (ammo, caps, junk) get a refusal that says so.
  */
@@ -39,7 +51,7 @@ export function quickAction(player: Character, row: InventoryRow): QuickAction {
   const { itemId } = row;
   const item = getItem(itemId);
   if (item.consumable) return { run: () => player.use(itemId), sound: 'stimpak' };
-  if (item.category === 'weapon') return { run: () => player.equip(itemId, weaponSlotFor(player)), sound: 'equip' };
+  if (item.category === 'weapon') return { run: () => equipWeapon(player, itemId), sound: 'equip' };
   if (item.category === 'armor') return { run: () => player.equip(itemId, 'armor'), sound: 'equip' };
   return { run: () => failure(`There's nothing to do with the ${item.name} here.`) };
 }

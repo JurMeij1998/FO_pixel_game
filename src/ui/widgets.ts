@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import type { ListCursor } from './listCursor';
+import { RepeatGuard } from './repeatGuard';
 import { CHAR_WIDTH, COLORS, DIM_TEXT, ROW_HEIGHT, TEXT, TITLE_TEXT } from './theme';
 
 export const PANEL = { x: 30, y: 30, width: 900, height: 580 };
@@ -233,19 +234,26 @@ export class ListView {
 
 /**
  * Keyboard control for a screen of side-by-side lists: W/S (or Up/Down) move the cursor up and
- * down a list, A/D (or Left/Right) between the lists. Calls `onMove` after every move.
+ * down a list, A/D (or Left/Right) between the lists. Calls `onMove` after every move. Holding
+ * a key scrolls, but only once it's been pressed on this screen: a key still held from walking
+ * around the map doesn't race the cursor away (RepeatGuard).
  */
 export function bindCursorKeys(scene: Phaser.Scene, cursor: ListCursor, onMove: () => void): void {
   const keyboard = scene.input.keyboard!;
-  const move = (moved: boolean) => {
-    if (!moved) return;
-    playSound('menuMove');
-    onMove();
+  const guard = new RepeatGuard();
+  const bind = (keys: string[], step: () => boolean) => {
+    for (const key of keys) {
+      keyboard.on(`keydown-${key}`, (event: KeyboardEvent) => {
+        if (!guard.allow(key, event.repeat) || !step()) return;
+        playSound('menuMove');
+        onMove();
+      });
+    }
   };
-  for (const key of ['W', 'UP']) keyboard.on(`keydown-${key}`, () => move(cursor.moveRow(-1)));
-  for (const key of ['S', 'DOWN']) keyboard.on(`keydown-${key}`, () => move(cursor.moveRow(1)));
-  for (const key of ['A', 'LEFT']) keyboard.on(`keydown-${key}`, () => move(cursor.moveColumn(-1)));
-  for (const key of ['D', 'RIGHT']) keyboard.on(`keydown-${key}`, () => move(cursor.moveColumn(1)));
+  bind(['W', 'UP'], () => cursor.moveRow(-1));
+  bind(['S', 'DOWN'], () => cursor.moveRow(1));
+  bind(['A', 'LEFT'], () => cursor.moveColumn(-1));
+  bind(['D', 'RIGHT'], () => cursor.moveColumn(1));
 }
 
 /** Shows the cursor on side-by-side lists: '>' on its row in the list it's in, none in the others. */

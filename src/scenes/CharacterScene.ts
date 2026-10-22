@@ -99,7 +99,7 @@ export class CharacterScene extends Phaser.Scene {
       if (this.cursor.activeColumn === SKILL_COLUMN) this.improve(key as Skill);
       else this.feedback.setText("S.P.E.C.I.A.L. doesn't change; spend skill points on skills.").setColor(COLORS.warn);
     });
-    keyboard.on('keydown-C', () => closeOverlay(this));
+    keyboard.on('keydown-C', (event: KeyboardEvent) => !event.repeat && closeOverlay(this));
     keyboard.on('keydown-ESC', () => closeOverlay(this));
 
     this.refresh();
