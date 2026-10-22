@@ -60,6 +60,11 @@ export class WorldScene extends Phaser.Scene {
   private steps = 0;
   /** True while an animation plays; input is ignored until it finishes. */
   private busy = false;
+  /**
+   * The tile ("x,y") the player last walked into and was told why they can't (a locked door,
+   * an exit mid-fight). Holding the key against it says so once; letting go clears it.
+   */
+  private bumpedInto: string | null = null;
   private readonly chestImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly creatureImages = new Map<Creature, Phaser.GameObjects.Image>();
   private readonly doorImages = new Map<Door, Phaser.GameObjects.Image>();
@@ -80,6 +85,7 @@ export class WorldScene extends Phaser.Scene {
   create(): void {
     // The scene object is reused when a game is loaded or started, so reset what create() fills in.
     this.busy = false;
+    this.bumpedInto = null;
     this.steps = 0;
     this.facing = 'down';
     this.chestImages.clear();
@@ -142,8 +148,12 @@ export class WorldScene extends Phaser.Scene {
       right: [keyboard.addKey(K.RIGHT), keyboard.addKey(K.D)],
     };
     keyboard.addCapture('TAB'); // keep the browser from moving focus
-    keyboard.on('keydown-E', () => this.interact());
-    keyboard.on('keydown-SPACE', () => (state.combat ? this.endTurn() : this.interact()));
+    // Not on key repeat: holding E at a lock you can't pick would try (and fail) over and over.
+    keyboard.on('keydown-E', (event: KeyboardEvent) => !event.repeat && this.interact());
+    keyboard.on('keydown-SPACE', (event: KeyboardEvent) => {
+      if (state.combat) this.endTurn();
+      else if (!event.repeat) this.interact();
+    });
     keyboard.on('keydown-F', () => state.combat?.target && this.attack(state.combat.target));
     keyboard.on('keydown-T', () => state.combat?.cycleTarget());
     // Not on key repeat: a held key would open it again the moment it closes.
@@ -184,9 +194,9 @@ export class WorldScene extends Phaser.Scene {
     this.drawTargetMarker();
     this.drawEnemyBars();
     this.updateApGauge(delta);
-    if (this.busy) return;
     const direction = this.heldDirection();
-    if (!direction) return;
+    if (!direction) this.bumpedInto = null;
+    if (this.busy || !direction) return;
 
     this.face(direction);
     if (state.combat) this.stepInCombat(direction);
@@ -240,16 +250,26 @@ export class WorldScene extends Phaser.Scene {
    * and whether you can pick it (E does that).
    */
   private walkIntoDoor(door: Door): void {
-    this.input.keyboard!.resetKeys(); // once, not every frame the key is held
     const opened = state.map.openDoor(door);
     if (!opened.ok) {
-      playSound('locked');
-      postMessage(this, lockedMessage('door', door, state.player));
+      this.explainBump(door, () => {
+        playSound('locked');
+        postMessage(this, lockedMessage('door', door, state.player));
+      });
       return;
     }
+    this.input.keyboard!.resetKeys(); // the key held to open it shouldn't count as held while the door swings
     this.showDoor(door);
     autosave();
     void this.run(() => this.wait(DOOR_PAUSE_MS));
+  }
+
+  /** Says why the player can't walk onto a tile, once for as long as the key is held against it. */
+  private explainBump(tile: GridPos, explain: () => void): void {
+    const key = `${tile.x},${tile.y}`;
+    if (this.bumpedInto === key) return;
+    this.bumpedInto = key;
+    explain();
   }
 
   private stepInCombat(direction: Direction): void {
@@ -260,9 +280,10 @@ export class WorldScene extends Phaser.Scene {
       // Say why only for the refusals worth explaining; bumping into walls while a key is held stays quiet.
       const to = addPos(state.player.pos, STEP[direction]);
       if (state.map.exitAt(to.x, to.y) || state.map.isClosedDoor(to.x, to.y)) {
-        if (state.map.isClosedDoor(to.x, to.y)) playSound('locked');
-        postMessage(this, result.message);
-        this.input.keyboard!.resetKeys(); // once, not every frame the key is held
+        this.explainBump(to, () => {
+          if (state.map.isClosedDoor(to.x, to.y)) playSound('locked');
+          postMessage(this, result.message);
+        });
       }
       return;
     }
