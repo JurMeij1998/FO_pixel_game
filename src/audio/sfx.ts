@@ -26,6 +26,8 @@ export type SoundName =
   | 'doorClose'
   | 'locked'
   | 'lockPick'
+  | 'pinSet'
+  | 'pinsDrop'
   | 'levelUp'
   | 'combatStart'
   | 'menuMove'
@@ -321,6 +323,17 @@ const SOUNDS: Record<SoundName, (v: Voice) => void> = {
       v.noise({ at: i * 0.07, duration: 0.03, volume: 0.15, filter: 'bandpass', frequency: 3500 + i * 300, q: 4 });
     }
     click(v, 0.34, 0.45);
+  },
+  // A pin pressed home: a soft tick of metal on metal.
+  pinSet: (v) => {
+    v.noise({ duration: 0.02, volume: 0.3, filter: 'bandpass', frequency: 4200, q: 5 });
+    v.tone({ duration: 0.04, volume: 0.04, wave: 'square', frequency: 1760 });
+  },
+  // The pins springing back out: a quick cascade of clicks, falling in pitch.
+  pinsDrop: (v) => {
+    for (let i = 0; i < 4; i++) {
+      v.noise({ at: i * 0.04, duration: 0.02, volume: 0.3, filter: 'bandpass', frequency: 3600 - i * 500, q: 4 });
+    }
   },
 
   // Events and menus

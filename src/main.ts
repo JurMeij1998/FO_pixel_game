@@ -10,6 +10,7 @@ import { DialogScene } from './scenes/DialogScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
 import { InventoryScene } from './scenes/InventoryScene';
+import { LockpickScene } from './scenes/LockpickScene';
 import { LootScene } from './scenes/LootScene';
 import { MenuScene } from './scenes/MenuScene';
 import { PauseScene } from './scenes/PauseScene';
@@ -44,6 +45,7 @@ new Phaser.Game({
     HudScene,
     InventoryScene,
     LootScene,
+    LockpickScene,
     DialogScene,
     BarterScene,
     CharacterScene,

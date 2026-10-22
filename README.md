@@ -51,6 +51,7 @@ behind it, and the guard outside by the door.
 | Click (loot)    | Move 1 of a stack; Ctrl+click half (rounded up), Shift+click all |   |
 | Space (loot)    | Take all and close               |                               |
 | Esc (loot, barter) | Close the screen              |                               |
+| A/D, E (lock)   | Lockpicking: choose a pin, press it in (or 1-4, or click it); Esc gives up | |
 | Up/Down, Enter (talk) | Pick a reply and answer (or click it, or press its number); Esc walks away | |
 | Click (barter)  | Sell (left) or buy (right) 1; Ctrl+click half, Shift+click all |     |
 | W/S, A/D (screens) | Inventory, loot, barter, character sheet: move the `>` cursor up/down a list, and between the lists (arrow keys too). Item lists are sorted by category (weapons, armour, aid, ammo, the rest), and the inventory reopens on the item you last had selected | |
@@ -109,10 +110,16 @@ someone you're fighting is inside one you haven't entered, its roof comes off to
 
 Doors and chests can be **locked** (`core/locks.ts`). Each lock needs a certain Lockpick
 skill: simple 25%, average 40%, good 60%, hard 80%. Walk into a locked door (or press E at a
-locked chest) and you're told what lock it is and whether you can pick it; press E to pick
-it. With enough skill it always works, and the lock stays open; with less it never does,
-so come back once you've put skill points into Lockpick. Lockpick starts at 10% +
-Perception + Agility (20% for an average character).
+locked chest) and you're told what lock it is and whether you can pick it. With less skill
+than the lock needs you can't even try, so come back once you've put skill points into
+Lockpick (it starts at 10% + Perception + Agility: 20% for an average character).
+
+With enough skill, E opens the **lockpicking screen** (`scenes/LockpickScene.ts`, rules in
+`core/lockPuzzle.ts`): a padlock with four pins sticking out of its bottom, to be pushed up
+into it in one order, new every time. The first pin you press always goes in; after that, the right pin
+stays in and any other drops every pin back out, and you start over.
+Once all four are in, the lock opens for good. A/D (or the arrow keys) choose a pin and E,
+Space or W press it in; 1-4 or a click press one directly; Esc gives up.
 
 On the wasteland, the shed with the metal locker has a simple lock, and in the village Gus's
 stockroom crate has a good one. Picking the lock of something that belongs to someone (a
@@ -274,7 +281,8 @@ src/
                   sight; who you can talk to, provoking groups and noticing theft; buildings
                   entered
     buildings.ts  Finding buildings (walled areas with a door) and what their roofs cover
-    locks.ts      Locks on doors and chests, and picking them with the Lockpick skill
+    locks.ts      Locks on doors and chests, and who has the Lockpick skill to try one
+    lockPuzzle.ts The lockpicking puzzle: four pins, one order
     random.ts     Seeded random numbers, so generated maps can be rebuilt from a seed
     result.ts     ActionResult: success or failure plus a message for the log
     save.ts       Game state (all visited maps) to and from plain JSON
@@ -285,8 +293,9 @@ src/
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting, and the pure logic
               behind the HUD and screens: AP gauge and its placement, health bars, the
               shared glow, dialog box, barter lists, the message log, creation screen keys
-  scenes/     Phaser scenes: Boot, Menu, Creation, World, Hud, Inventory, Loot, Dialog, Barter,
-              Character, Pause, GameOver, Controls; flow.ts switches between menus and the game
+  scenes/     Phaser scenes: Boot, Menu, Creation, World, Hud, Inventory, Loot, Lockpick, Dialog,
+              Barter, Character, Pause, GameOver, Controls; flow.ts switches between menus and
+              the game
   state.ts    The running game (player + map), loaded from the save if there is one
   storage.ts  localStorage access for the save
   main.ts     Phaser game config

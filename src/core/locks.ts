@@ -3,9 +3,9 @@ import { failure, success, type ActionResult } from './result';
 
 /**
  * Locks on doors and chests. A lock needs a certain Lockpick skill: with at least that much
- * you pick it, every time; with less you can't, however often you try. Raise the skill (it
- * grows with Perception and Agility, and with skill points) and come back. Pure, so it can be
- * tested; the world scene calls it when you press E at something locked.
+ * you can set to work on it (the pin puzzle in core/lockPuzzle.ts); with less you can't even
+ * try. Raise the skill (it grows with Perception and Agility, and with skill points) and come
+ * back. Pure, so it can be tested; the world scene calls it when you press E at something locked.
  */
 
 /** Lockpick skill (in percent) each kind of lock needs. A new character has 10 + PE + AG. */
@@ -37,13 +37,18 @@ export function lockedMessage(what: string, thing: Lockable, player: Character):
   return `The ${what} is locked with ${kind} (Lockpick ${thing.lock}%; you have ${skill}%).`;
 }
 
-/** Tries to pick a lock. On success the thing stays unlocked for good. */
-export function pickLock(what: string, thing: Lockable, player: Character): ActionResult {
-  if (thing.lock === null) return success(`The ${what} isn't locked.`);
+/** Whether the player has the skill to try picking this lock: if not, the message says what it takes. */
+export function canPick(what: string, thing: Lockable, player: Character): ActionResult {
+  if (thing.lock === null) return failure(`The ${what} isn't locked.`);
   const skill = player.skill('lockpick');
   if (skill < thing.lock) {
     return failure(`This lock is beyond you: it takes Lockpick ${thing.lock}%, and you have ${skill}%.`);
   }
+  return success(`You set to work on the lock.`);
+}
+
+/** The lock has been picked (its puzzle solved): it stays open for good. Returns what to tell the player. */
+export function unlock(what: string, thing: Lockable): string {
   thing.lock = null;
-  return success(`You pick the lock on the ${what}.`);
+  return `You pick the lock on the ${what}.`;
 }

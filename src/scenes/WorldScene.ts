@@ -5,10 +5,11 @@ import type { Building } from '../core/buildings';
 import { Combat, INVENTORY_AP_COST, type AttackEvent, type CombatEvent } from '../core/combat';
 import { capitalize, listNames, type Creature } from '../core/creature';
 import type { DialogData } from './DialogScene';
+import type { LockpickData } from './LockpickScene';
 import type { Fighter } from '../core/fighter';
 import { addPos, type GridPos } from '../core/grid';
 import type { Chest, Door, Exit, Owned } from '../core/gridMap';
-import { lockedMessage, pickLock } from '../core/locks';
+import { canPick, lockedMessage, unlock, type Lockable } from '../core/locks';
 import type { Lootable } from '../core/loot';
 import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
@@ -38,8 +39,6 @@ const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, healthBar
 const ROOF_FADE_MS = 300;
 /** A pause after opening a door by walking into it, so a held key doesn't stride straight through. */
 const DOOR_PAUSE_MS = 120;
-/** How long picking a lock takes before the door swings open: the lock-pick sound's length. */
-const PICK_MS = 450;
 const ENEMY_RED = 0xd02020;
 const FADE_MS = 250;
 
@@ -807,18 +806,14 @@ export class WorldScene extends Phaser.Scene {
    */
   private openChest(chest: Chest): void {
     if (chest.lock !== null) {
-      const picked = pickLock(chest.name.toLowerCase(), chest, state.player);
-      postMessage(this, picked.message);
-      if (!picked.ok) {
-        playSound('locked');
-        return;
-      }
-      playSound('lockPick');
-      if (this.caughtPicking(chest)) {
-        this.chestImages.get(chest.id)?.setTexture(chestTexture(chest));
-        return;
-      }
-      autosave();
+      this.pickLock(chest.name, chest, () => {
+        if (this.caughtPicking(chest)) {
+          this.chestImages.get(chest.id)?.setTexture(chestTexture(chest));
+          return;
+        }
+        this.openChest(chest);
+      });
+      return;
     }
     chest.opened = true;
     playSound('chestOpen');
@@ -829,20 +824,10 @@ export class WorldScene extends Phaser.Scene {
   /** E at a door: pick its lock and open it (picking someone's lock turns them hostile), open it, or close it. */
   private useDoor(door: Door): void {
     if (door.lock !== null) {
-      const picked = pickLock('door', door, state.player);
-      postMessage(this, picked.message);
-      if (!picked.ok) {
-        playSound('locked');
-        return;
-      }
-      playSound('lockPick');
-      state.map.openDoor(door);
-      const caught = this.caughtPicking(door);
-      // Once the tumblers have given, the door swings open; input waits for it, so you can't walk
-      // through a door that still looks shut.
-      void this.run(async () => {
-        await this.wait(PICK_MS);
-        if (caught) this.showDoor(door);
+      this.pickLock('Door', door, () => {
+        // Picked, the door swings open.
+        state.map.openDoor(door);
+        if (this.caughtPicking(door)) this.showDoor(door);
         else this.doorOpened(door);
       });
       return;
@@ -885,6 +870,33 @@ export class WorldScene extends Phaser.Scene {
   private openLoot(lootable: Lootable): void {
     // Taking from something that isn't yours can start a fight once the loot screen closes.
     this.openOverlay('Loot', { lootable, onTheft: (angered: Creature[]) => this.caughtStealing(angered) });
+  }
+
+  /**
+   * Picking a lock: if the player has the skill to try, the lockpicking screen opens (the pin
+   * puzzle); once it's solved and the screen has closed, the lock is open for good and `then`
+   * carries on (open the door, look in the chest). Giving up leaves it locked. Without the
+   * skill you're told what it takes.
+   */
+  private pickLock(what: string, thing: Lockable, then: () => void): void {
+    const allowed = canPick(what.toLowerCase(), thing, state.player);
+    if (!allowed.ok) {
+      playSound('locked');
+      postMessage(this, allowed.message);
+      return;
+    }
+    const data: LockpickData = {
+      title: what,
+      // Only once the world is back: a fight or the loot screen can't start under the lock screen.
+      // (It's registered after the world's own resume handler, which autosaves, so a lock picked
+      // into a fight isn't saved as open.)
+      onPicked: () =>
+        this.events.once(Phaser.Scenes.Events.RESUME, () => {
+          postMessage(this, unlock(what.toLowerCase(), thing));
+          then();
+        }),
+    };
+    this.openOverlay('Lockpick', data);
   }
 
   /**

@@ -117,9 +117,13 @@ are found from the tiles (`core/buildings.ts`: walls and doors around an area th
 reach the map edge), so every prefab and hand-made map gets roofs for free, and a building's
 id is its first inside tile so saves can list the ones entered. A roof hides everything in an
 unentered building, including clicks on the people in it, and lifts the first time you step
-in (or when someone in it joins your fight). Locks are deterministic (`core/locks.ts`): enough
-Lockpick skill always opens one, less never does, and the message says what it takes, so the
-skill has a clear goal. In combat, walking into a door opens it for a move's AP, and
+in (or when someone in it joins your fight). Lockpick skill is a gate (`core/locks.ts`): with
+less than a lock needs you can't try, and the message says what it takes, so the skill has a
+clear goal; with enough, the Lockpick overlay runs the pin puzzle (`core/lockPuzzle.ts`: four
+pins, a random order per attempt whose first pin is whichever you press first, a wrong pin
+drops them all). Its `onPicked` callback waits
+for the World's RESUME, after the World's own autosave, so a lock picked into a fight
+(an owned one) isn't saved as open, and loot or combat never start under the overlay. In combat, walking into a door opens it for a move's AP, and
 creatures with `opensDoors` (people, raiders) path through unlocked doors, opening them.
 
 **UI structure.** The world is drawn at integer zoom 3 (`WORLD_ZOOM`) for crisp pixels. HUD,
