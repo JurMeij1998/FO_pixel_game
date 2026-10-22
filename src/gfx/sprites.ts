@@ -426,8 +426,86 @@ const FRONT_STRIDE = {
 };
 SPRITES.player_down_walk = withRows(SPRITES.player_down, FRONT_STRIDE);
 SPRITES.player_up_walk = withRows(SPRITES.player_up, FRONT_STRIDE);
-SPRITES.player_side_walk = withRows(SPRITES.player_side, {
+const SIDE_STRIDE = {
   12: '....kbbkkbbk....', // legs apart
   13: '...kggk..kggk...',
   14: '...kkk....kkk...',
-});
+};
+SPRITES.player_side_walk = withRows(SPRITES.player_side, SIDE_STRIDE);
+
+// The female player: the same vault jumpsuit, with long blonde hair down to the shoulders
+// (not Rosa's auburn, so the two don't look alike).
+const FEMALE_PLAYER_PALETTE = {
+  ...PLAYER_PALETTE,
+  h: '#d0a848', // blonde hair
+  r: '#c05050', // lips
+};
+
+SPRITES.player_female_down = {
+  palette: FEMALE_PLAYER_PALETTE,
+  rows: [
+    '................',
+    '....kkkkkkkk....',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...khsssssshk...',
+    '...khsksskshk...',
+    '...khssrrsshk...',
+    '...kkbbyybbkk...',
+    '..kbkbbyybbkbk..',
+    '..kskbbyybbksk..',
+    '...kkbbyybbkk...',
+    '....kbbBBbbk....',
+    '....kbbkkbbk....',
+    '....kggkkggk....',
+    '....kkk..kkk....',
+    '................',
+  ],
+};
+SPRITES.player_female_up = {
+  palette: FEMALE_PLAYER_PALETTE,
+  rows: [
+    '................',
+    '....kkkkkkkk....',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '..kbkbbbbbbkbk..',
+    '..kskbbbbbbksk..',
+    '...kkbbbbbbkk...',
+    '....kbbBBbbk....',
+    '....kbbkkbbk....',
+    '....kggkkggk....',
+    '....kkk..kkk....',
+    '................',
+  ],
+};
+// Faces right; flipped horizontally for left. The hair falls down the back of her head.
+SPRITES.player_female_side = {
+  palette: FEMALE_PLAYER_PALETTE,
+  rows: [
+    '................',
+    '.....kkkkkk.....',
+    '....khhhhhhk....',
+    '....khhhhhhk....',
+    '....khhsssssk...',
+    '....khhssksk....',
+    '....khhssrk.....',
+    '....khbbyykk....',
+    '....kbbbyybk....',
+    '....kbkbyybk....',
+    '....kbsbbbbk....',
+    '....kbbBBbbk....',
+    '.....kbbbbk.....',
+    '.....kgkkgk.....',
+    '.....kkk.kkk....',
+    '................',
+  ],
+};
+SPRITES.player_female_down_walk = withRows(SPRITES.player_female_down, FRONT_STRIDE);
+SPRITES.player_female_up_walk = withRows(SPRITES.player_female_up, FRONT_STRIDE);
+SPRITES.player_female_side_walk = withRows(SPRITES.player_female_side, SIDE_STRIDE);
+

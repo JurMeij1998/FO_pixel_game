@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { loadSavedGame, startNewGame, startTestArena, startTestShop } from '../state';
+import { loadSavedGame, resetToDefaultGame, startTestArena, startTestShop } from '../state';
 
 /**
  * Switching between the menus and the game. The game scenes build themselves from `state`
@@ -15,10 +15,17 @@ export function startPlaying(from: Phaser.Scene): void {
 
 /** Leaves the game for the main menu. Anything since the last autosave (such as a fight in progress) is dropped. */
 export function quitToMenu(from: Phaser.Scene): void {
-  if (!loadSavedGame()) startNewGame();
+  if (!loadSavedGame()) resetToDefaultGame();
   from.scene.stop('Hud');
   from.scene.stop('World');
   from.scene.start('Menu');
+}
+
+/** Leaves whatever is running for character creation, which starts the new game when it's done. */
+export function showCharacterCreation(from: Phaser.Scene): void {
+  from.scene.stop('Hud');
+  from.scene.stop('World');
+  from.scene.start('Creation');
 }
 
 /** Starts (or restarts) the test arena; development only. */

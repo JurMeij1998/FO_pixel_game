@@ -53,11 +53,12 @@ Roughly in the order discussed with the user:
   metal or other materials. Needs a per-weapon condition, which items don't have today:
   identical items share one stack (`ItemContainer`), so a weapon's condition has to live
   somewhere else, e.g. per equipped slot like the loaded rounds, or stacks split by condition.
-- **Character creation** when starting a new game: choose a name and allocate the
-  S.P.E.C.I.A.L. stats (today every new game starts as the same "Wanderer", see `newGame()` in
-  `state.ts`). Likely also choosing the tagged skills, as in Fallout.
+- **More character creation** (`scenes/CreationScene.ts`, rules in `core/creation.ts`; name,
+  gender, S.P.E.C.I.A.L. and difficulty are done): choosing the tagged skills, as in Fallout
+  (every character still tags Small Guns and Melee Weapons), and perhaps traits.
 - **Give Perception a use.** It has no effect yet (the character sheet says so): for example
   your sight range, the range penalty on ranged attacks, or noticing hidden things. When it
   gets one, update its text in `SPECIAL_EFFECTS` (`core/stats.ts`).
-- **Difficulty levels** (easy, medium, hard), chosen when starting a new game and stored in
-  the save. Likely knobs: damage taken and dealt, enemy hit chance, loot amounts and prices.
+- **More difficulty knobs.** Easy/normal/hard exist (`core/difficulty.ts`, chosen at character
+  creation, saved): they change how often enemies hit you and how much damage you take. Other
+  candidates: damage dealt, loot amounts, prices.

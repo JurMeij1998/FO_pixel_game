@@ -5,6 +5,7 @@ import { BootScene } from './scenes/BootScene';
 import { BarterScene } from './scenes/BarterScene';
 import { CharacterScene } from './scenes/CharacterScene';
 import { ControlsScene } from './scenes/ControlsScene';
+import { CreationScene } from './scenes/CreationScene';
 import { DialogScene } from './scenes/DialogScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { HudScene } from './scenes/HudScene';
@@ -36,6 +37,7 @@ new Phaser.Game({
   scene: [
     BootScene,
     MenuScene,
+    CreationScene,
     WorldScene,
     HudScene,
     InventoryScene,

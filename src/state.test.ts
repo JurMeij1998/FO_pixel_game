@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Combat } from './core/combat';
+import { newBuild } from './core/creation';
 import { autosave, loadSavedGame, savedGameSummary, startNewGame, startTestArena, state, travelTo } from './state';
 
 // Tests run in Node, which has no localStorage: give it a minimal in-memory one.
@@ -16,7 +17,7 @@ globalThis.localStorage = {
 describe('game state', () => {
   beforeEach(() => {
     store.clear();
-    startNewGame();
+    startNewGame(newBuild());
   });
 
   it('has no saved game until something is saved', () => {
@@ -38,7 +39,7 @@ describe('game state', () => {
 
   it('throws the save away on a new game', () => {
     autosave();
-    startNewGame();
+    startNewGame(newBuild());
     expect(savedGameSummary()).toBeNull();
   });
 
@@ -77,7 +78,7 @@ describe('game state', () => {
   it('forgets the old world on a new game', () => {
     travelTo('forest');
     const seed = state.worldSeed;
-    startNewGame();
+    startNewGame(newBuild());
     expect(Object.keys(state.maps)).toEqual(['wasteland']);
     expect(state.worldSeed).not.toBe(seed);
   });
@@ -125,7 +126,7 @@ describe('game state', () => {
 
   it('starts a new game with a fresh map', () => {
     state.map.chests[0].opened = true;
-    startNewGame();
+    startNewGame(newBuild());
     expect(state.map.chests[0].opened).toBe(false);
     expect(state.player.level).toBe(1);
     expect(state.combat).toBeNull();

@@ -668,3 +668,44 @@ describe('Someone nearly defenseless', () => {
     expect(player.experience).toBe(0);
   });
 });
+
+describe('Difficulty', () => {
+  // A raider right next to the player; every roll succeeds.
+  function fight(difficulty: 'easy' | 'normal' | 'hard', rng: () => number = ALWAYS) {
+    const map = GridMap.parse({ name: 'pit', rows: ['#####', '#PX.#', '#####'], chests: {}, creatures: { X: 'raider' } });
+    const player = new Character('Tester', {
+      strength: 5,
+      perception: 5,
+      endurance: 5,
+      charisma: 5,
+      intelligence: 5,
+      agility: 5,
+      luck: 5,
+    });
+    player.pos = { ...map.playerStart };
+    const [raider] = map.creatures;
+    return { player, raider, combat: new Combat(map, player, rng, difficulty) };
+  }
+
+  it("changes how often enemies hit you, but not how often you hit them", () => {
+    const easy = fight('easy');
+    const normal = fight('normal');
+    const hard = fight('hard');
+    expect(easy.combat.hitChance(easy.raider, easy.player)).toBe(normal.combat.hitChance(normal.raider, normal.player) - 10);
+    expect(hard.combat.hitChance(hard.raider, hard.player)).toBe(normal.combat.hitChance(normal.raider, normal.player) + 10);
+    expect(easy.combat.hitChance(easy.player, easy.raider)).toBe(normal.combat.hitChance(normal.player, normal.raider));
+  });
+
+  it('changes how much damage you take', () => {
+    const taken = (difficulty: 'easy' | 'normal' | 'hard') => {
+      const { player, combat } = fight(difficulty);
+      const before = player.hitPoints;
+      combat.endTurn(); // the raider shoots: always hits, critical, minimum damage
+      return before - player.hitPoints;
+    };
+    // Raider: 3 damage minimum, doubled on a critical: 6.
+    expect(taken('normal')).toBe(6);
+    expect(taken('easy')).toBe(5); // 6 x 0.75, rounded
+    expect(taken('hard')).toBe(8); // 6 x 1.25, rounded
+  });
+});

@@ -92,7 +92,7 @@ export class WorldScene extends Phaser.Scene {
     }
 
     const start = state.player.pos;
-    this.player = this.add.image(toPixel(start.x), toPixel(start.y), 'player_down').setDepth(DEPTH.player);
+    this.player = this.add.image(toPixel(start.x), toPixel(start.y), this.playerTexture('down')).setDepth(DEPTH.player);
     // Start facing whoever is right there to talk to (Rosa at the start of a game, Gus in the
     // test shop), so E talks to them straight away.
     const towardsSomeone = (['up', 'down', 'left', 'right'] as const).find((d) => state.map.personFacing(start, STEP[d]));
@@ -220,7 +220,7 @@ export class WorldScene extends Phaser.Scene {
   private checkForCombat(): void {
     const spotters = Combat.spotters(state.map, state.player);
     if (spotters.length === 0) return;
-    this.enterCombat(new Combat(state.map, state.player));
+    this.enterCombat(new Combat(state.map, state.player, Math.random, state.difficulty));
     const names = spotters.map((c) => (c.def.properName ? c.name : `a ${c.name}`)).join(' and ');
     postMessage(this, `Combat! You are spotted by ${names}.`);
   }
@@ -251,7 +251,7 @@ export class WorldScene extends Phaser.Scene {
    */
   private attackFriendly(person: Creature): void {
     if (this.busy || person.isDead) return;
-    const problem = (state.combat ?? new Combat(state.map, state.player)).attackProblem(person);
+    const problem = (state.combat ?? new Combat(state.map, state.player, Math.random, state.difficulty)).attackProblem(person);
     if (problem && problem.code !== 'outOfRange') {
       postMessage(this, problem.message);
       if (problem.code === 'empty') playSound('dryFire');
@@ -268,7 +268,7 @@ export class WorldScene extends Phaser.Scene {
   private fightWith(angered: Creature[]): void {
     if (angered.length === 0) return;
     postMessage(this, `${capitalize(listNames(angered))} turn${angered.length > 1 ? '' : 's'} hostile!`);
-    const combat = state.combat ?? new Combat(state.map, state.player);
+    const combat = state.combat ?? new Combat(state.map, state.player, Math.random, state.difficulty);
     combat.join(angered);
     if (!state.combat) this.enterCombat(combat);
   }
@@ -276,7 +276,7 @@ export class WorldScene extends Phaser.Scene {
   /** Attacks a creature; outside combat a successful attack starts a fight. */
   private attack(creature: Creature): void {
     if (this.busy || creature.isDead) return;
-    const combat = state.combat ?? new Combat(state.map, state.player);
+    const combat = state.combat ?? new Combat(state.map, state.player, Math.random, state.difficulty);
     const result = combat.attack(creature);
     if (!result.ok) {
       postMessage(this, result.message);
@@ -425,7 +425,7 @@ export class WorldScene extends Phaser.Scene {
     const ground = state.map.tileAt(state.player.pos.x, state.player.pos.y);
     playSound(ground === 'floor' || ground === 'planks' ? 'stepFloor' : 'stepGravel');
     const vertical = this.facing === 'up' || this.facing === 'down';
-    const texture = this.facing === 'up' ? 'player_up_walk' : this.facing === 'down' ? 'player_down_walk' : 'player_side_walk';
+    const texture = this.playerTexture(this.facing === 'up' ? 'up_walk' : this.facing === 'down' ? 'down_walk' : 'side_walk');
     // Mirroring the up/down stride swaps which leg is lifted, so the legs alternate step by step.
     const flip = vertical ? this.steps % 2 === 1 : this.facing === 'left';
     this.player.setTexture(texture).setFlipX(flip);
@@ -578,8 +578,13 @@ export class WorldScene extends Phaser.Scene {
 
   private face(direction: Direction): void {
     this.facing = direction;
-    const texture = direction === 'up' ? 'player_up' : direction === 'down' ? 'player_down' : 'player_side';
+    const texture = this.playerTexture(direction === 'up' ? 'up' : direction === 'down' ? 'down' : 'side');
     this.player.setTexture(texture).setFlipX(direction === 'left');
+  }
+
+  /** The player's sprite for a pose: the female or male one, by the character's gender. */
+  private playerTexture(pose: 'down' | 'up' | 'side' | 'down_walk' | 'up_walk' | 'side_walk'): string {
+    return `${state.player.gender === 'female' ? 'player_female' : 'player'}_${pose}`;
   }
 
   private faceToward(pos: GridPos): void {

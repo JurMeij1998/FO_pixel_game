@@ -7,6 +7,8 @@ import * as derived from './stats';
 import { SKILL_NAMES, SKILLS, SPECIAL_KEYS, type Skill, type Special } from './stats';
 
 export type WeaponSlot = 'primary' | 'secondary';
+/** Chosen at character creation; it sets how the player looks. */
+export type Gender = 'male' | 'female';
 export type EquipSlot = WeaponSlot | 'armor';
 export const EQUIP_SLOTS: readonly EquipSlot[] = ['primary', 'secondary', 'armor'];
 
@@ -23,6 +25,7 @@ export interface CharacterData {
   equipment: Record<EquipSlot, string | null>;
   backpack: Array<[itemId: string, quantity: number]>;
   // Optional so older saves still load.
+  gender?: Gender;
   loadedRounds?: Record<WeaponSlot, number>;
   level?: number;
   experience?: number;
@@ -38,6 +41,7 @@ export class Character implements Fighter {
   pos: GridPos = { x: 0, y: 0 };
   /** The weapon slot currently in hand, like Fallout's two hand slots. */
   activeWeaponSlot: WeaponSlot = 'primary';
+  gender: Gender = 'male';
 
   level = 1;
   experience = 0;
@@ -70,6 +74,7 @@ export class Character implements Fighter {
   toData(): CharacterData {
     return {
       name: this.name,
+      gender: this.gender,
       special: { ...this.special },
       taggedSkills: [...this.taggedSkills],
       hitPoints: this.hitPoints,
@@ -105,6 +110,8 @@ export class Character implements Fighter {
     }
 
     const c = new Character(data.name, { ...data.special });
+    // Saves from before character creation had no gender: those players were all male.
+    c.gender = data.gender === 'female' ? 'female' : 'male';
     for (const skill of data.taggedSkills) c.taggedSkills.add(skill);
     c.pos = { ...data.pos };
     c.activeWeaponSlot = data.activeWeaponSlot;

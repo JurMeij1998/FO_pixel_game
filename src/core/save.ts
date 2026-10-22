@@ -1,4 +1,5 @@
 import { Character, type CharacterData } from './character';
+import { isDifficulty, type Difficulty } from './difficulty';
 import { isGridPos, type GridPos } from './grid';
 import type { GridMap } from './gridMap';
 import { hashSeed } from './random';
@@ -23,6 +24,8 @@ export interface SaveData {
   /** Seeds every generated map, so they come out the same each time they are rebuilt. */
   worldSeed: number;
   currentMap: string;
+  /** Missing in saves from before difficulty levels: those games were all on normal. */
+  difficulty?: Difficulty;
   player: CharacterData;
   /** Only the maps that have been visited. */
   maps: Record<string, MapState>;
@@ -38,6 +41,7 @@ interface SaveDataV1 extends MapState {
 export interface GameData {
   player: Character;
   worldSeed: number;
+  difficulty: Difficulty;
   /** Every visited map, by id. */
   maps: Record<string, GridMap>;
   currentMap: string;
@@ -54,6 +58,7 @@ export function saveGame(game: GameData): SaveData {
     version: SAVE_VERSION,
     worldSeed: game.worldSeed,
     currentMap: game.currentMap,
+    difficulty: game.difficulty,
     player: game.player.toData(),
     maps,
   };
@@ -95,7 +100,8 @@ export function loadGame(data: unknown, buildMap: MapBuilderFn, startMap: string
   const standable = current.isWalkable(player.pos.x, player.pos.y) || current.exitAt(player.pos.x, player.pos.y);
   const connected = current.reachableFrom(current.playerStart).has(`${player.pos.x},${player.pos.y}`);
   if (!standable || !connected) player.pos = { ...current.playerStart };
-  return { player, worldSeed: save.worldSeed, maps, currentMap };
+  const difficulty = isDifficulty(save.difficulty) ? save.difficulty : 'normal';
+  return { player, worldSeed: save.worldSeed, difficulty, maps, currentMap };
 }
 
 function upgrade(data: unknown): SaveData {

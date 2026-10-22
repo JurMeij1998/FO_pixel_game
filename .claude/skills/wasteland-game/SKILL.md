@@ -41,8 +41,10 @@ must therefore never assume the screen has caught up:
   empty-gun sound).
 
 **One mutable `state` object, replaced in place.** `src/state.ts` holds `player`, `map` (the
-current one), `maps` (all visited), `worldSeed`, `combat`, `loadedFromSave` and `sandbox`. New
-game, load and test arena use `Object.assign(state, ...)` so every importer sees the new game,
+current one), `maps` (all visited), `worldSeed`, `difficulty`, `combat`, `loadedFromSave` and
+`sandbox`. A new game comes from a `CharacterBuild` made on the character creation screen
+(`startNewGame(build)`; `resetToDefaultGame()` only fills memory, e.g. behind the menu, and
+never clears the save). New game, load and test arena use `Object.assign(state, ...)` so every importer sees the new game,
 and scenes rebuild themselves from `state` in `create()`; `scenes/flow.ts` restarts World and
 HUD instead of reloading the page. Phaser reuses scene objects across restarts, so each
 `create()` resets its per-session fields, and listeners added to `this.events` or `game.events`

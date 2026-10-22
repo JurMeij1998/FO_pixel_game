@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { loadSavedGame, savedGameSummary, startNewGame } from '../state';
+import { loadSavedGame, savedGameSummary } from '../state';
 import { COLORS, DIM_TEXT, SMALL_TEXT, TITLE_TEXT } from '../ui/theme';
 import { MenuList } from '../ui/widgets';
-import { playTestArena, playTestShop, showControls, startPlaying } from './flow';
+import { playTestArena, playTestShop, showCharacterCreation, showControls, startPlaying } from './flow';
 
 /** The title screen: continue the saved game, start a new one, or look up the controls. */
 export class MenuScene extends Phaser.Scene {
@@ -40,8 +40,7 @@ export class MenuScene extends Phaser.Scene {
             menu.setLabel(1, 'Overwrite your save? Choose again');
             return;
           }
-          startNewGame();
-          startPlaying(this);
+          showCharacterCreation(this);
         },
       },
       { label: 'Controls', onSelect: () => showControls(this) },

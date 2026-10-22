@@ -166,6 +166,15 @@ The game opens on a main menu: Continue (if there is a save), New game (asks bef
 overwriting a save) and Controls. Esc in the game opens the pause menu, which can go back to
 the main menu.
 
+A new game starts with **character creation** (`scenes/CreationScene.ts`, rules in
+`core/creation.ts`): type a name, pick male or female (how you look), set the S.P.E.C.I.A.L.
+stats (each starts at 5, with 8 more points to spend; lowering a stat frees its points, down
+to 1; at most 10) and choose the difficulty. A preview shows what the stats make you (HP, AP,
+carry weight...). The game only starts with a name and every point spent; Esc goes back to the
+menu without touching your save. Difficulty (`core/difficulty.ts`) changes how dangerous
+enemies are: on easy they hit you 10% less often and you take 25% less damage, on hard 10%
+more often and 25% more damage. It's kept in the save.
+
 The game autosaves to the browser's localStorage after every step, every closed screen and
 every finished fight, but never during combat. Dying lets you load that save (so you go back
 to just before the fight), start a new game, or return to the main menu. `core/save.ts` turns
