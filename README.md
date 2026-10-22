@@ -41,8 +41,8 @@ behind it, and the guard outside by the door.
 | E / Space       | Interact with what you face: open a chest, loot a corpse, talk | Space: end turn |
 | Click a person  | Talk, when next to them or across a counter; Ctrl+click attacks them |      |
 | F / click enemy | Click: attack (starts combat)    | Attack the target             |
-| Tab             |                                  | Next target                   |
-| I               | Inventory                        | Inventory (costs 4 AP)        |
+| T               |                                  | Next target                   |
+| Tab / I         | Inventory (again to close)       | Inventory (costs 4 AP)        |
 | C               | Character sheet, spend skill points |                            |
 | Q               | Swap primary/secondary weapon    | Same, free                    |
 | R               | Reload the gun in hand           | Reload (costs 2 AP)           |

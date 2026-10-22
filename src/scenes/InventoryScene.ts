@@ -69,7 +69,10 @@ export class InventoryScene extends Phaser.Scene {
 
     bindCursorKeys(this, this.cursor, () => this.select());
     const keyboard = this.input.keyboard!;
-    keyboard.on('keydown-I', () => closeOverlay(this));
+    // The keys that open it close it again (not on key repeat, or holding one would flicker it).
+    for (const key of ['TAB', 'I']) {
+      keyboard.on(`keydown-${key}`, (event: KeyboardEvent) => !event.repeat && closeOverlay(this));
+    }
     keyboard.on('keydown-ESC', () => closeOverlay(this));
 
     this.refresh();

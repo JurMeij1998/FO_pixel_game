@@ -117,8 +117,11 @@ export class WorldScene extends Phaser.Scene {
     keyboard.on('keydown-E', () => this.interact());
     keyboard.on('keydown-SPACE', () => (state.combat ? this.endTurn() : this.interact()));
     keyboard.on('keydown-F', () => state.combat?.target && this.attack(state.combat.target));
-    keyboard.on('keydown-TAB', () => state.combat?.cycleTarget());
-    keyboard.on('keydown-I', () => this.openInventory());
+    keyboard.on('keydown-T', () => state.combat?.cycleTarget());
+    // Not on key repeat: a held key would open it again the moment it closes.
+    for (const key of ['TAB', 'I']) {
+      keyboard.on(`keydown-${key}`, (event: KeyboardEvent) => !event.repeat && this.openInventory());
+    }
     keyboard.on('keydown-C', () => this.openCharacterSheet());
     keyboard.on('keydown-R', () => this.reload());
     keyboard.on('keydown-ESC', () => this.openOverlay('Pause'));
