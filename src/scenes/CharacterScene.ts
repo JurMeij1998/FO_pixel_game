@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
-import { SKILL_NAMES, SKILLS, type Special } from '../core/stats';
+import { SKILL_NAMES, SKILLS, type Skill, type Special } from '../core/stats';
 import { state } from '../state';
+import { ListCursor } from '../ui/listCursor';
 import { COLORS, DIM_TEXT, HEADER_TEXT, TEXT } from '../ui/theme';
-import { addButton, closeOverlay, drawPanel, PANEL } from '../ui/widgets';
+import { addButton, bindCursorKeys, closeOverlay, drawPanel, PANEL } from '../ui/widgets';
 
 const SPECIAL_NAMES: Array<[keyof Special, string]> = [
   ['strength', 'Strength'],
@@ -18,7 +19,10 @@ const SPECIAL_NAMES: Array<[keyof Special, string]> = [
 const LEFT = PANEL.x + 30;
 const RIGHT = PANEL.x + 470;
 
-/** Fallout-style character sheet: S.P.E.C.I.A.L., derived stats, and skills to spend points on. */
+/**
+ * Fallout-style character sheet: S.P.E.C.I.A.L., derived stats, and skills to spend points on.
+ * W/S choose a skill and E spends a point on it (or click its + button).
+ */
 export class CharacterScene extends Phaser.Scene {
   private summary!: Phaser.GameObjects.Text;
   private derived!: Phaser.GameObjects.Text;
@@ -26,6 +30,8 @@ export class CharacterScene extends Phaser.Scene {
   private plusButtons: Phaser.GameObjects.Text[] = [];
   private pointsText!: Phaser.GameObjects.Text;
   private feedback!: Phaser.GameObjects.Text;
+  /** The keyboard cursor on the skills list. */
+  private cursor!: ListCursor;
 
   constructor() {
     super('Character');
@@ -52,26 +58,39 @@ export class CharacterScene extends Phaser.Scene {
     this.add.text(RIGHT, 300, 'SKILLS', HEADER_TEXT);
     this.skillTexts = [];
     this.plusButtons = [];
+    this.cursor = new ListCursor([[...SKILLS]]);
     SKILLS.forEach((skill, i) => {
       const y = 332 + i * 30;
-      this.skillTexts.push(this.add.text(RIGHT, y, '', TEXT));
-      this.plusButtons.push(
-        addButton(this, RIGHT + 300, y, '+', () => {
-          const result = player.improveSkill(skill);
-          if (result.ok) playSound('menuSelect');
-          this.feedback.setText(result.message).setColor(result.ok ? COLORS.text : COLORS.warn);
-          this.refresh();
-        }),
-      );
+      const text = this.add.text(RIGHT, y, '', TEXT).setInteractive({ useHandCursor: true });
+      text.on('pointerdown', () => {
+        this.cursor.focus(0, skill);
+        this.refresh();
+      });
+      this.skillTexts.push(text);
+      this.plusButtons.push(addButton(this, RIGHT + 300, y, '+', () => this.improve(skill)));
     });
     this.pointsText = this.add.text(RIGHT, 432, '', TEXT);
     this.add.text(RIGHT, 460, '* tagged: +20%, and each point adds 2%', DIM_TEXT);
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
 
+    bindCursorKeys(this, this.cursor, () => this.refresh());
     const keyboard = this.input.keyboard!;
+    keyboard.on('keydown-E', (event: KeyboardEvent) => {
+      const skill = this.cursor.selectedKey as Skill | null;
+      if (!event.repeat && skill) this.improve(skill);
+    });
     keyboard.on('keydown-C', () => closeOverlay(this));
     keyboard.on('keydown-ESC', () => closeOverlay(this));
 
+    this.refresh();
+  }
+
+  /** Spends a skill point on a skill (selecting it, if it was its + button that was clicked). */
+  private improve(skill: Skill): void {
+    this.cursor.focus(0, skill);
+    const result = state.player.improveSkill(skill);
+    if (result.ok) playSound('menuSelect');
+    this.feedback.setText(result.message).setColor(result.ok ? COLORS.text : COLORS.warn);
     this.refresh();
   }
 
@@ -92,7 +111,10 @@ export class CharacterScene extends Phaser.Scene {
     );
     SKILLS.forEach((skill, i) => {
       const tag = p.taggedSkills.has(skill) ? '*' : ' ';
-      this.skillTexts[i].setText(`${tag} ${SKILL_NAMES[skill].padEnd(16)}${String(p.skill(skill)).padStart(3)}%`);
+      const selected = this.cursor.selectedKey === skill;
+      this.skillTexts[i]
+        .setText(`${selected ? '>' : ' '}${tag} ${SKILL_NAMES[skill].padEnd(16)}${String(p.skill(skill)).padStart(3)}%`)
+        .setColor(selected ? COLORS.bright : COLORS.text);
       this.plusButtons[i].setVisible(p.skillPoints > 0);
     });
     this.pointsText

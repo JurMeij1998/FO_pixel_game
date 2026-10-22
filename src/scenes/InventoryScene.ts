@@ -4,7 +4,7 @@ import { EQUIP_SLOTS, type EquipSlot } from '../core/character';
 import { getItem, type ItemDef } from '../core/items';
 import type { ActionResult } from '../core/result';
 import { state } from '../state';
-import { describeItem, stackRows } from '../ui/format';
+import { describeItem, sortedStacks, stackRows } from '../ui/format';
 import { ListCursor } from '../ui/listCursor';
 import { quickAction } from '../ui/quickAction';
 import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
@@ -14,6 +14,12 @@ type Selection = { kind: 'backpack'; itemId: string } | { kind: 'slot'; slot: Eq
 
 const BACKPACK = 0;
 const EQUIPMENT = 1;
+
+/**
+ * Where the cursor was when the inventory last closed, so it reopens on the same item (or
+ * slot). Kept for the session only; if that item has gone since, it opens at the top.
+ */
+let lastSelection: { column: number; key: string } | null = null;
 type Action = { label: string; run: () => ActionResult; sound?: SoundName };
 
 const SLOT_LABELS: Record<EquipSlot, string> = { primary: 'Primary', secondary: 'Secondary', armor: 'Armor' };
@@ -46,6 +52,7 @@ export class InventoryScene extends Phaser.Scene {
     // A scene object is reused each time it is launched, so reset its state here.
     this.slotTexts.clear();
     this.cursor = new ListCursor(this.keys(), BACKPACK);
+    if (lastSelection) this.cursor.focus(lastSelection.column, lastSelection.key);
 
     drawPanel(this, 'INVENTORY');
     addButton(this, PANEL.x + PANEL.width - 130, PANEL.y + 18, 'Close', () => closeOverlay(this));
@@ -95,7 +102,7 @@ export class InventoryScene extends Phaser.Scene {
 
   /** The backpack's item ids and the equipment slots, as the cursor walks them. */
   private keys(): string[][] {
-    return [state.player.backpack.items.map((s) => s.itemId), [...EQUIP_SLOTS]];
+    return [sortedStacks(state.player.backpack.items).map((s) => s.itemId), [...EQUIP_SLOTS]];
   }
 
   private get selection(): Selection {
@@ -121,6 +128,8 @@ export class InventoryScene extends Phaser.Scene {
 
     // An item used up, dropped or equipped leaves the backpack: the cursor moves to its neighbour.
     this.cursor.update(this.keys());
+    const key = this.cursor.selectedKey;
+    lastSelection = key === null ? null : { column: this.cursor.activeColumn, key };
 
     this.backpack.selectedKey = this.selection?.kind === 'backpack' ? this.selection.itemId : null;
     this.backpack.setRows(stackRows(player.backpack.items));

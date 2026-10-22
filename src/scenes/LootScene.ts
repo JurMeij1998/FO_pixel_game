@@ -4,7 +4,7 @@ import type { Creature } from '../core/creature';
 import { OwnStash, storeItem, takeAll, takeItem, transferQuantity, type Lootable } from '../core/loot';
 import type { ActionResult } from '../core/result';
 import { state } from '../state';
-import { stackRows } from '../ui/format';
+import { sortedStacks, stackRows } from '../ui/format';
 import { postMessage } from '../ui/messages';
 import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
 import { ListCursor } from '../ui/listCursor';
@@ -148,7 +148,7 @@ export class LootScene extends Phaser.Scene {
 
   /** The item ids in each list, left to right, as the cursor walks them. */
   private keys(): string[][] {
-    return [state.player.backpack.items, this.lootable.contents.items].map((items) => items.map((s) => s.itemId));
+    return [state.player.backpack.items, this.lootable.contents.items].map((items) => sortedStacks(items).map((s) => s.itemId));
   }
 
   private close(): void {

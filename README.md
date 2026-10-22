@@ -53,8 +53,8 @@ behind it, and the guard outside by the door.
 | Esc (loot, barter) | Close the screen              |                               |
 | Up/Down, Enter (talk) | Pick a reply and answer (or click it, or press its number); Esc walks away | |
 | Click (barter)  | Sell (left) or buy (right) 1; Ctrl+click half, Shift+click all |     |
-| W/S, A/D (screens) | Inventory, loot, barter: move the `>` cursor up/down a list, and between the lists (arrow keys too) | |
-| E (screens)     | Inventory: use, equip (first free hand, else primary), wear or unequip the selected item. Loot, barter: move it to the other side (take/store, buy/sell); Shift+E the whole stack | |
+| W/S, A/D (screens) | Inventory, loot, barter, character sheet: move the `>` cursor up/down a list, and between the lists (arrow keys too). Item lists are sorted by category (weapons, armour, aid, ammo, the rest), and the inventory reopens on the item you last had selected | |
+| E (screens)     | Inventory: use, equip (first free hand, else primary), wear or unequip the selected item. Loot, barter: move it to the other side (take/store, buy/sell); Shift+E the whole stack. Character sheet: spend a skill point on the selected skill | |
 
 ## Talking and trading
 
@@ -73,7 +73,8 @@ poor odds, until one of you is down or you get away. Killing her earns no XP.
 
 Every village has a small general store with **Gus** behind the counter: "if you break
 anything, you buy it!" He sells ammo, two stimpaks and a leather jacket, and buys what you
-bring with his own (limited) caps. On the barter screen a click buys or sells at once. Prices
+bring with his own (limited) caps. On the barter screen a click (or E) buys or sells at once, and
+the selected item's description and price show under the lists. Prices
 depend on Charisma (`core/barter.ts`): you buy at 100% of an item's value at Charisma 10, up
 to 136% at 1, and sell for 55% at Charisma 10, down to 28% at 1.
 

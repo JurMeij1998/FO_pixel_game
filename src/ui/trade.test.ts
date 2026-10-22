@@ -3,7 +3,7 @@ import { CAPS } from '../core/barter';
 import { Character } from '../core/character';
 import { ItemContainer } from '../core/container';
 import { Creature, getCreatureDef } from '../core/creature';
-import { amountFor, barterClick, barterHeaders, barterRows } from './trade';
+import { amountFor, barterClick, barterDetail, barterHeaders, barterRows } from './trade';
 
 const PLAIN = { shift: false, ctrl: false };
 const CTRL = { shift: false, ctrl: true };
@@ -39,11 +39,12 @@ describe('click modifiers', () => {
 describe('barter screen lists', () => {
   it("shows Gus's stock with buying prices, and leaves his caps out", () => {
     const { theirs } = barterRows(customer(0), gus().inventory);
+    // Sorted like every list: armour, aid, then ammo by name.
     expect(theirs).toEqual([
-      { key: 'ammo_10mm', label: '10mm Rounds x40', detail: '3c' },
-      { key: 'ammo_223', label: '.223 Rounds x20', detail: '5c' },
-      { key: 'stimpak', label: 'Stimpak x2', detail: '210c' },
       { key: 'leather_jacket', label: 'Leather Jacket', detail: '300c' },
+      { key: 'stimpak', label: 'Stimpak x2', detail: '210c' },
+      { key: 'ammo_223', label: '.223 Rounds x20', detail: '5c' },
+      { key: 'ammo_10mm', label: '10mm Rounds x40', detail: '3c' },
     ]);
   });
 
@@ -104,5 +105,18 @@ describe('barter screen clicks', () => {
     const result = barterClick('theirs', broke, shop, 'leather_jacket', PLAIN);
     expect(result).toMatchObject({ ok: false, message: "You can't afford the Leather Jacket (300 caps)." });
     expect(shop.count('leather_jacket')).toBe(1);
+  });
+});
+
+describe('barter screen details', () => {
+  it("describes the selected item, with Gus's price to buy it", () => {
+    const detail = barterDetail(customer(0), 'Gus', 'theirs', 'stimpak');
+    expect(detail).toContain('STIMPAK');
+    expect(detail).toContain('Heals 15 HP');
+    expect(detail.split('\n').at(-1)).toBe('Gus sells it for 210 caps each.');
+  });
+
+  it('says what Gus would pay for one of yours', () => {
+    expect(barterDetail(customer(0), 'Gus', 'yours', 'stimpak').split('\n').at(-1)).toBe('Gus pays 70 caps each.');
   });
 });

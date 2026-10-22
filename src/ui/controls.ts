@@ -17,6 +17,7 @@ export const CONTROL_ROWS: Array<[keys: string, exploring: string, combat: strin
   ['Space (loot)', 'Take all and close', '-'],
   ['W/S, A/D (screens)', 'Move the cursor in lists', 'Same'],
   ['E (inventory)', 'Use / equip / unequip', 'Same'],
+  ['E (character sheet)', 'Spend a point on the skill', '-'],
   ['E (loot, barter)', 'Move it across (Shift: all)', '-'],
   ['Esc (screens)', 'Close', 'Close'],
 ];

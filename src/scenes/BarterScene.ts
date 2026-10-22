@@ -5,7 +5,7 @@ import type { ActionResult } from '../core/result';
 import { state } from '../state';
 import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
 import { ListCursor } from '../ui/listCursor';
-import { barterClick, barterHeaders, barterRows } from '../ui/trade';
+import { barterClick, barterDetail, barterHeaders, barterRows } from '../ui/trade';
 import { addButton, bindCursorKeys, drawPanel, ListView, PANEL, showCursor, type ClickModifiers, type ListRow } from '../ui/widgets';
 
 const LEFT = PANEL.x + 30;
@@ -16,7 +16,7 @@ const RIGHT = PANEL.x + 470;
  * the right with what it costs. A click sells or buys straight away (see ui/trade.ts); caps
  * change hands at once. Prices depend on your Charisma (core/barter.ts). W/S and A/D move a
  * cursor through the two lists, and E sells or buys the item it's on (Shift+E the whole
- * stack). Esc goes back to the conversation.
+ * stack); its description and price show under the lists. Esc goes back to the conversation.
  */
 export class BarterScene extends Phaser.Scene {
   private trader!: Creature;
@@ -26,6 +26,8 @@ export class BarterScene extends Phaser.Scene {
   private yourHeader!: Phaser.GameObjects.Text;
   private theirHeader!: Phaser.GameObjects.Text;
   private feedback!: Phaser.GameObjects.Text;
+  /** The selected item's description and price, under the lists. */
+  private details!: Phaser.GameObjects.Text;
 
   constructor() {
     super('Barter');
@@ -45,8 +47,10 @@ export class BarterScene extends Phaser.Scene {
     this.yourHeader = this.add.text(LEFT, 90, '', HEADER_TEXT);
     this.theirHeader = this.add.text(RIGHT, 90, '', HEADER_TEXT);
 
-    this.yourItems = new ListView(this, LEFT, 122, 36, 15, (itemId, modifiers) => this.trade(0, itemId, modifiers));
-    this.theirItems = new ListView(this, RIGHT, 122, 36, 15, (itemId, modifiers) => this.trade(1, itemId, modifiers));
+    // Ten rows each, leaving room underneath for the selected item's details.
+    this.yourItems = new ListView(this, LEFT, 122, 36, 10, (itemId, modifiers) => this.trade(0, itemId, modifiers));
+    this.theirItems = new ListView(this, RIGHT, 122, 36, 10, (itemId, modifiers) => this.trade(1, itemId, modifiers));
+    this.details = this.add.text(LEFT, 380, '', { ...TEXT, wordWrap: { width: PANEL.width - 60 } });
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
 
     const rows = barterRows(player, stock);
@@ -84,6 +88,9 @@ export class BarterScene extends Phaser.Scene {
     this.theirItems.setRows(rows.theirs);
     this.cursor.update(keysOf(rows.yours, rows.theirs));
     showCursor(this.cursor, [this.yourItems, this.theirItems]);
+    const key = this.cursor.selectedKey;
+    const side = this.cursor.activeColumn === 0 ? 'yours' : 'theirs';
+    this.details.setText(key ? barterDetail(state.player, this.trader.name, side, key) : '');
   }
 
   /** Back to the conversation, which was put to sleep while trading. */
