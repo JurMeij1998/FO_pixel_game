@@ -1,5 +1,6 @@
 import type { Character } from './character';
 import { capitalize, listNames, type Creature } from './creature';
+import { DIFFICULTIES, type Difficulty } from './difficulty';
 import type { AttackSound, Fighter } from './fighter';
 import { addPos, DIRECTIONS, distance, samePos, type GridPos } from './grid';
 import type { GridMap } from './gridMap';
@@ -77,7 +78,12 @@ export class Combat {
     private readonly map: GridMap,
     private readonly player: Character,
     /** Returns values in [0, 1); injectable so tests are deterministic. */
-    private readonly rng: () => number = Math.random,
+    private readonly rng: () => number,
+    /**
+     * How dangerous enemies are to the player: their hit chance and damage (core/difficulty.ts).
+     * Required, so a fight started somewhere new can't quietly ignore the chosen difficulty.
+     */
+    private readonly difficulty: Difficulty,
   ) {
     this.recruitSpotters();
     this.actionPoints = player.maxActionPoints;
@@ -117,6 +123,7 @@ export class Combat {
   hitChance(attacker: Fighter, target: Fighter): number {
     const { hitChance, ranged } = attacker.attack;
     let chance = hitChance - target.armorClass;
+    if (target === this.player) chance += DIFFICULTIES[this.difficulty].enemyHitChance;
     if (ranged) chance -= RANGE_PENALTY_PER_TILE * Math.max(0, distance(attacker.pos, target.pos) - 1);
     return Math.max(5, Math.min(95, chance));
   }
@@ -300,7 +307,10 @@ export class Combat {
     const critical = this.rng() * 100 < attacker.critChance;
     let damage = attack.damageMin + Math.floor(this.rng() * (attack.damageMax - attack.damageMin + 1));
     if (critical) damage *= 2;
-    damage = Math.max(1, Math.round((damage * (100 - target.damageResist)) / 100));
+    // Damage resistance, then (for hits on the player) the difficulty, rounded once at the end:
+    // rounding in between would make easy and hard change nothing on small hits.
+    const difficulty = target === this.player ? DIFFICULTIES[this.difficulty].damageTaken : 1;
+    damage = Math.max(1, Math.round(((damage * (100 - target.damageResist)) / 100) * difficulty));
     const before = target.hitPoints;
     target.hitPoints = Math.max(0, target.hitPoints - damage);
     const killed = target.hitPoints === 0;

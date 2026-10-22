@@ -1,20 +1,10 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
-import { SKILL_EFFECTS, SKILL_NAMES, SKILLS, SPECIAL_EFFECTS, type Skill, type Special } from '../core/stats';
+import { SKILL_EFFECTS, SKILL_NAMES, SKILLS, SPECIAL_EFFECTS, SPECIAL_KEYS, SPECIAL_NAMES, type Skill, type Special } from '../core/stats';
 import { state } from '../state';
 import { ListCursor } from '../ui/listCursor';
 import { COLORS, DIM_TEXT, HEADER_TEXT, TEXT } from '../ui/theme';
 import { addButton, bindCursorKeys, closeOverlay, drawPanel, PANEL } from '../ui/widgets';
-
-const SPECIAL_NAMES: Array<[keyof Special, string]> = [
-  ['strength', 'Strength'],
-  ['perception', 'Perception'],
-  ['endurance', 'Endurance'],
-  ['charisma', 'Charisma'],
-  ['intelligence', 'Intelligence'],
-  ['agility', 'Agility'],
-  ['luck', 'Luck'],
-];
 
 const LEFT = PANEL.x + 30;
 const RIGHT = PANEL.x + 470;
@@ -55,12 +45,12 @@ export class CharacterScene extends Phaser.Scene {
 
     // Open on the skills when there are points to spend, else on S.P.E.C.I.A.L.
     this.cursor = new ListCursor(
-      [SPECIAL_NAMES.map(([key]) => key), [...SKILLS]],
+      [[...SPECIAL_KEYS], [...SKILLS]],
       player.skillPoints > 0 ? SKILL_COLUMN : SPECIAL_COLUMN,
     );
 
     this.add.text(LEFT, 170, 'S.P.E.C.I.A.L.', HEADER_TEXT);
-    this.specialTexts = SPECIAL_NAMES.map(([key], i) => {
+    this.specialTexts = SPECIAL_KEYS.map((key, i) => {
       const text = this.add.text(LEFT, 200 + i * 24, '', TEXT).setInteractive({ useHandCursor: true });
       text.on('pointerdown', () => {
         this.cursor.focus(SPECIAL_COLUMN, key);
@@ -131,15 +121,15 @@ export class CharacterScene extends Phaser.Scene {
     );
     const selected = (column: number, key: string) =>
       this.cursor.activeColumn === column && this.cursor.selectedKey === key;
-    SPECIAL_NAMES.forEach(([key, name], i) => {
+    SPECIAL_KEYS.forEach((key, i) => {
       const isSelected = selected(SPECIAL_COLUMN, key);
       this.specialTexts[i]
-        .setText(`${isSelected ? '>' : ' '} ${name.padEnd(14)}${String(p.special[key]).padStart(2)}`)
+        .setText(`${isSelected ? '>' : ' '} ${SPECIAL_NAMES[key].padEnd(14)}${String(p.special[key]).padStart(2)}`)
         .setColor(isSelected ? COLORS.bright : COLORS.text);
     });
     const key = this.cursor.selectedKey;
     if (this.cursor.activeColumn === SPECIAL_COLUMN && key) {
-      this.explanationTitle.setText(SPECIAL_NAMES.find(([k]) => k === key)![1].toUpperCase());
+      this.explanationTitle.setText(SPECIAL_NAMES[key as keyof Special].toUpperCase());
       this.explanation.setText(SPECIAL_EFFECTS[key as keyof Special]);
     } else if (key) {
       this.explanationTitle.setText(SKILL_NAMES[key as Skill].toUpperCase());

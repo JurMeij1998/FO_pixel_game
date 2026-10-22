@@ -20,4 +20,5 @@ export const CONTROL_ROWS: Array<[keys: string, exploring: string, combat: strin
   ['E (character sheet)', 'Spend a point on the skill', '-'],
   ['E (loot, barter)', 'Move it across (Shift: all)', '-'],
   ['Esc (screens)', 'Close', 'Close'],
+  ['Type (creation)', 'Your name; arrows move on', '-'],
 ];

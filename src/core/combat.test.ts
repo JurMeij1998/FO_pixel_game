@@ -22,7 +22,7 @@ function setup(rows: string[], rng: () => number = ALWAYS) {
   player.pos = { ...map.playerStart };
   player.backpack.add('knife');
   player.equip('knife', 'primary');
-  return { map, player, roach: map.creatures[0], combat: new Combat(map, player, rng) };
+  return { map, player, roach: map.creatures[0], combat: new Combat(map, player, rng, 'normal') };
 }
 
 // Player at (1,1), radroach three tiles to the right: within its sight range of 4.
@@ -78,7 +78,7 @@ describe('Combat', () => {
       luck: 5,
     });
     player.pos = { ...map.playerStart };
-    const combat = new Combat(map, player);
+    const combat = new Combat(map, player, Math.random, 'normal');
     const result = combat.movePlayer({ x: -1, y: 0 });
     expect(result).toMatchObject({ ok: false });
     expect(player.pos).toEqual({ x: 1, y: 1 });
@@ -283,7 +283,7 @@ describe('Combat', () => {
       luck: 5,
     });
     player.pos = { ...map.playerStart };
-    const combat = new Combat(map, player, ALWAYS);
+    const combat = new Combat(map, player, ALWAYS, 'normal');
     const first = combat.target!;
     first.hitPoints = 1;
     combat.attack(first);
@@ -335,7 +335,7 @@ describe('Combat', () => {
       luck: 5,
     });
     player.pos = { ...map.playerStart };
-    const combat = new Combat(map, player);
+    const combat = new Combat(map, player, Math.random, 'normal');
     const first = combat.target;
     combat.cycleTarget();
     expect(combat.target).not.toBe(first);
@@ -376,7 +376,7 @@ describe('Combat with people', () => {
 
   it('bring the whole group into the fight once provoked, the guard even out of sight', () => {
     const { map, player, gus, guard, rng } = store();
-    const combat = new Combat(map, player, rng);
+    const combat = new Combat(map, player, rng, 'normal');
     expect(combat.participants).toEqual([]);
     combat.join(map.provoke(gus));
     expect(combat.participants).toEqual([gus, guard]);
@@ -386,7 +386,7 @@ describe('Combat with people', () => {
 
   it('never fight while still friendly', () => {
     const { map, player, gus, rng } = store();
-    const combat = new Combat(map, player, rng);
+    const combat = new Combat(map, player, rng, 'normal');
     combat.join([gus]); // not provoked
     expect(combat.participants).toEqual([]);
     player.pos = { x: 2, y: 1 }; // right next to Gus
@@ -395,7 +395,7 @@ describe('Combat with people', () => {
 
   it('call people by their name in messages', () => {
     const { map, player, gus, rng } = store();
-    const combat = new Combat(map, player, rng);
+    const combat = new Combat(map, player, rng, 'normal');
     combat.join(map.provoke(gus));
     player.pos = { x: 2, y: 1 };
     const result = combat.attack(gus);
@@ -407,7 +407,7 @@ describe('Combat with people', () => {
 
   it('give the guard a far better shot than a raider', () => {
     const { map, player, guard } = store();
-    const combat = new Combat(map, player);
+    const combat = new Combat(map, player, Math.random, 'normal');
     const raider = new Creature('raider@7,1', getCreatureDef('raider'), { ...guard.pos });
     expect(combat.hitChance(guard, player)).toBeGreaterThan(combat.hitChance(raider, player) + 30);
     expect(guard.attack.ranged).toBe(true);
@@ -441,7 +441,7 @@ describe('Line of fire', () => {
       player.reload();
     }
     const [gus, guard, roach] = ['shopkeeper', 'guard', 'radroach'].map((id) => map.creatures.find((c) => c.def.id === id)!);
-    return { map, player, gus, guard, roach, combat: new Combat(map, player, rng) };
+    return { map, player, gus, guard, roach, combat: new Combat(map, player, rng, 'normal') };
   }
 
   it('lists the tiles a shot crosses, nearest the shooter first', () => {
@@ -535,7 +535,7 @@ describe('Line of fire', () => {
     player.backpack.add('ammo_223', 5);
     player.reload();
     const [roach, raider] = map.creatures;
-    const combat = new Combat(map, player, NEVER);
+    const combat = new Combat(map, player, NEVER, 'normal');
     expect(combat.participants).toEqual([]); // both too far away to notice you
     combat.join([raider]);
     expect(combat.inTheWay(raider)).toBe(roach);
@@ -570,7 +570,7 @@ describe('Line of fire', () => {
       { x: 1, y: 2 },
       { x: 2, y: 3 },
     ]);
-    expect(new Combat(map, player).inTheWay(moleRat)).toBe(roach);
+    expect(new Combat(map, player, Math.random, 'normal').inTheWay(moleRat)).toBe(roach);
   });
 
   it("doesn't stop melee, not even a spear reaching past someone", () => {
@@ -634,7 +634,7 @@ describe('Someone nearly defenseless', () => {
   it('takes on the fight: it goes on after your turn, until she is down or you get away', () => {
     const { map, player, rosa, rng } = shack();
     map.provoke(rosa);
-    const combat = new Combat(map, player, rng);
+    const combat = new Combat(map, player, rng, 'normal');
     expect(combat.attack(rosa).ok).toBe(true);
     expect(rosa.isDead).toBe(false); // the knife does 1-6; she has 12 HP
     expect(combat.outcome).toBeNull();
@@ -647,7 +647,7 @@ describe('Someone nearly defenseless', () => {
   it('fights back with nothing more than a slap', () => {
     const { map, player, rosa, rng } = shack();
     map.provoke(rosa);
-    const combat = new Combat(map, player, rng);
+    const combat = new Combat(map, player, rng, 'normal');
     const before = player.hitPoints;
     const events = combat.endTurn();
     const slaps = events.filter((e) => e.type === 'attack' && e.attacker === rosa);
@@ -660,11 +660,88 @@ describe('Someone nearly defenseless', () => {
     const { map, player, rosa, rng } = shack();
     map.provoke(rosa);
     rosa.hitPoints = 1;
-    const combat = new Combat(map, player, rng);
+    const combat = new Combat(map, player, rng, 'normal');
     const result = combat.attack(rosa);
     if (!result.ok || result.events[0].type !== 'attack') throw new Error('expected an attack');
     expect(result.events[0].killed).toBe(true);
     expect(result.events[0].message).not.toMatch(/XP/);
     expect(player.experience).toBe(0);
+  });
+});
+
+describe('Difficulty', () => {
+  // A raider right next to the player; every roll succeeds.
+  function fight(difficulty: 'easy' | 'normal' | 'hard', rng: () => number = ALWAYS) {
+    const map = GridMap.parse({ name: 'pit', rows: ['#####', '#PX.#', '#####'], chests: {}, creatures: { X: 'raider' } });
+    const player = new Character('Tester', {
+      strength: 5,
+      perception: 5,
+      endurance: 5,
+      charisma: 5,
+      intelligence: 5,
+      agility: 5,
+      luck: 5,
+    });
+    player.pos = { ...map.playerStart };
+    const [raider] = map.creatures;
+    return { player, raider, combat: new Combat(map, player, rng, difficulty) };
+  }
+
+  it("changes how often enemies hit you, but not how often you hit them", () => {
+    const easy = fight('easy');
+    const normal = fight('normal');
+    const hard = fight('hard');
+    expect(easy.combat.hitChance(easy.raider, easy.player)).toBe(normal.combat.hitChance(normal.raider, normal.player) - 10);
+    expect(hard.combat.hitChance(hard.raider, hard.player)).toBe(normal.combat.hitChance(normal.raider, normal.player) + 10);
+    expect(easy.combat.hitChance(easy.player, easy.raider)).toBe(normal.combat.hitChance(normal.player, normal.raider));
+  });
+
+  it('changes small hits too, rounding only once', () => {
+    // A radroach bite of 2 (rng 0.25 picks 1 + floor(0.25 * 4) = 2), no critical, no armour.
+    const bite = (difficulty: 'easy' | 'normal' | 'hard') => {
+      const map = GridMap.parse({ name: 'nest', rows: ['####', '#PR#', '####'], chests: {}, creatures: { R: 'radroach' } });
+      const player = new Character('Tester', {
+        strength: 5,
+        perception: 5,
+        endurance: 5,
+        charisma: 5,
+        intelligence: 5,
+        agility: 5,
+        luck: 5,
+      });
+      player.pos = { ...map.playerStart };
+      // Rolls in order: to hit (0 = hit), critical (0.99 = no), damage (0.25).
+      const rolls = [0, 0.99, 0.25];
+      const combat = new Combat(map, player, () => rolls.shift() ?? 0.99, difficulty);
+      const before = player.hitPoints;
+      combat.endTurn();
+      return before - player.hitPoints;
+    };
+    expect(bite('normal')).toBe(2);
+    expect(bite('easy')).toBe(2); // 1.5 rounds to 2
+    expect(bite('hard')).toBe(3); // 2.5 rounds to 3
+  });
+
+  it('applies the difficulty after armour, so armour and difficulty both count', () => {
+    const { player, raider, combat } = fight('hard');
+    player.backpack.add('leather_armor');
+    player.equip('leather_armor', 'armor'); // DR 25
+    const before = player.hitPoints;
+    combat.endTurn(); // 6 damage, 25% absorbed: 4.5, then x1.25 on hard: 5.625, rounded once: 6
+    expect(before - player.hitPoints).toBe(6);
+    void raider;
+  });
+
+  it('changes how much damage you take', () => {
+    const taken = (difficulty: 'easy' | 'normal' | 'hard') => {
+      const { player, combat } = fight(difficulty);
+      const before = player.hitPoints;
+      combat.endTurn(); // the raider shoots: always hits, critical, minimum damage
+      return before - player.hitPoints;
+    };
+    // Raider: 3 damage minimum, doubled on a critical: 6.
+    expect(taken('normal')).toBe(6);
+    expect(taken('easy')).toBe(5); // 6 x 0.75, rounded
+    expect(taken('hard')).toBe(8); // 6 x 1.25, rounded
   });
 });

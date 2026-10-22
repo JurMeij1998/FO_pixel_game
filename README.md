@@ -162,9 +162,19 @@ and is remembered.
 
 ## Saving
 
-The game opens on a main menu: Continue (if there is a save), New game (asks before
-overwriting a save) and Controls. Esc in the game opens the pause menu, which can go back to
+The game opens on a main menu: Continue (if there is a save), New game and Controls. Esc in the game opens the pause menu, which can go back to
 the main menu.
+
+A new game starts with **character creation** (`scenes/CreationScene.ts`, rules in
+`core/creation.ts`): type a name, pick male or female (how you look), set the S.P.E.C.I.A.L.
+stats (each starts at 5, with 5 more points to spend, 40 in all as in Fallout; lowering a stat
+frees its points, down to 1; at most 10) and choose the difficulty. A preview shows what the
+stats make you (HP, AP, carry weight...). You start a bit beaten up, on 60% of your maximum HP.
+The game only starts with a name and every point spent, and asks once before it overwrites a
+saved game; it is saved straight away. Esc goes back to the menu without touching your save.
+On the name row you type (W/S/A/D and M are letters there); the arrow keys move on. Difficulty (`core/difficulty.ts`) changes how dangerous
+enemies are: on easy they hit you 10% less often and you take 25% less damage, on hard 10%
+more often and 25% more damage. It's kept in the save.
 
 The game autosaves to the browser's localStorage after every step, every closed screen and
 every finished fight, but never during combat. Dying lets you load that save (so you go back
@@ -223,6 +233,8 @@ fight, there are none.
 src/
   core/       Game rules in plain TypeScript, no Phaser imports. Unit tested.
     stats.ts      S.P.E.C.I.A.L., skills and the Fallout formulas derived from them
+    creation.ts   Character creation: the build (name, gender, stats, difficulty), point rules
+    difficulty.ts Difficulty levels and what they change in combat
     items.ts      Item definitions (weight, value, weapon/armor stats)
     container.ts  ItemContainer: stacks of items (backpack, chest)
     character.ts  Character: skills, levels, equipment slots, magazines
@@ -244,8 +256,8 @@ src/
   audio/      Synthesised sound effects
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting, and the pure logic
               behind the HUD and screens: AP gauge and its placement, health bars, the
-              shared glow, dialog box, barter lists, the message log
-  scenes/     Phaser scenes: Boot, Menu, World, Hud, Inventory, Loot, Dialog, Barter,
+              shared glow, dialog box, barter lists, the message log, creation screen keys
+  scenes/     Phaser scenes: Boot, Menu, Creation, World, Hud, Inventory, Loot, Dialog, Barter,
               Character, Pause, GameOver, Controls; flow.ts switches between menus and the game
   state.ts    The running game (player + map), loaded from the save if there is one
   storage.ts  localStorage access for the save

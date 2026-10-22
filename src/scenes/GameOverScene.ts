@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { loadSavedGame, startNewGame, state } from '../state';
+import { loadSavedGame, savedGameSummary, state } from '../state';
 import { COLORS, TEXT, TITLE_TEXT } from '../ui/theme';
 import { MenuList } from '../ui/widgets';
-import { playTestArena, quitToMenu, startPlaying } from './flow';
+import { playTestArena, quitToMenu, showCharacterCreation, startPlaying } from './flow';
 
 /** Shown when the player dies. The last save was made just before the fight. */
 export class GameOverScene extends Phaser.Scene {
@@ -24,18 +24,12 @@ export class GameOverScene extends Phaser.Scene {
       ...(state.sandbox ? [{ label: 'Restart test arena', onSelect: () => playTestArena(this) }] : []),
       {
         label: 'Load last save',
+        disabled: savedGameSummary() === null,
         onSelect: () => {
-          if (!loadSavedGame()) startNewGame();
-          startPlaying(this);
+          if (loadSavedGame()) startPlaying(this);
         },
       },
-      {
-        label: 'New game',
-        onSelect: () => {
-          startNewGame();
-          startPlaying(this);
-        },
-      },
+      { label: 'New game', onSelect: () => showCharacterCreation(this) },
       { label: 'Main menu', onSelect: () => quitToMenu(this) },
     ]);
   }

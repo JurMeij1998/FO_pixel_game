@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { loadSavedGame, savedGameSummary, startNewGame } from '../state';
-import { COLORS, DIM_TEXT, SMALL_TEXT, TITLE_TEXT } from '../ui/theme';
+import { loadSavedGame, savedGameSummary } from '../state';
+import { COLORS, DIM_TEXT, TITLE_TEXT } from '../ui/theme';
 import { MenuList } from '../ui/widgets';
-import { playTestArena, playTestShop, showControls, startPlaying } from './flow';
+import { playTestArena, playTestShop, showCharacterCreation, showControls, startPlaying } from './flow';
 
 /** The title screen: continue the saved game, start a new one, or look up the controls. */
 export class MenuScene extends Phaser.Scene {
@@ -22,8 +22,7 @@ export class MenuScene extends Phaser.Scene {
     this.add.text(centerX, 215, 'a post-nuclear pixel RPG', DIM_TEXT).setOrigin(0.5);
 
     const summary = savedGameSummary();
-    let confirmingNewGame = false;
-    const menu = new MenuList(this, centerX, 300, [
+    new MenuList(this, centerX, 300, [
       {
         label: summary ? `Continue (${summary})` : 'Continue',
         disabled: !summary,
@@ -31,19 +30,8 @@ export class MenuScene extends Phaser.Scene {
           if (loadSavedGame()) startPlaying(this);
         },
       },
-      {
-        label: 'New game',
-        onSelect: () => {
-          // Ask once before overwriting an existing save.
-          if (summary && !confirmingNewGame) {
-            confirmingNewGame = true;
-            menu.setLabel(1, 'Overwrite your save? Choose again');
-            return;
-          }
-          startNewGame();
-          startPlaying(this);
-        },
-      },
+      // Character creation asks before its new game overwrites the save.
+      { label: 'New game', onSelect: () => showCharacterCreation(this) },
       { label: 'Controls', onSelect: () => showControls(this) },
       // Development builds only (npm run dev): quick ways into a fight, or a shop, to try out UI.
       ...(import.meta.env.DEV
@@ -53,9 +41,5 @@ export class MenuScene extends Phaser.Scene {
           ]
         : []),
     ]);
-
-    this.add
-      .text(centerX, GAME_HEIGHT - 40, 'Up/Down to choose, Enter to select, M for sound on/off. The game saves automatically.', SMALL_TEXT)
-      .setOrigin(0.5);
   }
 }

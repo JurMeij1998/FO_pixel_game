@@ -41,9 +41,11 @@ must therefore never assume the screen has caught up:
   empty-gun sound).
 
 **One mutable `state` object, replaced in place.** `src/state.ts` holds `player`, `map` (the
-current one), `maps` (all visited), `worldSeed`, `combat`, `loadedFromSave` and `sandbox`. New
-game, load and test arena use `Object.assign(state, ...)` so every importer sees the new game,
-and scenes rebuild themselves from `state` in `create()`; `scenes/flow.ts` restarts World and
+current one), `maps` (all visited), `worldSeed`, `difficulty`, `combat`, `loadedFromSave` and
+`sandbox`. A new game comes from a `CharacterBuild` made on the character creation screen
+(`startNewGame(build)`; `resetToDefaultGame()` only fills memory, e.g. behind the menu, and
+never clears the save; a new game saves straight away). New game, load and test arena use
+`Object.assign(state, ...)` so every importer sees the new game, and scenes rebuild themselves from `state` in `create()`; `scenes/flow.ts` restarts World and
 HUD instead of reloading the page. Phaser reuses scene objects across restarts, so each
 `create()` resets its per-session fields, and listeners added to `this.events` or `game.events`
 are removed on `SHUTDOWN` (keyboard and input plugins clean themselves up).
@@ -60,7 +62,8 @@ their volume. Sound stays silent until the first click or key press (browser aut
 (`.` dirt, `#` wall, `^` tree, `%` wooden wall, ...) because letters and digits are markers:
 `P` player start, `a-z` chests, `A-Z` creatures and people (except P), `1-9` exits. A marker
 stands on its first walkable neighbour's ground. `BLOCKING` and `OPAQUE` in `core/gridMap.ts`
-decide walkability and sight. Creature ids are their spawn tile (`radroach@8,14`) so editing a map elsewhere doesn't shift saved ids. Line of sight is a Bresenham line tried in both directions
+decide walkability and sight. Creature ids are their spawn tile (`radroach@8,14`) so editing a
+map elsewhere doesn't shift saved ids. Line of sight is a Bresenham line tried in both directions
 (so it's symmetric) and blocked through the gap where two blocking tiles touch diagonally.
 
 **Generated maps: `Biome` → `MapBuilder` → an ordinary `MapDef`.** A biome (`data/biomes/`)

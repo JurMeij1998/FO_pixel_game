@@ -1,21 +1,15 @@
-import { Character } from './core/character';
+import type { Character } from './core/character';
 import type { Combat } from './core/combat';
+import { createCharacter, newBuild, type CharacterBuild } from './core/creation';
 import type { GridMap } from './core/gridMap';
 import { loadGame, saveGame, type GameData } from './core/save';
 import { testCharacter } from './data/testArena';
 import { buildKnownMap, buildMap, START_MAP, TEST_ARENA_MAP, TEST_SHOP_MAP } from './data/world';
 import { clearSave, readSave, writeSave } from './storage';
 
-function newGame() {
-  const player = new Character('Wanderer', {
-    strength: 4,
-    perception: 6,
-    endurance: 5,
-    charisma: 4,
-    intelligence: 6,
-    agility: 6,
-    luck: 5,
-  });
+/** A new game for the character made at character creation (or a default one, before that). */
+function newGame(build: CharacterBuild = newBuild()) {
+  const player = createCharacter(build);
   player.backpack.add('knife');
   player.backpack.add('stimpak');
   player.backpack.add('canteen');
@@ -23,17 +17,22 @@ function newGame() {
   player.equip('knife', 'primary');
   player.taggedSkills.add('smallGuns');
   player.taggedSkills.add('meleeWeapons');
-  player.hitPoints = 18; // start a bit beaten up, so the stimpaks are useful
 
   // A fresh seed per new game, so every game gets its own generated maps.
   const worldSeed = Math.floor(Math.random() * 2 ** 31);
   const map = buildMap(START_MAP, worldSeed);
   player.pos = { ...map.playerStart };
-  return toState({ player, worldSeed, maps: { [START_MAP]: map }, currentMap: START_MAP });
+  return toState({ player, worldSeed, difficulty: build.difficulty, maps: { [START_MAP]: map }, currentMap: START_MAP });
 }
 
 function toState(game: GameData) {
-  return { player: game.player, worldSeed: game.worldSeed, maps: game.maps, map: game.maps[game.currentMap] };
+  return {
+    player: game.player,
+    worldSeed: game.worldSeed,
+    difficulty: game.difficulty,
+    maps: game.maps,
+    map: game.maps[game.currentMap],
+  };
 }
 
 /** The saved game, or null if there is none or it can't be read. */
@@ -69,10 +68,21 @@ export function loadSavedGame(): boolean {
   return true;
 }
 
-/** Throws away the save and starts over. */
-export function startNewGame(): void {
-  clearSave();
+/**
+ * Puts a default game in memory without touching the save: what the menu sits on top of when
+ * there's no saved game to load.
+ */
+export function resetToDefaultGame(): void {
   Object.assign(state, { ...newGame(), combat: null, loadedFromSave: false, sandbox: false });
+}
+
+/** Throws away the save and starts over, with the character made at character creation. */
+export function startNewGame(build: CharacterBuild): void {
+  clearSave();
+  Object.assign(state, { ...newGame(build), combat: null, loadedFromSave: false, sandbox: false });
+  // Saved straight away: otherwise quitting before the first step would lose both the new
+  // character and (already cleared) the old save.
+  autosave();
 }
 
 /**
@@ -95,7 +105,7 @@ function startSandbox(mapId: string, player: Character): void {
   const map = buildMap(mapId, worldSeed);
   player.pos = { ...map.playerStart };
   Object.assign(state, {
-    ...toState({ player, worldSeed, maps: { [mapId]: map }, currentMap: mapId }),
+    ...toState({ player, worldSeed, difficulty: 'normal', maps: { [mapId]: map }, currentMap: mapId }),
     combat: null,
     loadedFromSave: false,
     sandbox: true,
@@ -119,6 +129,12 @@ export function travelTo(mapId: string): GridMap {
 export function autosave(): void {
   if (state.combat || state.sandbox) return;
   writeSave(
-    saveGame({ player: state.player, worldSeed: state.worldSeed, maps: state.maps, currentMap: state.map.id }),
+    saveGame({
+      player: state.player,
+      worldSeed: state.worldSeed,
+      difficulty: state.difficulty,
+      maps: state.maps,
+      currentMap: state.map.id,
+    }),
   );
 }

@@ -19,7 +19,7 @@ function freshGame(): GameData {
     luck: 5,
   });
   player.pos = { ...wasteland.playerStart };
-  return { player, worldSeed: SEED, maps: { wasteland }, currentMap: 'wasteland' };
+  return { player, worldSeed: SEED, difficulty: 'normal', maps: { wasteland }, currentMap: 'wasteland' };
 }
 
 /** Goes through JSON like the real save does, so nothing relies on shared object references. */
@@ -270,5 +270,31 @@ describe('save and load', () => {
     const broken = JSON.parse(JSON.stringify(save));
     broken.player.backpack = [['laser_sword', 1]];
     expect(() => loadGame(broken, buildKnownMap, 'wasteland')).toThrow(/Unknown item/);
+  });
+});
+
+describe('character creation in saves', () => {
+  it('keeps the difficulty and the gender', () => {
+    const game = freshGame();
+    game.difficulty = 'hard';
+    game.player.gender = 'female';
+    const loaded = roundTrip(game);
+    expect(loaded.difficulty).toBe('hard');
+    expect(loaded.player.gender).toBe('female');
+  });
+
+  it('loads saves from before character creation as normal difficulty and a male player', () => {
+    const old = saveJson(freshGame());
+    delete old.difficulty;
+    delete old.player.gender;
+    const loaded = loadGame(old, buildKnownMap, 'wasteland');
+    expect(loaded.difficulty).toBe('normal');
+    expect(loaded.player.gender).toBe('male');
+  });
+
+  it('ignores a difficulty it does not know', () => {
+    const odd = saveJson(freshGame());
+    odd.difficulty = 'nightmare';
+    expect(loadGame(odd, buildKnownMap, 'wasteland').difficulty).toBe('normal');
   });
 });
