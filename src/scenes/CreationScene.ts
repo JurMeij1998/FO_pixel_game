@@ -48,6 +48,8 @@ const SPECIAL_TOP = 215;
 const ROW_HEIGHT = 28;
 const DIFFICULTY_Y = SPECIAL_TOP + SPECIAL_KEYS.length * ROW_HEIGHT + 24;
 const START_Y = DIFFICULTY_Y + 50;
+/** How long the name's text cursor stays on, and off, while it blinks. */
+const CARET_BLINK_MS = 530;
 
 /**
  * Character creation, between choosing "New game" and the game itself: a name (typed), a
@@ -69,6 +71,9 @@ export class CreationScene extends Phaser.Scene {
   private derived!: Phaser.GameObjects.Text;
   private portrait!: Phaser.GameObjects.Image;
   private feedback!: Phaser.GameObjects.Text;
+  /** The blinking block after the name while its row is selected, to show you can type. */
+  private caret!: Phaser.GameObjects.Rectangle;
+  private caretBlink!: Phaser.Time.TimerEvent;
   /** Whether starting overwrites a saved game, and whether the player was warned about it. */
   private overwritesSave = false;
   private warnedOverwrite = false;
@@ -91,6 +96,12 @@ export class CreationScene extends Phaser.Scene {
     this.add.text(LEFT, 50, 'CREATE YOUR CHARACTER', TITLE_TEXT);
 
     this.addRow('name', NAME_Y);
+    this.caret = this.add.rectangle(0, NAME_Y, 9, 1, Phaser.Display.Color.HexStringToColor(COLORS.bright).color).setOrigin(0);
+    this.caretBlink = this.time.addEvent({
+      delay: CARET_BLINK_MS,
+      loop: true,
+      callback: () => this.caret.setAlpha(this.caret.alpha > 0 ? 0 : 1),
+    });
     this.addRow('gender', GENDER_Y);
     this.addArrows(GENDER_Y, () => this.toggleGender(), () => this.toggleGender());
 
@@ -253,9 +264,10 @@ export class CreationScene extends Phaser.Scene {
       this.rowTexts.get(row)!.setText(`${selected ? '>' : ' '} ${title}`).setColor(color);
       this.valueTexts.get(row)?.setText(value).setColor(color);
     };
-    setTextEntry(this.row === 'name'); // M types an M here instead of muting
-    const typing = this.row === 'name' ? '_' : '';
-    label('name', 'Name', `${build.name}${typing}`);
+    const onName = this.row === 'name';
+    setTextEntry(onName); // M types an M here instead of muting
+    label('name', 'Name', build.name);
+    this.placeCaret(onName);
     label('gender', 'Gender', build.gender === 'male' ? 'Male' : 'Female');
     for (const key of SPECIAL_KEYS) label(key, SPECIAL_NAMES[key], String(build.special[key]));
     label('difficulty', 'Difficulty', DIFFICULTIES[build.difficulty].name);
@@ -280,6 +292,21 @@ export class CreationScene extends Phaser.Scene {
         `Skill points   ${skillPointsPerLevel(s)} per level`,
       ].join('\n'),
     );
+  }
+
+  /** Puts the cursor right after the name, shown solid: it starts blinking again from there. */
+  private placeCaret(visible: boolean): void {
+    const name = this.valueTexts.get('name')!;
+    this.caret
+      .setPosition(name.x + name.width + 2, name.y + 3)
+      .setSize(9, name.height - 6)
+      .setVisible(visible)
+      .setAlpha(1);
+    this.caretBlink.reset({
+      delay: CARET_BLINK_MS,
+      loop: true,
+      callback: () => this.caret.setAlpha(this.caret.alpha > 0 ? 0 : 1),
+    });
   }
 
   private explain(row: Row): [string, string] {
