@@ -1,14 +1,16 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
 import { COMBAT_LABEL, HUD_BOTTOM, TILE_SIZE, WORLD_ZOOM } from '../config';
+import type { Building } from '../core/buildings';
 import { Combat, INVENTORY_AP_COST, type AttackEvent, type CombatEvent } from '../core/combat';
 import { capitalize, listNames, type Creature } from '../core/creature';
 import type { DialogData } from './DialogScene';
 import type { Fighter } from '../core/fighter';
 import { addPos, type GridPos } from '../core/grid';
-import type { Exit } from '../core/gridMap';
+import type { Chest, Door, Exit } from '../core/gridMap';
+import { lockedMessage, pickLock } from '../core/locks';
 import type { Lootable } from '../core/loot';
-import { tileTextureKey } from '../gfx/textures';
+import { DOOR_CLOSED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
 import { ApGauge } from '../ui/apGauge';
 import { ENEMY_BAR_GAP, ENEMY_BAR_HEIGHT, enemyBar } from '../ui/healthBar';
@@ -29,7 +31,13 @@ const STEP: Record<Direction, GridPos> = {
 
 const MOVE_DURATION_MS = 140;
 
-const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, healthBars: 5, gauge: 9, effects: 10 };
+// Roofs go over everything inside a building, health bars included; the AP gauge and effects
+// stay on top.
+const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, healthBars: 5, roof: 6, gauge: 9, effects: 10 };
+/** How long a roof takes to fade away when you first step inside. */
+const ROOF_FADE_MS = 300;
+/** A pause after opening a door by walking into it, so a held key doesn't stride straight through. */
+const DOOR_PAUSE_MS = 120;
 const ENEMY_RED = 0xd02020;
 const FADE_MS = 250;
 
@@ -50,6 +58,9 @@ export class WorldScene extends Phaser.Scene {
   private busy = false;
   private readonly chestImages = new Map<string, Phaser.GameObjects.Image>();
   private readonly creatureImages = new Map<Creature, Phaser.GameObjects.Image>();
+  private readonly doorImages = new Map<Door, Phaser.GameObjects.Image>();
+  /** The roofs still on, by building id. */
+  private readonly roofs = new Map<string, Phaser.GameObjects.Container>();
   private targetMarker!: Phaser.GameObjects.Graphics;
   /** The thin health bars floating over the creatures you're fighting. */
   private enemyBars!: Phaser.GameObjects.Graphics;
@@ -69,6 +80,8 @@ export class WorldScene extends Phaser.Scene {
     this.facing = 'down';
     this.chestImages.clear();
     this.creatureImages.clear();
+    this.doorImages.clear();
+    this.roofs.clear();
 
     const map = state.map;
     for (let y = 0; y < map.height; y++) {
@@ -81,6 +94,13 @@ export class WorldScene extends Phaser.Scene {
       this.chestImages.set(chest.id, image);
     }
     for (const exit of map.exits) this.add.image(toPixel(exit.x), toPixel(exit.y), 'signpost').setDepth(DEPTH.prop);
+    for (const door of map.doors) {
+      // Drawn for a wall running left to right; turned a quarter in one running up and down.
+      const wall = (x: number) => map.tileAt(x, door.y) === 'wall' || map.tileAt(x, door.y) === 'woodWall';
+      const upright = !wall(door.x - 1) && !wall(door.x + 1);
+      const image = this.add.image(toPixel(door.x), toPixel(door.y), door.open ? DOOR_OPEN : DOOR_CLOSED).setDepth(DEPTH.prop);
+      this.doorImages.set(door, image.setAngle(upright ? 90 : 0));
+    }
     for (const creature of map.creatures) {
       const image = this.add
         .image(toPixel(creature.pos.x), toPixel(creature.pos.y), creature.def.id)
@@ -92,6 +112,10 @@ export class WorldScene extends Phaser.Scene {
     }
 
     const start = state.player.pos;
+    map.enter(start); // starting (or loading) inside a building: its roof is off
+    for (const building of map.buildings) {
+      if (!map.entered.has(building.id)) this.roofs.set(building.id, this.drawRoof(building));
+    }
     this.player = this.add.image(toPixel(start.x), toPixel(start.y), this.playerTexture('down')).setDepth(DEPTH.player);
     // Start facing whoever is right there to talk to (Rosa at the start of a game, Gus in the
     // test shop), so E talks to them straight away.
@@ -152,6 +176,7 @@ export class WorldScene extends Phaser.Scene {
       this.combatBounds = state.combat !== null;
       this.setCameraBounds();
     }
+    this.revealFighters();
     this.drawTargetMarker();
     this.drawEnemyBars();
     this.updateApGauge(delta);
@@ -166,10 +191,15 @@ export class WorldScene extends Phaser.Scene {
 
   private stepFreely(direction: Direction): void {
     const target = addPos(state.player.pos, STEP[direction]);
+    if (state.map.isClosedDoor(target.x, target.y)) {
+      this.walkIntoDoor(state.map.doorAt(target.x, target.y)!);
+      return;
+    }
     if (!state.map.isWalkable(target.x, target.y)) return;
     state.player.pos = target;
     void this.run(async () => {
       await this.tweenTo(this.player, target);
+      this.enterBuilding();
       const exit = state.map.exitAt(target.x, target.y);
       if (exit) {
         await this.travel(exit);
@@ -201,13 +231,32 @@ export class WorldScene extends Phaser.Scene {
     this.scene.restart(); // create() draws the new map and fades back in
   }
 
+  /**
+   * Walking into a closed door opens it, unless it's locked: then you're told what lock it is
+   * and whether you can pick it (E does that).
+   */
+  private walkIntoDoor(door: Door): void {
+    this.input.keyboard!.resetKeys(); // once, not every frame the key is held
+    const opened = state.map.openDoor(door);
+    if (!opened.ok) {
+      playSound('locked');
+      postMessage(this, lockedMessage('door', door, state.player));
+      return;
+    }
+    this.showDoor(door);
+    autosave();
+    void this.run(() => this.wait(DOOR_PAUSE_MS));
+  }
+
   private stepInCombat(direction: Direction): void {
     const combat = state.combat!;
     if (!combat.isPlayerTurn) return;
     const result = combat.movePlayer(STEP[direction]);
     if (!result.ok) {
-      // Say why only for the refusal worth explaining; bumping into walls while a key is held stays quiet.
-      if (state.map.exitAt(state.player.pos.x + STEP[direction].x, state.player.pos.y + STEP[direction].y)) {
+      // Say why only for the refusals worth explaining; bumping into walls while a key is held stays quiet.
+      const to = addPos(state.player.pos, STEP[direction]);
+      if (state.map.exitAt(to.x, to.y) || state.map.isClosedDoor(to.x, to.y)) {
+        if (state.map.isClosedDoor(to.x, to.y)) playSound('locked');
         postMessage(this, result.message);
         this.input.keyboard!.resetKeys(); // once, not every frame the key is held
       }
@@ -237,7 +286,8 @@ export class WorldScene extends Phaser.Scene {
    * attacks them instead, which turns them (and their group) hostile.
    */
   private clickCreature(creature: Creature, ctrl: boolean): void {
-    if (creature.isDead) return;
+    // Under a roof you haven't looked beneath, there's nothing to click as far as you know.
+    if (creature.isDead || state.map.isHidden(creature.pos.x, creature.pos.y)) return;
     if (creature.hostile) this.attack(creature);
     else if (ctrl) this.attackFriendly(creature);
     else this.talkByClick(creature);
@@ -347,6 +397,11 @@ export class WorldScene extends Phaser.Scene {
           const image = this.imageFor(event.fighter);
           if (event.fighter !== state.player) playSound('creatureStep'); // the player's steps play in showStride
           await this.tweenTo(image, event.to);
+          if (event.fighter === state.player) this.enterBuilding();
+        } else if (event.type === 'door') {
+          if (event.fighter !== state.player) this.faceDoor(event.fighter, event.door);
+          this.showDoor(event.door);
+          await this.wait(DOOR_PAUSE_MS * 2);
         } else {
           await this.showAttack(event);
         }
@@ -560,6 +615,87 @@ export class WorldScene extends Phaser.Scene {
       .strokeRect(image.x - TILE_SIZE / 2 + 0.5, image.y - TILE_SIZE / 2 + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
   }
 
+  // --- Doors and roofs -----------------------------------------------------
+
+  /** Shows a door as it now is (open or closed), with its sound. */
+  private showDoor(door: Door): void {
+    this.doorImages.get(door)?.setTexture(door.open ? DOOR_OPEN : DOOR_CLOSED);
+    playSound(door.open ? 'doorOpen' : 'doorClose');
+  }
+
+  /** A creature opening a door leans into it, so you can tell who did. */
+  private faceDoor(fighter: Fighter, door: Door): void {
+    const image = this.imageFor(fighter);
+    this.tweens.add({
+      targets: image,
+      x: image.x + (toPixel(door.x) - image.x) * 0.2,
+      y: image.y + (toPixel(door.y) - image.y) * 0.2,
+      duration: 70,
+      yoyo: true,
+    });
+  }
+
+  /**
+   * A building's roof: a tile over every inside and wall tile, with a dark edge along the
+   * outside so it reads as one roof. It hides everything under it until you step inside.
+   */
+  private drawRoof(building: Building): Phaser.GameObjects.Container {
+    const key = (x: number, y: number) => `${x},${y}`;
+    const covered = new Set(building.roof.map((p) => key(p.x, p.y)));
+    const roof = this.add.container(0, 0).setDepth(DEPTH.roof);
+    // A ridge across the middle, the far slope in the light and the near one in shade, so it
+    // reads as a pitched roof rather than a flat patch.
+    const rows = building.roof.map((p) => p.y);
+    const ridge = ((Math.min(...rows) + Math.max(...rows) + 1) / 2) * TILE_SIZE;
+    const shade = this.add.graphics().fillStyle(0x000000, 0.18);
+    const ridgeLine = this.add.graphics();
+    const edge = this.add.graphics().fillStyle(0x1a1410);
+    for (const { x, y } of building.roof) {
+      roof.add(this.add.image(x * TILE_SIZE, y * TILE_SIZE, roofTextureKey(building.material, roofVariant(x, y))).setOrigin(0));
+      const left = x * TILE_SIZE;
+      const top = y * TILE_SIZE;
+      const shadeFrom = Math.max(top, ridge);
+      if (shadeFrom < top + TILE_SIZE) shade.fillRect(left, shadeFrom, TILE_SIZE, top + TILE_SIZE - shadeFrom);
+      if (ridge > top && ridge < top + TILE_SIZE) {
+        ridgeLine.fillStyle(0x000000, 0.35).fillRect(left, ridge, TILE_SIZE, 1);
+        ridgeLine.fillStyle(0xffffff, 0.15).fillRect(left, ridge - 1, TILE_SIZE, 1);
+      }
+      if (!covered.has(key(x, y - 1))) edge.fillRect(left, top, TILE_SIZE, 1);
+      if (!covered.has(key(x, y + 1))) edge.fillRect(left, top + TILE_SIZE - 1, TILE_SIZE, 1);
+      if (!covered.has(key(x - 1, y))) edge.fillRect(left, top, 1, TILE_SIZE);
+      if (!covered.has(key(x + 1, y))) edge.fillRect(left + TILE_SIZE - 1, top, 1, TILE_SIZE);
+    }
+    roof.add([shade, ridgeLine, edge]);
+    return roof;
+  }
+
+  /** After the player's step: the first time inside a building, its roof comes off. */
+  private enterBuilding(): void {
+    const building = state.map.enter(state.player.pos);
+    if (building) this.liftRoof(building.id);
+  }
+
+  private liftRoof(id: string): void {
+    const roof = this.roofs.get(id);
+    if (!roof) return;
+    this.roofs.delete(id);
+    this.tweens.add({ targets: roof, alpha: 0, duration: ROOF_FADE_MS, onComplete: () => roof.destroy() });
+  }
+
+  /**
+   * Someone you're fighting is inside a building you haven't been in (shooting through its open
+   * door, say): you know they're there now, so its roof comes off.
+   */
+  private revealFighters(): void {
+    if (this.roofs.size === 0) return;
+    for (const creature of state.combat?.participants ?? []) {
+      const building = state.map.buildingAt(creature.pos.x, creature.pos.y);
+      if (!building || state.map.entered.has(building.id)) continue;
+      state.map.entered.add(building.id);
+      this.liftRoof(building.id);
+    }
+  }
+
   private imageFor(fighter: Fighter): Phaser.GameObjects.Image {
     if (fighter === state.player) return this.player;
     const image = this.creatureImages.get(fighter as Creature);
@@ -609,10 +745,13 @@ export class WorldScene extends Phaser.Scene {
     const { x, y } = addPos(state.player.pos, STEP[this.facing]);
     const chest = state.map.chestAt(x, y);
     if (chest) {
-      chest.opened = true;
-      playSound('chestOpen');
-      this.chestImages.get(chest.id)?.setTexture('chest_open');
-      this.openLoot(chest);
+      this.openChest(chest);
+      return;
+    }
+    // A door in front of you, unless a corpse lies in the doorway: that's what you'd reach for.
+    const door = state.map.doorAt(x, y);
+    if (door && !state.map.corpseAt(x, y)) {
+      this.useDoor(door);
       return;
     }
     // A corpse in front of you, or else one you're standing on.
@@ -622,6 +761,49 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
     postMessage(this, 'There is nothing there.');
+  }
+
+  /** Opens a chest, picking its lock first if it has one (and you can). */
+  private openChest(chest: Chest): void {
+    if (chest.lock !== null) {
+      const picked = pickLock(chest.name.toLowerCase(), chest, state.player);
+      postMessage(this, picked.message);
+      if (!picked.ok) {
+        playSound('locked');
+        return;
+      }
+      playSound('lockPick');
+      autosave();
+    }
+    chest.opened = true;
+    playSound('chestOpen');
+    this.chestImages.get(chest.id)?.setTexture('chest_open');
+    this.openLoot(chest);
+  }
+
+  /** E at a door: pick its lock and open it, open it, or close it. */
+  private useDoor(door: Door): void {
+    if (door.lock !== null) {
+      const picked = pickLock('door', door, state.player);
+      postMessage(this, picked.message);
+      if (!picked.ok) {
+        playSound('locked');
+        return;
+      }
+      playSound('lockPick');
+      // Once the tumblers have given, the door swings open.
+      state.map.openDoor(door);
+      this.time.delayedCall(450, () => this.showDoor(door));
+      autosave();
+      return;
+    }
+    const result = door.open ? state.map.closeDoor(door, state.player.pos) : state.map.openDoor(door);
+    if (!result.ok) {
+      postMessage(this, result.message);
+      return;
+    }
+    this.showDoor(door);
+    autosave();
   }
 
   private talkTo(person: Creature): void {

@@ -17,7 +17,10 @@ export interface Prefab {
   rows: string[];
   /** The tile a path should lead to, relative to the top-left corner. */
   entrance: GridPos;
-  chest?: { name: string; loot: LootTable; owner?: string };
+  /** `lock`: the chest is always locked, needing that much Lockpick skill (core/locks.ts). */
+  chest?: { name: string; loot: LootTable; owner?: string; lock?: number };
+  /** With this chance, every door (`/`) of the prefab is locked, needing `lock` Lockpick skill. */
+  doorLock?: { lock: number; chance: number };
   creatures?: SpawnTable;
   /** Letter in the rows to the creature id of the person standing there, e.g. the shopkeeper. */
   residents?: Record<string, string>;
@@ -55,7 +58,15 @@ export class MapBuilder {
 
   private readonly tiles: string[][];
   private readonly locked: boolean[][];
-  private readonly chests: Array<{ pos: GridPos; name: string; contents: Array<[string, number]>; owner?: string }> = [];
+  private readonly chests: Array<{
+    pos: GridPos;
+    name: string;
+    contents: Array<[string, number]>;
+    owner?: string;
+    lock?: number;
+  }> = [];
+  /** Locked doors, by position ("x,y"), with the Lockpick skill each needs. */
+  private readonly locks = new Map<string, number>();
   /** Residents stay where they are (until a fight), so paths go around them, not through. */
   private readonly creatures: Array<{ pos: GridPos; creatureId: string; resident: boolean }> = [];
   private readonly exits: Array<{ pos: GridPos; side: Side; to: string }> = [];
@@ -143,6 +154,7 @@ export class MapBuilder {
   /** Stamps a prefab with its top-left corner at (x, y), fills its chest and creatures, and returns its entrance. */
   stamp(prefab: Prefab, x: number, y: number, rng: Random): GridPos {
     if (!this.canStamp(prefab, x, y, 0)) throw new Error(`Prefab '${prefab.name}' doesn't fit at (${x}, ${y})`);
+    const doors: GridPos[] = [];
     prefab.rows.forEach((row, dy) => {
       [...row].forEach((char, dx) => {
         if (char === KEEP) return;
@@ -152,7 +164,8 @@ export class MapBuilder {
           this.tiles[pos.y][pos.x] = floorBeside(row, dx);
           if (char === CHEST_SLOT) {
             if (!prefab.chest) throw new Error(`Prefab '${prefab.name}' has a chest slot but no chest`);
-            this.addChest(pos, prefab.chest.name, rollLoot(prefab.chest.loot, rng), prefab.chest.owner);
+            const { name, loot, owner, lock } = prefab.chest;
+            this.addChest(pos, name, rollLoot(loot, rng), owner, lock);
           } else if (char !== CREATURE_SLOT) {
             const resident = prefab.residents?.[char];
             if (!resident) throw new Error(`Prefab '${prefab.name}' has no resident for '${char}'`);
@@ -162,20 +175,23 @@ export class MapBuilder {
             this.addCreature(pos, rollCreature(prefab.creatures, rng));
           }
         } else {
-          tileOf(char);
+          if (tileOf(char) === 'door') doors.push(pos);
           this.tiles[pos.y][pos.x] = char;
         }
         this.locked[pos.y][pos.x] = true;
       });
     });
+    if (prefab.doorLock && doors.length > 0 && rng.chance(prefab.doorLock.chance)) {
+      for (const door of doors) this.locks.set(`${door.x},${door.y}`, prefab.doorLock.lock);
+    }
     const entrance = addPos({ x, y }, prefab.entrance);
     this.landmarks.push(entrance);
     return entrance;
   }
 
-  addChest(pos: GridPos, name: string, contents: Array<[string, number]>, owner?: string): void {
+  addChest(pos: GridPos, name: string, contents: Array<[string, number]>, owner?: string, lock?: number): void {
     if (!this.isOpen(pos.x, pos.y)) throw new Error(`Can't place a chest at (${pos.x}, ${pos.y})`);
-    this.chests.push({ pos, name, contents, owner });
+    this.chests.push({ pos, name, contents, owner, lock });
   }
 
   /** A `resident` stays put, like a shopkeeper: paths lead up to them, not through them. */
@@ -241,8 +257,14 @@ export class MapBuilder {
       if (i >= 26) throw new Error('A map can hold at most 26 chests');
       const letter = String.fromCharCode(97 + i);
       rows[chest.pos.y][chest.pos.x] = letter;
-      def.chests[letter] = { name: chest.name, contents: chest.contents, ...(chest.owner && { owner: chest.owner }) };
+      def.chests[letter] = {
+        name: chest.name,
+        contents: chest.contents,
+        ...(chest.owner && { owner: chest.owner }),
+        ...(chest.lock !== undefined && { lock: chest.lock }),
+      };
     });
+    if (this.locks.size > 0) def.locks = Object.fromEntries(this.locks);
     // One letter per creature type, skipping P (the player start).
     const letters = 'ABCDEFGHIJKLMNOQRSTUVWXYZ';
     const letterFor = new Map<string, string>();
@@ -368,5 +390,5 @@ function tileOf(char: string): TileType {
 /** The floor a prefab's chest or creature slot stands on: its left neighbour, or dirt. */
 function floorBeside(row: string, dx: number): string {
   const left = row[dx - 1];
-  return left && LEGEND[left] && !isBlockingTile(LEGEND[left]) ? left : '.';
+  return left && LEGEND[left] && !isBlockingTile(LEGEND[left]) && LEGEND[left] !== 'door' ? left : '.';
 }

@@ -37,8 +37,8 @@ behind it, and the guard outside by the door.
 
 | Key             | Exploring                        | In combat                     |
 | --------------- | -------------------------------- | ----------------------------- |
-| Arrows / WASD   | Move                             | Move (1 AP per tile)          |
-| E / Space       | Interact with what you face: open a chest, loot a corpse (also one you stand on), talk | Space: end turn |
+| Arrows / WASD   | Move; walking into a closed door opens it | Move (1 AP per tile; opening a door costs 1 AP too) |
+| E / Space       | Interact with what you face: open a chest, loot a corpse (also one you stand on), talk, open or close a door, pick a lock | Space: end turn |
 | Click a person  | Talk, when next to them or across a counter; Ctrl+click attacks them |      |
 | F / click enemy | Click: attack (starts combat)    | Attack the target             |
 | T               |                                  | Next target                   |
@@ -98,6 +98,27 @@ guard sees further than any monster, so a village whose store you've turned agai
 greet you with gunfire as you arrive: the rule that nothing attacks on arrival only holds
 for creatures that start out hostile.
 
+## Doors, locks and roofs
+
+Buildings have doors (`/` in the map legend). A closed door blocks the way and the view;
+walk into it to open it, and press E facing it to close it again (or to open it). Until
+you've been inside a building, a roof hides what's in it: it lifts the first time you step
+in, and stays off (it's saved). A building is found from the tiles alone
+(`core/buildings.ts`): an area closed off by walls and doors, away from the map's edge. If
+someone you're fighting is inside one you haven't entered, its roof comes off too.
+
+Doors and chests can be **locked** (`core/locks.ts`). Each lock needs a certain Lockpick
+skill: simple 25%, average 40%, good 60%, hard 80%. Walk into a locked door (or press E at a
+locked chest) and you're told what lock it is and whether you can pick it; press E to pick
+it. With enough skill it always works, and the lock stays open; with less it never does,
+so come back once you've put skill points into Lockpick. Lockpick starts at 10% +
+Perception + Agility (20% for an average character).
+
+On the wasteland, the shed with the metal locker has a simple lock, and in the village Gus's
+stockroom crate has a good one (picking it is fine; taking from it is still stealing). Some
+village houses and hunter's cabins in the forest are locked up too. People and raiders open
+unlocked doors to come after you in a fight; animals and ghouls are kept out by a closed one.
+
 ## Maps and biomes
 
 The world is a set of maps joined by exits (signposts on the map edge); walking onto one
@@ -117,8 +138,10 @@ Afterwards it carves paths so every exit, chest and creature can be reached. The
 - `MapBuilder`: paint tiles, stamp prefabs, place chests, creatures and exits.
 - `Prefab`: a hand-drawn structure in the map legend, with `$` for its chest, `&` for its
   creatures and capital letters for its residents, particular people who are always there
-  (a logging camp, a hunter's cabin, the general store with Gus and the guard, ...). `flipVertical()` turns one around, e.g.
-  for houses on the other side of a street; `builder.lock()` keeps roads free of buildings.
+  (a logging camp, a hunter's cabin, the general store with Gus and the guard, ...). Its
+  doors are `/`; `doorLock` locks them with some chance, and the chest can have a `lock`.
+  `flipVertical()` turns one around, e.g. for houses on the other side of a street;
+  `builder.lock()` keeps roads free of buildings.
 - `LootTable` / `SpawnTable`: what a chest can contain, which creatures can appear.
 - `terrain.ts`: scatter, cellular smoothing (for groves and caves), blobs, borders, winding
   paths, finding free spots.
@@ -245,8 +268,11 @@ src/
     combat.ts     Turn-based combat rules and enemy AI; emits events for the scene
     loot.ts       Moving items between containers, honouring carry weight
     grid.ts       Grid positions, directions and distance
-    gridMap.ts    Parses ASCII maps into tiles, chests, creatures and exits; line of sight; who
-                  you can talk to, provoking groups and noticing theft
+    gridMap.ts    Parses ASCII maps into tiles, chests, creatures, doors and exits; line of
+                  sight; who you can talk to, provoking groups and noticing theft; buildings
+                  entered
+    buildings.ts  Finding buildings (walled areas with a door) and what their roofs cover
+    locks.ts      Locks on doors and chests, and picking them with the Lockpick skill
     random.ts     Seeded random numbers, so generated maps can be rebuilt from a seed
     result.ts     ActionResult: success or failure plus a message for the log
     save.ts       Game state (all visited maps) to and from plain JSON

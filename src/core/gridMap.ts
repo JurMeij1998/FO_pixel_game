@@ -1,6 +1,8 @@
+import { findBuildings, tileKey, type Building } from './buildings';
 import { ItemContainer } from './container';
 import { Creature, getCreatureDef } from './creature';
-import { addPos, DIRECTIONS, type GridPos } from './grid';
+import { addPos, DIRECTIONS, samePos, type GridPos } from './grid';
+import { failure, success, type ActionResult } from './result';
 
 export type TileType =
   | 'dirt'
@@ -19,7 +21,8 @@ export type TileType =
   | 'fence'
   | 'crops'
   | 'hay'
-  | 'shelf';
+  | 'shelf'
+  | 'door';
 
 /** Map characters for each tile. Letters and digits are taken by markers, so tiles use symbols. */
 export const LEGEND: Readonly<Record<string, TileType>> = {
@@ -40,6 +43,7 @@ export const LEGEND: Readonly<Record<string, TileType>> = {
   '*': 'crops',
   '[': 'hay',
   ']': 'shelf',
+  '/': 'door',
 };
 
 const BLOCKING: ReadonlySet<TileType> = new Set<TileType>([
@@ -53,7 +57,11 @@ const BLOCKING: ReadonlySet<TileType> = new Set<TileType>([
   'hay',
   'shelf',
 ]);
-/** Tiles you can't see (or shoot) through. Low obstacles (water, logs, fences, hay, shelves) block walking only. */
+/**
+ * Tiles you can't see (or shoot) through. Low obstacles (water, logs, fences, hay, shelves)
+ * block walking only. A door is in neither: whether it blocks depends on whether it's open
+ * (GridMap.isWalkable, blocksSight). Map generation counts doors as a way through.
+ */
 const OPAQUE: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'tree', 'woodWall']);
 
 export function isBlockingTile(tile: TileType): boolean {
@@ -84,6 +92,8 @@ export interface MapDef {
   creatures?: Record<string, string>;
   /** Marker digit to the id of the map it leads to. */
   exits?: Record<string, { to: string }>;
+  /** Locked doors (`/` tiles), by position ("x,y"), with the Lockpick skill each lock needs (see core/locks.ts). */
+  locks?: Record<string, number>;
 }
 
 export interface ChestDef {
@@ -91,6 +101,8 @@ export interface ChestDef {
   contents: Array<[itemId: string, quantity: number]>;
   /** The group it belongs to (see CreatureDef.group): taking from it is stealing from them. */
   owner?: string;
+  /** Locked, needing this much Lockpick skill (see core/locks.ts). */
+  lock?: number;
 }
 
 export interface Chest {
@@ -101,6 +113,17 @@ export interface Chest {
   contents: ItemContainer;
   opened: boolean;
   owner?: string;
+  /** The Lockpick skill its lock needs, or null if it isn't (or no longer) locked. */
+  lock: number | null;
+}
+
+/** A door in a doorway (a `/` tile). Closed, it blocks walking and sight. Doors start closed. */
+export interface Door {
+  x: number;
+  y: number;
+  open: boolean;
+  /** The Lockpick skill its lock needs, or null if it isn't (or no longer) locked. */
+  lock: number | null;
 }
 
 /** A walkable tile that takes the player to another map. */
@@ -129,7 +152,13 @@ export class GridMap {
     readonly creatures: Creature[],
     readonly exits: Exit[],
     readonly playerStart: GridPos,
+    readonly doors: Door[],
+    /** Found from the walls and doors (core/buildings.ts); roofed until entered. */
+    readonly buildings: Building[],
   ) {}
+
+  /** The ids of the buildings the player has been inside: their roofs are off. */
+  readonly entered = new Set<string>();
 
   get width(): number {
     return this.tiles[0].length;
@@ -147,6 +176,7 @@ export class GridMap {
     const chests: Chest[] = [];
     const creatures: Creature[] = [];
     const exits: Exit[] = [];
+    const doors: Door[] = [];
     let playerStart: GridPos | null = null;
 
     for (let y = 0; y < def.rows.length; y++) {
@@ -160,6 +190,7 @@ export class GridMap {
         const tile = LEGEND[char];
         if (tile) {
           tileRow.push(tile);
+          if (tile === 'door') doors.push({ x, y, open: false, lock: def.locks?.[tileKey({ x, y })] ?? null });
           continue;
         }
 
@@ -171,7 +202,7 @@ export class GridMap {
           const chest = def.chests[char];
           if (!chest) throw new Error(`Map '${def.name}': no chest defined for '${char}'`);
           const contents = new ItemContainer(chest.contents);
-          chests.push({ id: char, name: chest.name, x, y, contents, opened: false, owner: chest.owner });
+          chests.push({ id: char, name: chest.name, x, y, contents, opened: false, owner: chest.owner, lock: chest.lock ?? null });
         } else if (CREATURE_MARKER.test(char)) {
           const creatureId = def.creatures?.[char];
           if (!creatureId) throw new Error(`Map '${def.name}': no creature defined for '${char}'`);
@@ -196,7 +227,10 @@ export class GridMap {
     for (const digit of Object.keys(def.exits ?? {})) {
       if (!placedExits.has(digit)) throw new Error(`Map '${def.name}': exit '${digit}' is not placed`);
     }
-    return new GridMap(id, def.name, tiles, chests, creatures, exits, playerStart);
+    for (const at of Object.keys(def.locks ?? {})) {
+      if (!doors.some((d) => tileKey(d) === at)) throw new Error(`Map '${def.name}': lock at (${at}) is not on a door`);
+    }
+    return new GridMap(id, def.name, tiles, chests, creatures, exits, playerStart, doors, findBuildings(tiles));
   }
 
   tileAt(x: number, y: number): TileType | null {
@@ -209,6 +243,50 @@ export class GridMap {
 
   exitAt(x: number, y: number): Exit | undefined {
     return this.exits.find((e) => e.x === x && e.y === y);
+  }
+
+  doorAt(x: number, y: number): Door | undefined {
+    return this.doors.find((d) => d.x === x && d.y === y);
+  }
+
+  /** Opens a door, unless it's locked (pick the lock first: core/locks.ts). */
+  openDoor(door: Door): ActionResult {
+    if (door.lock !== null) return failure('The door is locked.');
+    if (door.open) return failure('The door is already open.');
+    door.open = true;
+    return success('You open the door.');
+  }
+
+  /** Closes a door, if nothing is in the doorway; `player` is where the player stands. */
+  closeDoor(door: Door, player: GridPos): ActionResult {
+    if (!door.open) return failure('The door is already closed.');
+    const blocked = samePos(door, player) || this.creatures.some((c) => samePos(c.pos, door));
+    if (blocked) return failure('Something is in the way.');
+    door.open = false;
+    return success('You close the door.');
+  }
+
+  /** The building whose inside this tile is part of, if any. */
+  buildingAt(x: number, y: number): Building | undefined {
+    const key = tileKey({ x, y });
+    return this.buildings.find((b) => b.interior.has(key));
+  }
+
+  /** Whether a roof still hides this tile: it's inside a building the player hasn't entered. */
+  isHidden(x: number, y: number): boolean {
+    const building = this.buildingAt(x, y);
+    return building !== undefined && !this.entered.has(building.id);
+  }
+
+  /**
+   * Notes that the player is inside the building at `pos`, if there is one; from then on its
+   * roof is off. Returns the building if this is the first time, else null.
+   */
+  enter(pos: GridPos): Building | null {
+    const building = this.buildingAt(pos.x, pos.y);
+    if (!building || this.entered.has(building.id)) return null;
+    this.entered.add(building.id);
+    return building;
   }
 
   /**
@@ -312,7 +390,12 @@ export class GridMap {
 
   blocksSight(x: number, y: number): boolean {
     const tile = this.tileAt(x, y);
-    return tile === null || OPAQUE.has(tile);
+    return tile === null || OPAQUE.has(tile) || this.isClosedDoor(x, y);
+  }
+
+  isClosedDoor(x: number, y: number): boolean {
+    const door = this.tileAt(x, y) === 'door' ? this.doorAt(x, y) : undefined;
+    return door !== undefined && !door.open;
   }
 
   /**
@@ -366,10 +449,12 @@ export class GridMap {
     return between;
   }
 
-  /** Corpses don't block; living creatures do. The player's own tile is not checked here. */
+  /** Corpses don't block; living creatures and closed doors do. The player's own tile is not checked here. */
   isWalkable(x: number, y: number): boolean {
     const tile = this.tileAt(x, y);
-    return tile !== null && !BLOCKING.has(tile) && !this.chestAt(x, y) && !this.livingCreatureAt(x, y);
+    return (
+      tile !== null && !BLOCKING.has(tile) && !this.isClosedDoor(x, y) && !this.chestAt(x, y) && !this.livingCreatureAt(x, y)
+    );
   }
 }
 
@@ -383,5 +468,5 @@ function groundUnderMarker(rows: string[], x: number, y: number): TileType {
   const neighbours = [rows[y][x - 1], rows[y][x + 1], rows[y - 1]?.[x], rows[y + 1]?.[x]]
     .map((char) => (char === undefined ? undefined : LEGEND[char]))
     .filter((tile): tile is TileType => tile !== undefined);
-  return neighbours.find((tile) => !BLOCKING.has(tile)) ?? 'dirt';
+  return neighbours.find((tile) => !BLOCKING.has(tile) && tile !== 'door') ?? 'dirt';
 }

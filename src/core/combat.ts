@@ -3,7 +3,7 @@ import { capitalize, listNames, type Creature } from './creature';
 import { DIFFICULTIES, type Difficulty } from './difficulty';
 import type { AttackSound, Fighter } from './fighter';
 import { addPos, DIRECTIONS, distance, samePos, type GridPos } from './grid';
-import type { GridMap } from './gridMap';
+import type { Door, GridMap } from './gridMap';
 import { failure, type ActionResult } from './result';
 
 export const MOVE_AP_COST = 1;
@@ -19,6 +19,8 @@ export type CombatOutcome = 'victory' | 'defeat' | 'escaped';
 
 export type CombatEvent =
   | { type: 'move'; fighter: Fighter; to: GridPos }
+  /** Someone opened a door (it costs a move's AP). */
+  | { type: 'door'; fighter: Fighter; door: Door }
   | {
       type: 'attack';
       attacker: Fighter;
@@ -151,6 +153,14 @@ export class Combat {
     if (!this.isPlayerTurn) return refused("It isn't your turn.");
     if (this.actionPoints < MOVE_AP_COST) return refused('You are out of action points.');
     const to = addPos(this.player.pos, step);
+    const door = this.map.isClosedDoor(to.x, to.y) ? this.map.doorAt(to.x, to.y)! : null;
+    if (door) {
+      // Walking into a closed door opens it, for the price of a step.
+      const opened = this.map.openDoor(door);
+      if (!opened.ok) return refused(opened.message);
+      this.actionPoints -= MOVE_AP_COST;
+      return done([{ type: 'door', fighter: this.player, door }]);
+    }
     if (!this.isFree(to)) return refused('Something is in the way.');
     // Leaving the map isn't possible mid-fight, so there's no point stepping onto an exit.
     if (this.map.exitAt(to.x, to.y)) return refused("You can't leave in the middle of a fight.");
@@ -274,6 +284,14 @@ export class Combat {
       if (ap < MOVE_AP_COST) return;
       const step = this.nextStepToward(enemy);
       if (!step) return;
+      if (this.map.isClosedDoor(step.x, step.y)) {
+        // Only those who open doors path through them, and only unlocked ones (see opensThrough).
+        const door = this.map.doorAt(step.x, step.y)!;
+        this.map.openDoor(door);
+        ap -= MOVE_AP_COST;
+        events.push({ type: 'door', fighter: enemy, door });
+        continue;
+      }
       enemy.pos = step;
       ap -= MOVE_AP_COST;
       events.push({ type: 'move', fighter: enemy, to: step });
@@ -362,7 +380,7 @@ export class Combat {
       }
       for (const direction of DIRECTIONS) {
         const next = addPos(current, direction);
-        if (cameFrom.has(key(next)) || !this.isFree(next)) continue;
+        if (cameFrom.has(key(next)) || !(this.isFree(next) || this.opensThrough(enemy, next))) continue;
         cameFrom.set(key(next), current);
         queue.push(next);
       }
@@ -372,6 +390,12 @@ export class Combat {
 
   private isFree(pos: GridPos): boolean {
     return this.map.isWalkable(pos.x, pos.y) && !samePos(pos, this.player.pos);
+  }
+
+  /** A closed, unlocked door this creature can open on its way (nobody stands in a closed doorway). */
+  private opensThrough(enemy: Creature, pos: GridPos): boolean {
+    if (!enemy.def.opensDoors || !this.map.isClosedDoor(pos.x, pos.y)) return false;
+    return this.map.doorAt(pos.x, pos.y)!.lock === null;
   }
 
   private recruitSpotters(): void {

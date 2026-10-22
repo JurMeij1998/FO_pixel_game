@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateMap, type ExitRequest } from '../../core/generation/biome';
 import { flipVertical } from '../../core/generation/mapBuilder';
 import { GridMap } from '../../core/gridMap';
+import { LOCKS } from '../../core/locks';
 import { playabilityProblems } from './playability';
 import { VILLAGE } from './village';
 
@@ -86,13 +87,50 @@ describe('village biome', () => {
         );
       });
       expect(spots).toHaveLength(1);
-      // The guard stands on the path to the door, just outside.
-      const besideTheDoorPath = [-1, 1].some((dx) => map.tileAt(guard.pos.x + dx, guard.pos.y) === 'path');
-      expect(besideTheDoorPath).toBe(true);
+      // The guard stands just outside, beside the way in: the store's door is diagonally next
+      // to him. (Not checked through the path tile beside him: a creature may stand on it.)
+      const byTheDoor = [-1, 1].some((dy) => map.doorAt(guard.pos.x - 1, guard.pos.y + dy));
+      expect(byTheDoor).toBe(true);
       expect(reachable.has(`${guard.pos.x},${guard.pos.y}`)).toBe(true);
     }
   });
 });
+
+describe('village buildings', () => {
+  it("lock the store's crate with a good lock, but never the store or the barn", () => {
+    for (const seed of SEEDS.slice(0, 10)) {
+      const map = GridMap.parse(generateMap(VILLAGE, seed, EXITS), 'village');
+      const crate = map.chests.find((c) => c.owner === 'store')!;
+      expect(crate.lock).toBe(LOCKS.good);
+      const gus = map.creatures.find((c) => c.def.id === 'shopkeeper')!;
+      const store = map.buildingAt(gus.pos.x, gus.pos.y)!;
+      expect(store).toBeDefined();
+      const storeDoors = map.doors.filter((d) => [...store.interior].some((k) => isNextTo(k, d)));
+      expect(storeDoors.map((d) => d.lock)).toEqual([null]);
+    }
+  });
+
+  it('are roofed, every one with a door, and some houses locked up', () => {
+    let locked = 0;
+    for (const seed of SEEDS) {
+      const map = GridMap.parse(generateMap(VILLAGE, seed, EXITS), 'village');
+      // The store, a house or two, maybe the barn: each enclosed, with its own roof.
+      expect(map.buildings.length).toBeGreaterThanOrEqual(2);
+      for (const chest of map.chests) {
+        if (chest.name !== 'Dresser' && chest.name !== 'Cupboard') continue;
+        expect(map.buildingAt(chest.x, chest.y)).toBeDefined();
+      }
+      locked += map.doors.filter((d) => d.lock !== null).length;
+    }
+    expect(locked).toBeGreaterThan(0);
+  });
+});
+
+/** Whether an "x,y" tile is right next to (up, down, left, right) a position. */
+function isNextTo(key: string, p: { x: number; y: number }): boolean {
+  const [x, y] = key.split(',').map(Number);
+  return Math.abs(x - p.x) + Math.abs(y - p.y) === 1;
+}
 
 describe('flipVertical', () => {
   it('turns a prefab upside down, entrance included', () => {

@@ -22,6 +22,10 @@ export type SoundName =
   | 'equip'
   | 'stimpak'
   | 'chestOpen'
+  | 'doorOpen'
+  | 'doorClose'
+  | 'locked'
+  | 'lockPick'
   | 'levelUp'
   | 'combatStart'
   | 'menuMove'
@@ -295,6 +299,28 @@ const SOUNDS: Record<SoundName, (v: Voice) => void> = {
   chestOpen: (v) => {
     click(v, 0, 0.3);
     v.tone({ at: 0.03, duration: 0.3, volume: 0.07, wave: 'sawtooth', frequency: 140, endFrequency: 210 }); // a creak
+  },
+  // The latch, then a long low creak of the hinges.
+  doorOpen: (v) => {
+    click(v, 0, 0.3);
+    v.tone({ at: 0.04, duration: 0.45, volume: 0.07, wave: 'sawtooth', frequency: 110, endFrequency: 170 });
+  },
+  // A short creak, then the door thudding into its frame.
+  doorClose: (v) => {
+    v.tone({ duration: 0.2, volume: 0.06, wave: 'sawtooth', frequency: 160, endFrequency: 120 });
+    v.noise({ at: 0.2, duration: 0.09, volume: 0.5, filter: 'lowpass', frequency: 500, endFrequency: 200 });
+  },
+  // Rattling a locked handle: two dull knocks of the latch against the strike plate.
+  locked: (v) => {
+    v.noise({ duration: 0.04, volume: 0.35, filter: 'bandpass', frequency: 900, q: 3 });
+    v.noise({ at: 0.09, duration: 0.04, volume: 0.35, filter: 'bandpass', frequency: 800, q: 3 });
+  },
+  // Picks scratching in the lock, then the tumblers giving with a click.
+  lockPick: (v) => {
+    for (let i = 0; i < 4; i++) {
+      v.noise({ at: i * 0.07, duration: 0.03, volume: 0.15, filter: 'bandpass', frequency: 3500 + i * 300, q: 4 });
+    }
+    click(v, 0.34, 0.45);
   },
 
   // Events and menus

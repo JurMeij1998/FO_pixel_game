@@ -59,12 +59,13 @@ export const SPECIAL_NAMES: Record<keyof Special, string> = {
   luck: 'Luck',
 };
 
-export type Skill = 'smallGuns' | 'meleeWeapons' | 'unarmed';
-export const SKILLS: readonly Skill[] = ['smallGuns', 'meleeWeapons', 'unarmed'];
+export type Skill = 'smallGuns' | 'meleeWeapons' | 'unarmed' | 'lockpick';
+export const SKILLS: readonly Skill[] = ['smallGuns', 'meleeWeapons', 'unarmed', 'lockpick'];
 export const SKILL_NAMES: Record<Skill, string> = {
   smallGuns: 'Small Guns',
   meleeWeapons: 'Melee Weapons',
   unarmed: 'Unarmed',
+  lockpick: 'Lockpick',
 };
 
 /** Tagged skills start 20 points higher, as in Fallout 2. */
@@ -79,6 +80,8 @@ export function baseSkill(special: Special, skill: Skill): number {
       return 20 + 2 * (special.agility + special.strength);
     case 'unarmed':
       return 30 + 2 * (special.agility + special.strength);
+    case 'lockpick':
+      return 10 + special.perception + special.agility;
   }
 }
 
@@ -90,13 +93,13 @@ export const SPECIAL_EFFECTS: Record<keyof Special, string> = {
   strength:
     'Raw physical power. Carry weight: 25 lb plus 25 per point. Max HP: +1 per point. ' +
     'Melee Weapons and Unarmed: +2% per point.',
-  perception: 'Awareness and keen senses. Not used yet.',
+  perception: 'Awareness and keen senses. Lockpick: +1% per point.',
   endurance: 'Toughness and stamina. Max HP: +2 per point. HP gained per level: 3, plus 1 per 2 points.',
   charisma: 'Presence and charm. Better prices when bartering: you buy for less and sell for more.',
   intelligence: 'Knowledge and wits. Skill points per level: 5, plus 2 per point.',
   agility:
     'Speed and coordination. Action points: 5, plus 1 per 2 points. Armor Class: +1 per point. ' +
-    'Small Guns: +4% per point; Melee Weapons and Unarmed: +2% per point.',
+    'Small Guns: +4% per point; Melee Weapons and Unarmed: +2% per point; Lockpick: +1% per point.',
   luck: 'Fate and good fortune. Critical hit chance: 1% per point (a critical does double damage).',
 };
 
@@ -105,4 +108,7 @@ export const SKILL_EFFECTS: Record<Skill, string> = {
   smallGuns: 'Your chance to hit with pistols and rifles. Based on Agility.',
   meleeWeapons: 'Your chance to hit with knives, spears and other hand-held weapons. Based on Strength and Agility.',
   unarmed: 'Your chance to hit with your fists. Based on Strength and Agility.',
+  lockpick:
+    'Opening locked doors and chests: you can pick any lock that needs no more than your skill. ' +
+    'Based on Perception and Agility.',
 };

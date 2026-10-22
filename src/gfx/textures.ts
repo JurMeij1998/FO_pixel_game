@@ -32,7 +32,91 @@ export function createTextures(scene: Phaser.Scene): void {
     createPlainGlyphTexture(scene, char, rows);
   }
   createSealTexture(scene);
+  createDoorTextures(scene);
+  for (const material of ['wood', 'brick'] as const) {
+    for (let variant = 0; variant < TILE_VARIANTS; variant++) {
+      createTexture(scene, roofTextureKey(material, variant), TILE_SIZE, TILE_SIZE, ROOF_PAINTERS[material]);
+    }
+  }
 }
+
+export const DOOR_CLOSED = 'door_closed';
+export const DOOR_OPEN = 'door_open';
+
+/**
+ * A door in a wall running left to right; the scene turns it a quarter for one running up and
+ * down. Closed: a plank door in a dark frame, with a handle. Open: just the frame, the door
+ * swung back against one side, so the threshold (the tile underneath) shows.
+ */
+function createDoorTextures(scene: Phaser.Scene): void {
+  const frame = (ctx: CanvasRenderingContext2D) => {
+    ctx.fillStyle = '#2a1c10';
+    ctx.fillRect(0, 0, 2, TILE_SIZE);
+    ctx.fillRect(TILE_SIZE - 2, 0, 2, TILE_SIZE);
+  };
+  createTexture(scene, DOOR_CLOSED, TILE_SIZE, TILE_SIZE, (ctx, rand) => {
+    ctx.fillStyle = '#7a5028';
+    ctx.fillRect(2, 0, TILE_SIZE - 4, TILE_SIZE);
+    ctx.fillStyle = '#5a3a1c'; // the gaps between the planks
+    for (const x of [5, 8, 11]) ctx.fillRect(x, 0, 1, TILE_SIZE);
+    ctx.fillStyle = '#946638'; // light catching the planks' left edges
+    for (const x of [2, 6, 9, 12]) ctx.fillRect(x, 0, 1, TILE_SIZE);
+    speckle(ctx, rand, ['#6a4422', '#86592e'], 10);
+    ctx.fillStyle = '#4a3018'; // cross braces
+    ctx.fillRect(2, 3, TILE_SIZE - 4, 2);
+    ctx.fillRect(2, 11, TILE_SIZE - 4, 2);
+    pixel(ctx, 11, 7, '#d8c070'); // handle
+    pixel(ctx, 11, 8, '#8a7030');
+    frame(ctx);
+  });
+  createTexture(scene, DOOR_OPEN, TILE_SIZE, TILE_SIZE, (ctx) => {
+    frame(ctx);
+    ctx.fillStyle = '#5a3a1c'; // the door, edge on, against the left of the frame
+    ctx.fillRect(2, 0, 3, TILE_SIZE);
+    ctx.fillStyle = '#7a5028';
+    ctx.fillRect(3, 0, 1, TILE_SIZE);
+  });
+}
+
+/** A roof tile, by what the building is made of; variants picked per position like the ground's. */
+export function roofTextureKey(material: 'wood' | 'brick', variant: number): string {
+  return `roof_${material}_${variant}`;
+}
+
+export function roofVariant(x: number, y: number): number {
+  return (((x * 83492791) ^ (y * 2654435761)) >>> 0) % TILE_VARIANTS;
+}
+
+const ROOF_PAINTERS: Record<'wood' | 'brick', Painter> = {
+  // Weathered wooden shingles in staggered rows, each lit along its top.
+  wood: (ctx, rand) => {
+    fill(ctx, '#4e3a28');
+    for (let row = 0; row < 4; row++) {
+      const offset = row % 2 === 0 ? 0 : 3;
+      for (let x = -offset; x < TILE_SIZE; x += 6) {
+        ctx.fillStyle = rand() < 0.2 ? '#5e4832' : '#6a5238';
+        ctx.fillRect(x + 1, row * 4, 5, 3);
+        ctx.fillStyle = '#7e6446';
+        ctx.fillRect(x + 1, row * 4, 5, 1);
+      }
+    }
+    speckle(ctx, rand, ['#3e2e20', '#584330'], 8);
+  },
+  // Corrugated tin, grey with streaks of rust.
+  brick: (ctx, rand) => {
+    fill(ctx, '#6a6e70');
+    for (let x = 0; x < TILE_SIZE; x += 3) {
+      ctx.fillStyle = '#80868a';
+      ctx.fillRect(x, 0, 1, TILE_SIZE);
+      ctx.fillStyle = '#50545a';
+      ctx.fillRect(x + 2, 0, 1, TILE_SIZE);
+    }
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = rand() < 0.5 ? '#8a5a38' : '#7a4a2a';
+      ctx.fillRect(Math.floor(rand() * 15), Math.floor(rand() * 10), 1, 3 + Math.floor(rand() * 4));
+    }
+  },
+};
 
 /** Diameter of the AP gauge's seal, in pixels. */
 export const SEAL_SIZE = 15;
@@ -255,6 +339,14 @@ const TILE_PAINTERS: Record<TileType, Painter> = {
     ctx.fillRect(1, 13, 14, 1);
     ctx.fillRect(4, 2, 1, 12);
     ctx.fillRect(11, 2, 1, 12);
+  },
+
+  // A doorway's threshold: worn stone, seen when the door (drawn on top) stands open.
+  door: (ctx, rand) => {
+    fill(ctx, '#4e4a42');
+    speckle(ctx, rand, ['#5a564c', '#44403a'], 18);
+    ctx.fillStyle = '#3a3630';
+    ctx.fillRect(0, 7, TILE_SIZE, 1);
   },
 
   // A shop shelf seen from above: wooden edge with tins and boxes on it.

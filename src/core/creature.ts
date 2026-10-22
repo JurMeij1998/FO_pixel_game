@@ -22,6 +22,11 @@ export interface CreatureDef {
   dialog?: Dialog;
   /** Trades the contents of their pack (`loot`, caps included) on the barter screen. */
   trader?: boolean;
+  /**
+   * Opens doors (unlocked ones) to get at you in a fight: people and raiders do, animals and
+   * feral ghouls don't. Everyone else is kept out (or in) by a closed door.
+   */
+  opensDoors?: boolean;
   maxHitPoints: number;
   actionPoints: number;
   armorClass: number;
@@ -104,6 +109,7 @@ const DEFINITIONS: CreatureDef[] = [
   {
     id: 'raider',
     name: 'Raider',
+    opensDoors: true,
     maxHitPoints: 24,
     actionPoints: 7,
     armorClass: 5,
@@ -124,6 +130,7 @@ const DEFINITIONS: CreatureDef[] = [
     name: 'Gus',
     properName: true,
     friendly: true,
+    opensDoors: true,
     group: 'store',
     trader: true,
     maxHitPoints: 20,
@@ -168,6 +175,7 @@ const DEFINITIONS: CreatureDef[] = [
     name: 'Rosa',
     properName: true,
     friendly: true,
+    opensDoors: true,
     maxHitPoints: 12,
     actionPoints: 5,
     armorClass: 2,
@@ -212,6 +220,7 @@ const DEFINITIONS: CreatureDef[] = [
     id: 'guard',
     name: 'Guard',
     friendly: true,
+    opensDoors: true,
     group: 'store',
     maxHitPoints: 40,
     actionPoints: 8,

@@ -1,7 +1,8 @@
 import { Character } from '../core/character';
-import { MapBuilder } from '../core/generation/mapBuilder';
+import { MapBuilder, type Prefab } from '../core/generation/mapBuilder';
 import { border } from '../core/generation/terrain';
 import type { MapDef } from '../core/gridMap';
+import { LOCKS } from '../core/locks';
 import { Random } from '../core/random';
 import { GENERAL_STORE } from './biomes/village';
 
@@ -9,7 +10,9 @@ import { GENERAL_STORE } from './biomes/village';
  * A small room for trying out combat UI (such as the AP gauge): a fight starts as soon as you
  * arrive, and the start is boxed in so floating UI has to work around things. Chests sit
  * directly above (b) and below (c) the start, a radroach three tiles to the right, more
- * creatures further out, and an exit signpost. Only reachable in development; never saved.
+ * creatures further out, and an exit signpost. Bottom right, a small brick shack with a good
+ * lock (60%) on its door, which the test character (66% Lockpick) can pick, mid-fight or after,
+ * and a strongbox (d) inside under its roof. Only reachable in development; never saved.
  */
 export const TEST_ARENA: MapDef = {
   name: 'Test Arena',
@@ -22,17 +25,18 @@ export const TEST_ARENA: MapDef = {
     '#.......b............#',
     '#.......P..R.........#',
     '#.......c............#',
-    '#....................#',
-    '#...oo.......o.......#',
-    '#...oo...........R...#',
-    '#....................#',
-    '#....................#',
+    '#..............#####.#',
+    '#...oo.......o.#_d_#.#',
+    '#...oo.........#___#.#',
+    '#..............##/##.#',
+    '#.........R..........#',
     '###########1##########',
   ],
   chests: {
     a: { name: 'Spare Ammo', contents: [['ammo_10mm', 60], ['ammo_223', 20]] },
     b: { name: 'Crate Above', contents: [['stimpak', 5]] },
     c: { name: 'Crate Below', contents: [['scrap_metal', 2]] },
+    d: { name: 'Strongbox', contents: [['stimpak', 2], ['bottle_caps', 50]] },
   },
   creatures: {
     R: 'radroach',
@@ -41,14 +45,33 @@ export const TEST_ARENA: MapDef = {
   exits: {
     '1': { to: 'wasteland' },
   },
+  locks: {
+    '17,11': LOCKS.good,
+  },
+};
+
+/** A one-room shack whose door has a hard lock (80%): beyond the test character's 66% Lockpick. */
+const LOCKED_SHACK: Prefab = {
+  name: 'locked shack',
+  rows: [
+    '%%%%%',
+    '%+$+%',
+    '%+++%',
+    '%%/%%',
+    '  :  ',
+  ],
+  entrance: { x: 2, y: 4 },
+  chest: { name: 'Footlocker', loot: { rolls: [1, 1], entries: [{ itemId: 'bottle_caps', min: 20, max: 20, weight: 1 }] } },
+  doorLock: { lock: LOCKS.hard, chance: 1 },
 };
 
 /**
  * The village store in a small yard, for trying out talking, bartering, stealing and
  * provoking. It's stamped from the same prefab as in the village (GENERAL_STORE), so it can't
- * drift from it: Gus behind his counter, the store's crate behind it, the guard by the door.
- * You start on the shop floor facing Gus across the counter. Only reachable in development;
- * never saved.
+ * drift from it: Gus behind his counter, the store's crate behind it (a good lock, which the
+ * test character can pick), the guard by the door. Left of the store, a shack with a hard lock
+ * the test character can't pick, to see that refusal. You start on the shop floor facing Gus
+ * across the counter. Only reachable in development; never saved.
  */
 export const TEST_SHOP: MapDef = buildTestShop();
 
@@ -57,6 +80,7 @@ function buildTestShop(): MapDef {
   border(b, '^', 1);
   const store = { x: 7, y: 2 };
   const entrance = b.stamp(GENERAL_STORE, store.x, store.y, new Random(1));
+  b.stamp(LOCKED_SHACK, 1, 3, new Random(1));
   const exit = b.addExit('south', 'wasteland', ':');
   // A path from the door down to the exit: down, across, and down again.
   const pathY = exit.y - 1;
@@ -70,7 +94,8 @@ function buildTestShop(): MapDef {
 
 /**
  * Sturdy and well equipped, so fights last long enough to watch the UI. 10 Agility gives 10 AP.
- * The hunting rifle is in hand, loaded; the pistol (loaded too) is in the other hand.
+ * The hunting rifle is in hand, loaded; the pistol (loaded too) is in the other hand. Lockpick
+ * 66%, enough for the store's crate (a good lock) but not a hard one.
  */
 export function testCharacter(): Character {
   const player = new Character('Tester', {
@@ -84,6 +109,7 @@ export function testCharacter(): Character {
   });
   player.taggedSkills.add('smallGuns');
   player.taggedSkills.add('meleeWeapons');
+  player.skillBonus.lockpick = 40;
   for (const [itemId, quantity] of [
     ['knife', 1],
     ['10mm_pistol', 1],

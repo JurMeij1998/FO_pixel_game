@@ -298,3 +298,50 @@ describe('character creation in saves', () => {
     expect(loadGame(odd, buildKnownMap, 'wasteland').difficulty).toBe('normal');
   });
 });
+
+describe('doors, locks and roofs in saves', () => {
+  it('keep doors open or shut, picked locks picked, and entered buildings unroofed', () => {
+    const game = freshGame();
+    const map = game.maps.wasteland;
+    const shed = map.doors.find((d) => d.lock !== null)!;
+    shed.lock = null;
+    shed.open = true;
+    const locker = map.chests.find((c) => c.name === 'Metal Locker')!;
+    map.enter(locker);
+
+    const loaded = roundTrip(game).maps.wasteland;
+    const loadedShed = loaded.doorAt(shed.x, shed.y)!;
+    expect(loadedShed).toMatchObject({ open: true, lock: null });
+    expect(loaded.isHidden(locker.x, locker.y)).toBe(false);
+    const shack = loaded.doors.find((d) => d !== loadedShed)!;
+    expect(shack.open).toBe(false);
+  });
+
+  it('keep a chest unlocked once picked', () => {
+    const game = freshGame();
+    const chest = game.maps.wasteland.chests[0];
+    chest.lock = 40; // as if the map had locked it
+    const json = saveJson(game);
+    expect(json.maps.wasteland.chests[chest.id].locked).toBe(true);
+    json.maps.wasteland.chests[chest.id].locked = false;
+    const loaded = loadGame(json, buildKnownMap, 'wasteland');
+    expect(loaded.maps.wasteland.chests[0].lock).toBeNull();
+  });
+
+  it('load saves from before doors: closed, locked as the map says, every roof on', () => {
+    const json = saveJson(freshGame());
+    delete json.maps.wasteland.doors;
+    delete json.maps.wasteland.entered;
+    for (const chest of Object.values(json.maps.wasteland.chests) as Array<{ locked?: boolean }>) delete chest.locked;
+    const loaded = loadGame(json, buildKnownMap, 'wasteland').maps.wasteland;
+    expect(loaded.doors.every((d) => !d.open)).toBe(true);
+    expect(loaded.doors.filter((d) => d.lock !== null)).toHaveLength(1);
+    expect(loaded.entered.size).toBe(0);
+  });
+
+  it("ignore entered buildings the map doesn't have (any more)", () => {
+    const json = saveJson(freshGame());
+    json.maps.wasteland.entered = ['99,99', 42];
+    expect(loadGame(json, buildKnownMap, 'wasteland').maps.wasteland.entered.size).toBe(0);
+  });
+});

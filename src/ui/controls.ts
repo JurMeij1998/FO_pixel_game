@@ -1,7 +1,7 @@
 /** Every key binding, for the Controls screen: [keys, while exploring, in combat]. */
 export const CONTROL_ROWS: Array<[keys: string, exploring: string, combat: string]> = [
-  ['Arrows / WASD', 'Move', 'Move (1 AP per tile)'],
-  ['E', 'Open, loot or talk to what you face', '-'],
+  ['Arrows / WASD', 'Move (into a door: open it)', 'Move (1 AP per tile)'],
+  ['E', 'Open, loot, talk; doors, locks', '-'],
   ['Space', 'Interact', 'End your turn'],
   ['Click an enemy', 'Attack it (starts combat)', 'Attack it'],
   ['Click a person', 'Talk to them (when close)', '-'],
