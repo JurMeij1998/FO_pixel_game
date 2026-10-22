@@ -71,3 +71,28 @@ export function baseSkill(special: Special, skill: Skill): number {
       return 30 + 2 * (special.agility + special.strength);
   }
 }
+
+/**
+ * What each S.P.E.C.I.A.L. stat does in this game, for the character sheet. Keep these in
+ * step with the formulas above (and Character.armorClass / critChance, core/barter.ts).
+ */
+export const SPECIAL_EFFECTS: Record<keyof Special, string> = {
+  strength:
+    'Raw physical power. Carry weight: 25 lb plus 25 per point. Max HP: +1 per point. ' +
+    'Melee Weapons and Unarmed: +2% per point.',
+  perception: 'Awareness and keen senses. Not used yet.',
+  endurance: 'Toughness and stamina. Max HP: +2 per point. HP gained per level: 3, plus 1 per 2 points.',
+  charisma: 'Presence and charm. Better prices when bartering: you buy for less and sell for more.',
+  intelligence: 'Knowledge and wits. Skill points per level: 5, plus 2 per point.',
+  agility:
+    'Speed and coordination. Action points: 5, plus 1 per 2 points. Armor Class: +1 per point. ' +
+    'Small Guns: +4% per point; Melee Weapons and Unarmed: +2% per point.',
+  luck: 'Fate and good fortune. Critical hit chance: 1% per point (a critical does double damage).',
+};
+
+/** What each skill is for, for the character sheet. */
+export const SKILL_EFFECTS: Record<Skill, string> = {
+  smallGuns: 'Your chance to hit with pistols and rifles. Based on Agility.',
+  meleeWeapons: 'Your chance to hit with knives, spears and other blades. Based on Strength and Agility.',
+  unarmed: 'Your chance to hit with your fists. Based on Strength and Agility.',
+};

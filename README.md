@@ -43,7 +43,7 @@ behind it, and the guard outside by the door.
 | F / click enemy | Click: attack (starts combat)    | Attack the target             |
 | T               |                                  | Next target                   |
 | Tab / I         | Inventory (again to close)       | Inventory (costs 4 AP)        |
-| C               | Character sheet, spend skill points |                            |
+| C               | Character sheet: browse S.P.E.C.I.A.L. and skills (with what each does), spend skill points | |
 | Q               | Swap primary/secondary weapon    | Same, free                    |
 | R               | Reload the gun in hand           | Reload (costs 2 AP)           |
 | M               | Sound on/off                     | Sound on/off                  |
