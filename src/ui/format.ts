@@ -1,14 +1,28 @@
 import type { ItemStack } from '../core/container';
-import { getItem, type ItemDef } from '../core/items';
+import { getItem, type ItemCategory, type ItemDef } from '../core/items';
 import type { ListRow } from './widgets';
+
+/** The order lists show items in, as in Fallout 2: weapons, armour, aid, ammo, then the rest. */
+const CATEGORY_ORDER: readonly ItemCategory[] = ['weapon', 'armor', 'consumable', 'ammo', 'misc'];
+
+/**
+ * Stacks in the order every list shows them: by category (see CATEGORY_ORDER), then by name.
+ * Containers keep items in the order they were added; only the lists are sorted.
+ */
+export function sortedStacks<T extends Readonly<ItemStack>>(stacks: readonly T[]): T[] {
+  const rank = (stack: T) => CATEGORY_ORDER.indexOf(getItem(stack.itemId).category);
+  return [...stacks].sort(
+    (a, b) => rank(a) - rank(b) || getItem(a.itemId).name.localeCompare(getItem(b.itemId).name),
+  );
+}
 
 export function stackLabel(item: ItemDef, quantity: number): string {
   return quantity > 1 ? `${item.name} x${quantity}` : item.name;
 }
 
-/** One list row per stack, with the stack's total weight on the right. */
+/** One list row per stack, sorted (see sortedStacks), with the stack's total weight on the right. */
 export function stackRows(stacks: ReadonlyArray<Readonly<ItemStack>>): ListRow[] {
-  return stacks.map(({ itemId, quantity }) => {
+  return sortedStacks(stacks).map(({ itemId, quantity }) => {
     const item = getItem(itemId);
     return { key: itemId, label: stackLabel(item, quantity), detail: `${item.weight * quantity} lb` };
   });

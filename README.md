@@ -38,21 +38,23 @@ behind it, and the guard outside by the door.
 | Key             | Exploring                        | In combat                     |
 | --------------- | -------------------------------- | ----------------------------- |
 | Arrows / WASD   | Move                             | Move (1 AP per tile)          |
-| E / Space       | Interact with what you face: open a chest, loot a corpse, talk | Space: end turn |
+| E / Space       | Interact with what you face: open a chest, loot a corpse (also one you stand on), talk | Space: end turn |
 | Click a person  | Talk, when next to them or across a counter; Ctrl+click attacks them |      |
 | F / click enemy | Click: attack (starts combat)    | Attack the target             |
-| Tab             |                                  | Next target                   |
-| I               | Inventory                        | Inventory (costs 4 AP)        |
-| C               | Character sheet, spend skill points |                            |
+| T               |                                  | Next target                   |
+| Tab / I         | Inventory (again to close)       | Inventory (costs 4 AP)        |
+| C               | Character sheet: browse S.P.E.C.I.A.L. and skills (with what each does), spend skill points | |
 | Q               | Swap primary/secondary weapon    | Same, free                    |
 | R               | Reload the gun in hand           | Reload (costs 2 AP)           |
 | M               | Sound on/off                     | Sound on/off                  |
 | Esc             | Pause menu / close a screen      | Pause menu                    |
 | Click (loot)    | Move 1 of a stack; Ctrl+click half (rounded up), Shift+click all |   |
-| Space (loot)    | Take all                         |                               |
-| E / Esc (loot)  | Close the loot screen            |                               |
+| Space (loot)    | Take all and close               |                               |
+| Esc (loot, barter) | Close the screen              |                               |
 | Up/Down, Enter (talk) | Pick a reply and answer (or click it, or press its number); Esc walks away | |
 | Click (barter)  | Sell (left) or buy (right) 1; Ctrl+click half, Shift+click all |     |
+| W/S, A/D (screens) | Inventory, loot, barter, character sheet: move the `>` cursor up/down a list, and between the lists (arrow keys too). Item lists are sorted by category (weapons, armour, aid, ammo, the rest), and the inventory reopens on the item you last had selected | |
+| E (screens)     | Inventory: use, equip (first free hand, else primary), wear or unequip the selected item. Loot, barter: move it to the other side (take/store, buy/sell); Shift+E the whole stack. Character sheet: spend a skill point on the selected skill | |
 
 ## Talking and trading
 
@@ -71,7 +73,8 @@ poor odds, until one of you is down or you get away. Killing her earns no XP.
 
 Every village has a small general store with **Gus** behind the counter: "if you break
 anything, you buy it!" He sells ammo, two stimpaks and a leather jacket, and buys what you
-bring with his own (limited) caps. On the barter screen a click buys or sells at once. Prices
+bring with his own (limited) caps. On the barter screen a click (or E) buys or sells at once, and
+the selected item's description and price show under the lists. Prices
 depend on Charisma (`core/barter.ts`): you buy at 100% of an item's value at Charisma 10, up
 to 136% at 1, and sell for 55% at Charisma 10, down to 28% at 1.
 

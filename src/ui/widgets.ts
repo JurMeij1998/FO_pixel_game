@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import type { ListCursor } from './listCursor';
 import { CHAR_WIDTH, COLORS, DIM_TEXT, ROW_HEIGHT, TEXT, TITLE_TEXT } from './theme';
 
 export const PANEL = { x: 30, y: 30, width: 900, height: 580 };
@@ -133,7 +134,7 @@ export function modifiersOf(pointer: Phaser.Input.Pointer): ClickModifiers {
  * and reused, so it is safe to call setRows() from a row's own click handler.
  */
 export class ListView {
-  selectedKey: string | null = null;
+  private selected: string | null = null;
 
   private rows: readonly ListRow[] = [];
   private scroll = 0;
@@ -179,6 +180,26 @@ export class ListView {
     this.scrollBy(0); // re-clamp after the list shrank
   }
 
+  /** The row marked with '>' (and drawn bright), if any. */
+  get selectedKey(): string | null {
+    return this.selected;
+  }
+
+  /** Marks a row with '>', redrawing straight away (also when the rows themselves haven't changed). */
+  set selectedKey(key: string | null) {
+    if (key === this.selected) return;
+    this.selected = key;
+    this.render();
+  }
+
+  /** Scrolls just far enough to bring the row with this key into view. */
+  reveal(key: string): void {
+    const index = this.rows.findIndex((row) => row.key === key);
+    if (index < 0) return;
+    if (index < this.scroll) this.scrollBy(index - this.scroll);
+    else if (index >= this.scroll + this.visibleRows) this.scrollBy(index - (this.scroll + this.visibleRows - 1));
+  }
+
   private scrollBy(delta: number): void {
     const maxScroll = Math.max(0, this.rows.length - this.visibleRows);
     this.scroll = Phaser.Math.Clamp(this.scroll + delta, 0, maxScroll);
@@ -194,7 +215,7 @@ export class ListView {
         line.setText(isEmptyHint ? '  (empty)' : '').setColor(COLORS.dim);
         return;
       }
-      const selected = row.key === this.selectedKey;
+      const selected = row.key === this.selected;
       line.setText(this.formatRow(row, selected)).setColor(selected ? COLORS.bright : COLORS.text);
     });
     this.moreAbove.setVisible(this.scroll > 0);
@@ -208,4 +229,30 @@ export class ListView {
     const label = row.label.length > width ? `${row.label.slice(0, width - 1)}…` : row.label.padEnd(width);
     return `${selected ? '>' : ' '} ${label}${detail}`;
   }
+}
+
+/**
+ * Keyboard control for a screen of side-by-side lists: W/S (or Up/Down) move the cursor up and
+ * down a list, A/D (or Left/Right) between the lists. Calls `onMove` after every move.
+ */
+export function bindCursorKeys(scene: Phaser.Scene, cursor: ListCursor, onMove: () => void): void {
+  const keyboard = scene.input.keyboard!;
+  const move = (moved: boolean) => {
+    if (!moved) return;
+    playSound('menuMove');
+    onMove();
+  };
+  for (const key of ['W', 'UP']) keyboard.on(`keydown-${key}`, () => move(cursor.moveRow(-1)));
+  for (const key of ['S', 'DOWN']) keyboard.on(`keydown-${key}`, () => move(cursor.moveRow(1)));
+  for (const key of ['A', 'LEFT']) keyboard.on(`keydown-${key}`, () => move(cursor.moveColumn(-1)));
+  for (const key of ['D', 'RIGHT']) keyboard.on(`keydown-${key}`, () => move(cursor.moveColumn(1)));
+}
+
+/** Shows the cursor on side-by-side lists: '>' on its row in the list it's in, none in the others. */
+export function showCursor(cursor: ListCursor, views: readonly ListView[]): void {
+  views.forEach((view, column) => {
+    const key = column === cursor.activeColumn ? cursor.selectedKey : null;
+    view.selectedKey = key;
+    if (key) view.reveal(key);
+  });
 }

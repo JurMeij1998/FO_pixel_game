@@ -84,6 +84,21 @@ describe('GridMap', () => {
     expect(open.hasLineOfSight({ x: 0, y: 0 }, { x: 1, y: 1 })).toBe(true); // one side is open
   });
 
+  it('loots the corpse in front of you, or else the one you stand on', () => {
+    const map = GridMap.parse({ name: 'field', rows: ['PRX.'], chests: {}, creatures: { R: 'radroach', X: 'raider' } });
+    const [roach, raider] = map.creatures;
+    const right = { x: 1, y: 0 };
+    expect(map.corpseToLoot({ x: 1, y: 0 }, right)).toBeUndefined(); // both still alive
+    roach.hitPoints = 0;
+    raider.hitPoints = 0;
+    // Standing on the radroach, facing the raider: the one in front wins.
+    expect(map.corpseToLoot({ x: 1, y: 0 }, right)).toBe(raider);
+    // Standing on the radroach, facing away from anything: the one underfoot.
+    expect(map.corpseToLoot({ x: 1, y: 0 }, { x: 0, y: 1 })).toBe(roach);
+    // Standing on bare ground with nothing in front: none.
+    expect(map.corpseToLoot({ x: 3, y: 0 }, right)).toBeUndefined();
+  });
+
   it('prefers the corpse that still has loot when several share a tile', () => {
     const map = GridMap.parse({
       name: 'pile',
