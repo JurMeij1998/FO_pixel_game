@@ -10,7 +10,7 @@ import { addPos, type GridPos } from '../core/grid';
 import type { Chest, Door, Exit } from '../core/gridMap';
 import { lockedMessage, pickLock } from '../core/locks';
 import type { Lootable } from '../core/loot';
-import { DOOR_CLOSED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey } from '../gfx/textures';
+import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
 import { ApGauge } from '../ui/apGauge';
 import { ENEMY_BAR_GAP, ENEMY_BAR_HEIGHT, enemyBar } from '../ui/healthBar';
@@ -40,6 +40,10 @@ const ROOF_FADE_MS = 300;
 const DOOR_PAUSE_MS = 120;
 const ENEMY_RED = 0xd02020;
 const FADE_MS = 250;
+
+/** Locked doors and chests show a padlock, so you can tell from afar. */
+const doorTexture = (door: Door) => (door.open ? DOOR_OPEN : door.lock !== null ? DOOR_LOCKED : DOOR_CLOSED);
+const chestTexture = (chest: Chest) => (chest.opened ? 'chest_open' : chest.lock !== null ? 'chest_locked' : 'chest_closed');
 
 /** Pixel position of a tile's centre. */
 const toPixel = (tile: number) => tile * TILE_SIZE + TILE_SIZE / 2;
@@ -90,7 +94,7 @@ export class WorldScene extends Phaser.Scene {
       }
     }
     for (const chest of map.chests) {
-      const image = this.add.image(toPixel(chest.x), toPixel(chest.y), chest.opened ? 'chest_open' : 'chest_closed');
+      const image = this.add.image(toPixel(chest.x), toPixel(chest.y), chestTexture(chest));
       this.chestImages.set(chest.id, image);
     }
     for (const exit of map.exits) this.add.image(toPixel(exit.x), toPixel(exit.y), 'signpost').setDepth(DEPTH.prop);
@@ -98,7 +102,7 @@ export class WorldScene extends Phaser.Scene {
       // Drawn for a wall running left to right; turned a quarter in one running up and down.
       const wall = (x: number) => map.tileAt(x, door.y) === 'wall' || map.tileAt(x, door.y) === 'woodWall';
       const upright = !wall(door.x - 1) && !wall(door.x + 1);
-      const image = this.add.image(toPixel(door.x), toPixel(door.y), door.open ? DOOR_OPEN : DOOR_CLOSED).setDepth(DEPTH.prop);
+      const image = this.add.image(toPixel(door.x), toPixel(door.y), doorTexture(door)).setDepth(DEPTH.prop);
       this.doorImages.set(door, image.setAngle(upright ? 90 : 0));
     }
     for (const creature of map.creatures) {
@@ -619,7 +623,7 @@ export class WorldScene extends Phaser.Scene {
 
   /** Shows a door as it now is (open or closed), with its sound. */
   private showDoor(door: Door): void {
-    this.doorImages.get(door)?.setTexture(door.open ? DOOR_OPEN : DOOR_CLOSED);
+    this.doorImages.get(door)?.setTexture(doorTexture(door));
     playSound(door.open ? 'doorOpen' : 'doorClose');
   }
 
@@ -777,7 +781,7 @@ export class WorldScene extends Phaser.Scene {
     }
     chest.opened = true;
     playSound('chestOpen');
-    this.chestImages.get(chest.id)?.setTexture('chest_open');
+    this.chestImages.get(chest.id)?.setTexture(chestTexture(chest));
     this.openLoot(chest);
   }
 

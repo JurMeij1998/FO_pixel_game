@@ -41,6 +41,7 @@ export function createTextures(scene: Phaser.Scene): void {
 }
 
 export const DOOR_CLOSED = 'door_closed';
+export const DOOR_LOCKED = 'door_locked';
 export const DOOR_OPEN = 'door_open';
 
 /**
@@ -54,7 +55,7 @@ function createDoorTextures(scene: Phaser.Scene): void {
     ctx.fillRect(0, 0, 2, TILE_SIZE);
     ctx.fillRect(TILE_SIZE - 2, 0, 2, TILE_SIZE);
   };
-  createTexture(scene, DOOR_CLOSED, TILE_SIZE, TILE_SIZE, (ctx, rand) => {
+  const closedDoor: Painter = (ctx, rand) => {
     ctx.fillStyle = '#7a5028';
     ctx.fillRect(2, 0, TILE_SIZE - 4, TILE_SIZE);
     ctx.fillStyle = '#5a3a1c'; // the gaps between the planks
@@ -68,6 +69,21 @@ function createDoorTextures(scene: Phaser.Scene): void {
     pixel(ctx, 11, 7, '#d8c070'); // handle
     pixel(ctx, 11, 8, '#8a7030');
     frame(ctx);
+  };
+  createTexture(scene, DOOR_CLOSED, TILE_SIZE, TILE_SIZE, closedDoor);
+  // The same door with a padlock over the handle, so you can see it's locked from afar.
+  createTexture(scene, DOOR_LOCKED, TILE_SIZE, TILE_SIZE, (ctx, rand) => {
+    closedDoor(ctx, rand);
+    ctx.fillStyle = '#c8c8c0'; // the shackle
+    ctx.fillRect(10, 4, 1, 3);
+    ctx.fillRect(13, 4, 1, 3);
+    ctx.fillRect(11, 3, 2, 1);
+    ctx.fillStyle = '#1e1a14'; // the body's outline
+    ctx.fillRect(9, 6, 6, 6);
+    ctx.fillStyle = '#f0d848';
+    ctx.fillRect(10, 7, 4, 4);
+    ctx.fillStyle = '#1e1a14'; // keyhole
+    ctx.fillRect(11, 8, 2, 2);
   });
   createTexture(scene, DOOR_OPEN, TILE_SIZE, TILE_SIZE, (ctx) => {
     frame(ctx);
