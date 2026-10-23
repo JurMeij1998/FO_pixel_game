@@ -81,18 +81,28 @@ export function findBuildings(tiles: Tiles): Building[] {
     }
   }
 
-  // A door leads outside when one of its sides is ground that's in no building.
-  const indoors = new Set(areas.flatMap((a) => [...a.interior]));
-  const leadsOutside = (door: GridPos) =>
-    DIRECTIONS.some((d) => {
-      const side = addPos(door, d);
-      return inside(side) && !indoors.has(tileKey(side));
-    });
+  // A door between two rooms (each side inside a different building) is an inner door; any
+  // other leads outside (even straight into another building's door).
+  const roomOf = new Map(areas.flatMap((a) => [...a.interior].map((k) => [k, a.id] as const)));
+  const leadsOutside = (door: GridPos) => {
+    const rooms = new Set(DIRECTIONS.map((d) => roomOf.get(tileKey(addPos(door, d)))).filter((id) => id !== undefined));
+    return rooms.size < 2;
+  };
   return areas.map(({ id, area, interior, doors }) => ({
     id,
     interior,
     ...roofOver(area, doors.filter(leadsOutside), tiles),
   }));
+}
+
+/**
+ * What of a building's roof is on, given the buildings already entered: all of it, except the
+ * walls and doors it shares with a room you've been in. From inside a room you see all of its
+ * walls, the doors to the rooms next door among them; their roofs only hide what's inside.
+ */
+export function roofShown(building: Building, entered: readonly Building[]): GridPos[] {
+  const seen = new Set(entered.filter((b) => b !== building).flatMap((b) => b.roof.map(tileKey)));
+  return building.roof.filter((p) => building.interior.has(tileKey(p)) || !seen.has(tileKey(p)));
 }
 
 /**

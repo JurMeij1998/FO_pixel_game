@@ -1,5 +1,4 @@
 import type { Character } from './character';
-import { failure, success, type ActionResult } from './result';
 
 /**
  * Locks on doors and chests. A lock needs a certain Lockpick skill: with at least that much
@@ -54,14 +53,12 @@ export function lockedMessage(what: string, thing: Lockable, player: Character):
   return `The ${what} is locked with ${kind} (Lockpick ${thing.lock}%; you have ${skill}%).`;
 }
 
-/** Whether the player has the skill to try picking this lock: if not, the message says what it takes. */
-export function canPick(what: string, thing: Lockable, player: Character): ActionResult {
-  if (thing.lock === null) return failure(`The ${what} isn't locked.`);
+/** Why the player can't try picking this lock (not locked, or not enough skill: it says what it takes), or null if they can. */
+export function pickProblem(what: string, thing: Lockable, player: Character): string | null {
+  if (thing.lock === null) return `The ${what} isn't locked.`;
   const skill = player.skill('lockpick');
-  if (skill < thing.lock) {
-    return failure(`This lock is beyond you: it takes Lockpick ${thing.lock}%, and you have ${skill}%.`);
-  }
-  return success(`You set to work on the lock.`);
+  if (skill < thing.lock) return `This lock is beyond you: it takes Lockpick ${thing.lock}%, and you have ${skill}%.`;
+  return null;
 }
 
 /** The lock has been picked (its puzzle solved): it stays open for good. Returns what to tell the player. */

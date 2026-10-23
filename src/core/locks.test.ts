@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Character } from './character';
-import { canPick, describeLock, lockedMessage, lockKind, LOCKS, pinsFor, unlock, type Lockable } from './locks';
+import { describeLock, lockedMessage, lockKind, LOCKS, pickProblem, pinsFor, unlock, type Lockable } from './locks';
 
 function picker(perception = 5, agility = 5): Character {
   return new Character('Picker', { strength: 5, perception, endurance: 5, charisma: 5, intelligence: 5, agility, luck: 5 });
@@ -18,7 +18,7 @@ describe('locks', () => {
 
   it('can be tried with at least the skill the lock needs, and stay open once picked', () => {
     const crate: Lockable = { lock: LOCKS.easy };
-    expect(canPick('crate', crate, picker(10, 10)).ok).toBe(true); // 30%
+    expect(pickProblem('crate', crate, picker(10, 10))).toBeNull(); // 30%
     expect(crate.lock).toBe(LOCKS.easy); // trying doesn't open it: the pin puzzle does
     expect(unlock('crate', crate)).toBe('You pick the lock on the crate.');
     expect(crate.lock).toBeNull();
@@ -26,18 +26,17 @@ describe('locks', () => {
 
   it("can't even be tried with less, and say what it takes", () => {
     const door: Lockable = { lock: LOCKS.hard };
-    expect(canPick('door', door, picker())).toMatchObject({
-      ok: false,
-      message: 'This lock is beyond you: it takes Lockpick 60%, and you have 20%.',
-    });
+    expect(pickProblem('door', door, picker())).toBe('This lock is beyond you: it takes Lockpick 60%, and you have 20%.');
     expect(door.lock).toBe(LOCKS.hard);
   });
 
   it('have no lock to pick once open', () => {
-    expect(canPick('door', { lock: null }, picker())).toMatchObject({ ok: false, message: "The door isn't locked." });
+    expect(pickProblem('door', { lock: null }, picker())).toBe("The door isn't locked.");
   });
 
   it('have more pins the harder they are: 3, 4, then 5', () => {
+    expect(pinsFor(10)).toBe(3); // below the easiest kind: still easy
+    expect(lockKind(10)).toBe('easy');
     expect(pinsFor(LOCKS.easy)).toBe(3);
     expect(pinsFor(LOCKS.medium)).toBe(4);
     expect(pinsFor(50)).toBe(4);

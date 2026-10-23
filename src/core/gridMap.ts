@@ -1,4 +1,4 @@
-import { findBuildings, inWallLeftToRight, tileKey, type Building } from './buildings';
+import { findBuildings, inWallLeftToRight, roofShown, tileKey, type Building } from './buildings';
 import { ItemContainer } from './container';
 import { Creature, getCreatureDef } from './creature';
 import { addPos, DIRECTIONS, samePos, type GridPos } from './grid';
@@ -296,6 +296,11 @@ export class GridMap {
   isHidden(x: number, y: number): boolean {
     const building = this.buildingAt(x, y);
     return building !== undefined && !this.entered.has(building.id);
+  }
+
+  /** The part of a building's roof that's on: without the walls of rooms you've been in (see roofShown). */
+  roofOf(building: Building): GridPos[] {
+    return roofShown(building, this.buildings.filter((b) => this.entered.has(b.id)));
   }
 
   /**

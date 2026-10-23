@@ -9,7 +9,7 @@ import type { LockpickData } from './LockpickScene';
 import type { Fighter } from '../core/fighter';
 import { addPos, type GridPos } from '../core/grid';
 import type { Chest, Door, Exit, Owned } from '../core/gridMap';
-import { canPick, lockedMessage, lockKind, pinsFor, unlock, type Lockable } from '../core/locks';
+import { lockedMessage, lockKind, pickProblem, pinsFor, unlock, type Lockable } from '../core/locks';
 import type { Lootable } from '../core/loot';
 import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
@@ -149,9 +149,12 @@ export class WorldScene extends Phaser.Scene {
     keyboard.addCapture('TAB'); // keep the browser from moving focus
     // Not on key repeat: holding E at a lock you can't pick would try (and fail) over and over.
     keyboard.on('keydown-E', (event: KeyboardEvent) => !event.repeat && this.interact());
+    // Not on key repeat either: Space still held from the lock screen (or a turn ago) mustn't
+    // end the turn the moment a fight starts.
     keyboard.on('keydown-SPACE', (event: KeyboardEvent) => {
+      if (event.repeat) return;
       if (state.combat) this.endTurn();
-      else if (!event.repeat) this.interact();
+      else this.interact();
     });
     keyboard.on('keydown-F', () => state.combat?.target && this.attack(state.combat.target));
     keyboard.on('keydown-T', () => state.combat?.cycleTarget());
@@ -676,16 +679,18 @@ export class WorldScene extends Phaser.Scene {
    */
   private drawRoof(building: Building): Phaser.GameObjects.Container {
     const key = (x: number, y: number) => `${x},${y}`;
-    const covered = new Set(building.roof.map((p) => key(p.x, p.y)));
+    // Without the walls it shares with rooms you've been in (GridMap.roofOf).
+    const tiles = state.map.roofOf(building);
+    const covered = new Set(tiles.map((p) => key(p.x, p.y)));
     const roof = this.add.container(0, 0).setDepth(DEPTH.roof);
     // A ridge across the middle, the far slope in the light and the near one in shade, so it
     // reads as a pitched roof rather than a flat patch.
-    const rows = building.roof.map((p) => p.y);
+    const rows = tiles.map((p) => p.y);
     const ridge = ((Math.min(...rows) + Math.max(...rows) + 1) / 2) * TILE_SIZE;
     const shade = this.add.graphics().fillStyle(0x000000, 0.18);
     const ridgeLine = this.add.graphics();
     const edge = this.add.graphics().fillStyle(0x1a1410);
-    for (const { x, y } of building.roof) {
+    for (const { x, y } of tiles) {
       roof.add(this.add.image(x * TILE_SIZE, y * TILE_SIZE, roofTextureKey(building.material, roofVariant(x, y))).setOrigin(0));
       const left = x * TILE_SIZE;
       const top = y * TILE_SIZE;
@@ -715,6 +720,13 @@ export class WorldScene extends Phaser.Scene {
     if (!roof) return;
     this.roofs.delete(id);
     this.tweens.add({ targets: roof, alpha: 0, duration: ROOF_FADE_MS, onComplete: () => roof.destroy() });
+    // The rooms next door no longer cover the walls (and doors) this one shares with them.
+    for (const building of state.map.buildings) {
+      const old = this.roofs.get(building.id);
+      if (!old) continue;
+      old.destroy();
+      this.roofs.set(building.id, this.drawRoof(building));
+    }
   }
 
   /**
@@ -879,16 +891,16 @@ export class WorldScene extends Phaser.Scene {
    * skill you're told what it takes.
    */
   private pickLock(what: string, thing: Lockable, then: () => void): void {
-    const allowed = canPick(what.toLowerCase(), thing, state.player);
-    if (!allowed.ok) {
+    const problem = pickProblem(what.toLowerCase(), thing, state.player);
+    if (problem || thing.lock === null) {
       playSound('locked');
-      postMessage(this, allowed.message);
+      postMessage(this, problem ?? '');
       return;
     }
     const data: LockpickData = {
       title: what,
-      level: lockKind(thing.lock!),
-      pins: pinsFor(thing.lock!),
+      level: lockKind(thing.lock),
+      pins: pinsFor(thing.lock),
       // Only once the world is back: a fight or the loot screen can't start under the lock screen.
       // (It's registered after the world's own resume handler, which autosaves, so a lock picked
       // into a fight isn't saved as open.)

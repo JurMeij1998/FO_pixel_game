@@ -353,6 +353,18 @@ describe('doors, locks and roofs in saves', () => {
     expect(loaded.doors.filter((d) => d.open)).toHaveLength(1);
   });
 
+  it('open and unlock a locked door with someone saved in its doorway', () => {
+    const game = freshGame();
+    const map = game.maps.wasteland;
+    const shed = map.doors.find((d) => d.lock !== null)!;
+    const raider = map.creatures.find((c) => c.def.id === 'raider')!;
+    raider.pos = { x: shed.x, y: shed.y };
+    const json = saveJson(game);
+    delete json.maps.wasteland.doors;
+    const loaded = loadGame(json, buildKnownMap, 'wasteland').maps.wasteland;
+    expect(loaded.doorAt(shed.x, shed.y)).toMatchObject({ open: true, lock: null });
+  });
+
   it("ignore entered buildings the map doesn't have (any more)", () => {
     const json = saveJson(freshGame());
     json.maps.wasteland.entered = ['99,99', 42];

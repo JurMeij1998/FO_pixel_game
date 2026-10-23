@@ -163,8 +163,11 @@ function applyMapState(map: GridMap, state: MapState): void {
     if (saved.hostile === true) creature.hostile = true;
   });
   // A creature (or corpse) saved before a doorway got its door stands in it: the door must be
-  // open, or it would be shut on them, blocking sight and the way, and never open again.
+  // open, or it would be shut on them, blocking sight and the way, and never open again. Its
+  // lock too: someone got through it, and a door can't be open and locked at once.
   for (const door of map.doors) {
-    if (map.creatures.some((c) => c.pos.x === door.x && c.pos.y === door.y)) door.open = true;
+    if (!map.creatures.some((c) => c.pos.x === door.x && c.pos.y === door.y)) continue;
+    door.open = true;
+    door.lock = null;
   }
 }

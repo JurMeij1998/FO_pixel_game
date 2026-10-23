@@ -19,8 +19,8 @@ export interface LockpickData {
 const CENTER_X = GAME_WIDTH / 2;
 const PIN_SPACING = 56;
 
-// A padlock: a steel shackle on top and a slim brass body, with the four pins sticking out of
-// its bottom until they're pushed up into it.
+// A padlock: a steel shackle on top and a slim brass body, with its pins (3 to 5) sticking out
+// of its bottom until they're pushed up into it.
 const BODY = { top: 250, width: 300, height: 150, radius: 22 };
 const BODY_LEFT = CENTER_X - BODY.width / 2;
 const BODY_BOTTOM = BODY.top + BODY.height;
@@ -73,7 +73,7 @@ export class LockpickScene extends Phaser.Scene {
   }
 
   create(): void {
-    drawPanel(this, `${this.title} - ${this.level}`.toUpperCase()); // e.g. STOCKROOM CRATE - GOOD
+    drawPanel(this, `${this.title} - ${this.level}`.toUpperCase()); // e.g. STOCKROOM CRATE - HARD
     addButton(this, PANEL.x + PANEL.width - 130, PANEL.y + 18, 'Close', () => this.giveUp());
 
     this.shackle = this.drawShackle();
@@ -208,6 +208,7 @@ export class LockpickScene extends Phaser.Scene {
   private press(pin: number): void {
     if (this.closed) return;
     this.selected = pin;
+    const wereIn = this.puzzle.setCount;
     switch (this.puzzle.press(pin)) {
       case 'set':
         playSound('pinSet');
@@ -217,8 +218,9 @@ export class LockpickScene extends Phaser.Scene {
         this.feedback.setText('That pin is already in.').setColor(COLORS.dim);
         break;
       case 'wrong':
-        playSound('pinsDrop');
-        this.feedback.setText('Wrong pin! They all drop back out.').setColor(COLORS.warn);
+        // With pins in, they all drop; with none in yet, it's just the wrong one.
+        playSound(wereIn > 0 ? 'pinsDrop' : 'dryFire');
+        this.feedback.setText(wereIn > 0 ? 'Wrong pin! They all drop back out.' : 'Wrong pin.').setColor(COLORS.warn);
         // The wrong pin gives a little under your pick before it drops with the rest.
         this.nudge(pin);
         this.refresh(pin);

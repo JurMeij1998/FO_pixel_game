@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WASTELAND } from '../data/wasteland';
-import { findBuildings, tileKey } from './buildings';
+import { findBuildings, roofShown, tileKey } from './buildings';
 import { GridMap, type MapDef } from './gridMap';
 
 const map = (rows: string[], extra: Partial<MapDef> = {}) => GridMap.parse({ name: 'test', rows, chests: {}, ...extra });
@@ -79,6 +79,34 @@ describe('buildings', () => {
     for (const front of ['1,2', '2,2', '3,2']) expect(a.has(front)).toBe(false);
     // B has no door out, so its whole bottom wall is roofed.
     expect(b.has('4,2')).toBe(true);
+  });
+
+  it("show you the walls and doors of a room you've been in, also where the room next door's roof covered them", () => {
+    const house = map(['#######', '#__/__#', '##/####', '...P...']);
+    const [a, b] = house.buildings;
+    const key = (tiles: { x: number; y: number }[]) => new Set(tiles.map(tileKey));
+    // Nothing entered: B's roof covers the inner door and the wall it's in.
+    expect(key(roofShown(b, [])).has('3,1')).toBe(true);
+    // Once you've been in A, B's roof leaves A's walls and the door to B alone, but still covers B.
+    const shown = key(house.roofOf(b));
+    expect(shown.has('3,1')).toBe(true);
+    house.enter({ x: 1, y: 1 });
+    const afterA = key(house.roofOf(b));
+    expect(afterA.has('3,1')).toBe(false); // the door between them
+    expect(afterA.has('3,0')).toBe(false); // the wall above it
+    expect(afterA.has('4,1')).toBe(true); // B's inside
+    expect(afterA.has('6,1')).toBe(true); // B's far wall
+    expect(key(house.roofOf(a)).size).toBe(a.roof.length); // A's own roof is whole (and off)
+  });
+
+  it('treat a door straight into another building as a front door, not an inner one', () => {
+    // Two huts, one above the other, joined door to door: each one's front stays uncovered.
+    const huts = map(['.%%%.', '.%+%.', '.%/%.', '.%/%.', '.%+%.', '.%%%.', '..P..']);
+    expect(huts.buildings).toHaveLength(2);
+    for (const hut of huts.buildings) {
+      const roof = new Set(hut.roof.map(tileKey));
+      expect(roof.has('2,2') || roof.has('2,3')).toBe(false); // neither door roofed
+    }
   });
 
   it('know which way each door turns', () => {
