@@ -14,6 +14,7 @@ import {
   windingPath,
 } from '../../core/generation/terrain';
 import type { GridPos } from '../../core/grid';
+import { LOCKS } from '../../core/locks';
 import type { Random } from '../../core/random';
 
 // Tiles (see LEGEND in core/gridMap.ts).
@@ -70,8 +71,9 @@ const STREET_LIFE: SpawnTable = [
 ];
 
 // Legend plus: ' ' keep terrain, '$' chest, '&' creature, A-Z a resident (see Prefab).
-// Every building's door is in its bottom wall, with the entrance (a path tile) just below it;
-// flipVertical() turns them around for the other side of the street.
+// Every building's door (/) is in its bottom wall, with the entrance (a path tile) just below
+// it; flipVertical() turns them around for the other side of the street. Some houses were
+// locked up when their owners left.
 
 const WOODEN_HOUSE: Prefab = {
   name: 'wooden house',
@@ -80,11 +82,12 @@ const WOODEN_HOUSE: Prefab = {
     '%+++++%',
     '%+$+++%',
     '%+++++%',
-    '%%%+%%%',
+    '%%%/%%%',
     '   :   ',
   ],
   entrance: { x: 3, y: 5 },
   chest: { name: 'Dresser', loot: HOUSE_LOOT },
+  doorLock: { lock: LOCKS.easy, chance: 0.3 },
 };
 
 /** Two back rooms opening onto a front room. */
@@ -96,18 +99,21 @@ const BRICK_HOUSE: Prefab = {
     '#_$_#___#',
     '#_______#',
     '#_______#',
-    '####_####',
+    '####/####',
     '    :    ',
   ],
   entrance: { x: 4, y: 6 },
   chest: { name: 'Cupboard', loot: HOUSE_LOOT },
+  doorLock: { lock: LOCKS.medium, chance: 0.3 },
 };
 
 /**
  * A small shop, 3 by 4 inside: bookcases along the back, Gus (G) behind his counter, and the
  * stockroom crate behind it too, through the gap in the counter. You talk to Gus across the
- * counter from the shop floor. Taking from the crate is stealing from the store. The guard (W)
- * stands outside, beside the door.
+ * counter from the shop floor. Taking from the crate is stealing from the store, and it's
+ * locked with a hard lock: picking it is breaking in, and turns the store against you too.
+ * The guard (W) stands outside, beside the door; the shop is open, so the door isn't locked
+ * (but it is the store's).
  */
 export const GENERAL_STORE: Prefab = {
   name: 'general store',
@@ -117,15 +123,16 @@ export const GENERAL_STORE: Prefab = {
     '%G+$%',
     '%]+]%',
     '%+++%',
-    '%%+%%',
+    '%%/%%',
     '  :W ',
   ],
   entrance: { x: 2, y: 6 },
-  chest: { name: 'Stockroom Crate', loot: STORE_LOOT, owner: 'store' },
+  chest: { name: 'Stockroom Crate', loot: STORE_LOOT, owner: 'store', lock: LOCKS.hard },
+  owner: 'store',
   residents: { G: 'shopkeeper', W: 'guard' },
 };
 
-/** Hay bales, a feed bin, and vermin. Wide doors. */
+/** Hay bales, a feed bin, and vermin. Wide double doors, never locked. */
 const BARN: Prefab = {
   name: 'barn',
   rows: [
@@ -136,7 +143,7 @@ const BARN: Prefab = {
     '%+++++++++++%',
     '%+[[+++++$++%',
     '%+++++&+++++%',
-    '%%%%%+++%%%%%',
+    '%%%%%///%%%%%',
     '     :::     ',
   ],
   entrance: { x: 6, y: 8 },
@@ -190,7 +197,7 @@ const STREET_BUILDINGS: Array<{ prefab: Prefab; weight: number; unique?: boolean
 
 export const VILLAGE: Biome = {
   id: 'village',
-  version: 4,
+  version: 5,
   names: ['Dusty Hollow', 'New Plenty', 'Rustwater', 'Cinder Creek', 'Harmony Flats', 'Last Stop'],
   width: 48,
   height: 34,

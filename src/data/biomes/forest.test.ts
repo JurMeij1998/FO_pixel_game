@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateMap, type ExitRequest } from '../../core/generation/biome';
 import { GridMap } from '../../core/gridMap';
+import { LOCKS } from '../../core/locks';
 import { FOREST } from './forest';
 import { playabilityProblems } from './playability';
 
@@ -50,5 +51,29 @@ describe('forest biome', () => {
     expect(count('Supply Crate')).toBeGreaterThan(SEEDS.length / 3);
     expect(count("Hunter's Footlocker")).toBeGreaterThan(0);
     expect(count('Abandoned Stash')).toBeGreaterThan(0);
+  });
+
+  it("roofs the logging camp's cabin and the hunter's cabin, and locks some hunter's cabins", () => {
+    let cabins = 0;
+    let locked = 0;
+    for (const seed of SEEDS) {
+      const map = GridMap.parse(generateMap(FOREST, seed, EXITS), 'forest');
+      for (const chest of map.chests) {
+        if (chest.name !== 'Supply Crate' && chest.name !== "Hunter's Footlocker") continue;
+        const cabin = map.buildingAt(chest.x, chest.y)!;
+        expect(cabin).toBeDefined();
+        const doors = map.doors.filter((d) => cabin.roof.some((p) => Math.abs(p.x - d.x) + Math.abs(p.y - d.y) === 1));
+        expect(doors.length).toBeGreaterThan(0);
+        if (chest.name === 'Supply Crate') {
+          expect(doors.every((d) => d.lock === null)).toBe(true); // the raiders come and go
+        } else {
+          cabins++;
+          if (doors.every((d) => d.lock === LOCKS.easy)) locked++;
+        }
+      }
+    }
+    expect(cabins).toBeGreaterThan(0);
+    expect(locked).toBeGreaterThan(0);
+    expect(locked).toBeLessThan(cabins); // but not every one
   });
 });

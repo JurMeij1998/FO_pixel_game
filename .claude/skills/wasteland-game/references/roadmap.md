@@ -43,11 +43,11 @@ Roughly in the order discussed with the user:
   pistol never runs dry), people taking sides in fights with monsters, and keeping the store
   out of a provoked guard's sight of the village entrances (today he can see some of them).
 - **Real sprite art** (a sprite sheet) replacing the generated placeholders.
-- **Doors, locks and lockpicking.** Doors as a tile or map object that opens and closes
-  (blocks walking and sight while closed), some of them locked. A new Lockpick skill (a
-  fourth entry in `SKILLS`, taggable, raised with skill points) gives the chance to pick a
-  lock; maybe keys as items. Door state (open, locked, picked) is saved per map like chests.
-  Locked doors could guard loot rooms, and picking an owned door could count as theft.
+- **More from doors and locks** (`core/locks.ts`, `core/buildings.ts`): keys as items;
+  picking an owned lock (which, like theft, always turns the owners hostile) only counting
+  when someone can see you; owners for houses once villages have residents; closing doors in combat
+  (today only walking into one opens it there); people opening doors outside combat (they
+  stand still until a fight); lockpicks as an item that helps, as in Fallout.
 - **Weapon deterioration and maintenance.** Weapons wear with use and work worse as they do
   (lower damage or hit chance, guns jamming), until repaired at a weapon workbench using scrap
   metal or other materials. Needs a per-weapon condition, which items don't have today:
@@ -56,8 +56,8 @@ Roughly in the order discussed with the user:
 - **Tagged skills and traits at character creation** (`scenes/CreationScene.ts`, rules in
   `core/creation.ts`): choosing the tagged skills, as in Fallout (every character still tags
   Small Guns and Melee Weapons), and perhaps traits.
-- **Give Perception a use.** It has no effect yet (the character sheet says so): for example
-  your sight range, the range penalty on ranged attacks, or noticing hidden things. When it
-  gets one, update its text in `SPECIAL_EFFECTS` (`core/stats.ts`).
+- **Give Perception more use.** So far it only adds to Lockpick: it could also set your
+  sight range, the range penalty on ranged attacks, or noticing hidden things. Update its
+  text in `SPECIAL_EFFECTS` (`core/stats.ts`) when it does.
 - **More difficulty knobs** (`core/difficulty.ts`): beyond enemy hit chance and damage taken,
   for example damage dealt, loot amounts and prices.

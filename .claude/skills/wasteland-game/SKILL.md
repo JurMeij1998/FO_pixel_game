@@ -110,6 +110,22 @@ moment you attack someone makes no sense to the user. Weak people get weak attac
 Prefabs place residents (particular people) with capital letters mapped in `residents`; paths
 are routed around them since they don't move until a fight.
 
+**Doors, locks and roofs.** Doors are a tile (`/`) plus per-map state (`GridMap.doors`:
+open, and the lock's required skill or null), so generation treats a doorway as passable while
+`isWalkable`/`blocksSight` check whether it's closed. Buildings aren't declared anywhere: they
+are found from the tiles (`core/buildings.ts`: walls and doors around an area that doesn't
+reach the map edge), so every prefab and hand-made map gets roofs for free, and a building's
+id is its first inside tile so saves can list the ones entered. A roof hides everything in an
+unentered building, including clicks on the people in it, and lifts the first time you step
+in (or when someone in it joins your fight). Lockpick skill is a gate (`core/locks.ts`): with
+less than a lock needs you can't try, and the message says what it takes, so the skill has a
+clear goal; with enough, the Lockpick overlay runs the pin puzzle (`core/lockPuzzle.ts`: 3 to
+5 pins by the lock's level (`pinsFor`), a random order per attempt, a wrong pin drops them all;
+letting the first press always count was tried and made it too easy). Its `onPicked` callback
+waits for the World's RESUME, after the World's own autosave, so a lock picked into a fight
+(an owned one) isn't saved as open, and loot or combat never start under the overlay. In combat, walking into a door opens it for a move's AP, and
+creatures with `opensDoors` (people, raiders) path through unlocked doors, opening them.
+
 **UI structure.** The world is drawn at integer zoom 3 (`WORLD_ZOOM`) for crisp pixels. HUD,
 menus and overlays are separate 1:1 scenes; overlays pause the World while open. Dialog
 sleeps while the barter screen is open and wakes when it closes, so the conversation goes on.

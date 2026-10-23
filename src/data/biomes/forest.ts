@@ -14,6 +14,7 @@ import {
   windingPath,
 } from '../../core/generation/terrain';
 import type { GridPos } from '../../core/grid';
+import { LOCKS } from '../../core/locks';
 
 // Tiles (see LEGEND in core/gridMap.ts).
 const FLOOR = ';';
@@ -69,7 +70,7 @@ const WILDLIFE: SpawnTable = [
   { creatureId: 'radroach', weight: 2 },
 ];
 
-// Legend plus: ' ' keep terrain, '$' chest, '&' creature (see Prefab).
+// Legend plus: ' ' keep terrain, '$' chest, '&' creature (see Prefab). Doors are '/'.
 
 /** A raider-held logging camp: a cabin with the supply crate, log piles, and guards. */
 const LOGGING_CAMP: Prefab = {
@@ -80,7 +81,7 @@ const LOGGING_CAMP: Prefab = {
     '.%++++%......',
     '.%+$++%..==..',
     '.%++++%......',
-    '.%%+%%%..&...',
+    '.%%/%%%..&...',
     '.............',
     '..==.....&...',
     '.............',
@@ -101,11 +102,13 @@ const HUNTERS_CABIN: Prefab = {
     '.%%%%%.',
     '.%+$+%.',
     '.%+++%.',
-    '.%%+%%.',
+    '.%%/%%.',
     '.......',
   ],
   entrance: { x: 3, y: 5 },
   chest: { name: "Hunter's Footlocker", loot: HUNTER_LOOT },
+  // The hunter locked up before leaving, more often than not.
+  doorLock: { lock: LOCKS.easy, chance: 0.6 },
 };
 
 /** Logs around an old fire, with someone's stash left behind. */
@@ -124,7 +127,7 @@ const CAMPSITE: Prefab = {
 
 export const FOREST: Biome = {
   id: 'forest',
-  version: 2,
+  version: 3,
   names: ['Blackroot Woods', 'Whispering Pines', 'Deadwood Forest', 'The Old Growth', 'Ashen Timberland', 'Hollow Pines'],
   width: 44,
   height: 32,

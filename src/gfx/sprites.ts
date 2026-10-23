@@ -15,6 +15,8 @@ const CHEST_PALETTE = {
   m: '#b8b8a0', // metal bands
   l: '#e0c050', // lock
   '0': '#120e0a', // inside
+  s: '#c8c8c0', // padlock shackle
+  L: '#f0d848', // padlock body
 };
 
 const PLAYER_PALETTE = {
@@ -320,6 +322,28 @@ export const SPRITES: Record<string, PixelSprite> = {
       '.kwwwwwwwwwwwwk.',
       '.kwmwwwwwwwwmwk.',
       '.kddddddddddddk.',
+      '..kkkkkkkkkkkk..',
+      '................',
+      '................',
+    ],
+  },
+  // The closed chest with a padlock hanging from its latch.
+  chest_locked: {
+    palette: CHEST_PALETTE,
+    rows: [
+      '................',
+      '................',
+      '................',
+      '..kkkkkkkkkkkk..',
+      '.kwwwwwwwwwwwwk.',
+      '.kwmwwwwwwwwmwk.',
+      '.kddddddddddddk.',
+      '.kmmmmmllmmmmmk.',
+      '.kwwwwsllswwwwk.',
+      '.kwmwkkkkkkwmwk.',
+      '.kwwwkLLLLkwwwk.',
+      '.kwmwkLkkLkwmwk.',
+      '.kdddkLLLLkdddk.',
       '..kkkkkkkkkkkk..',
       '................',
       '................',

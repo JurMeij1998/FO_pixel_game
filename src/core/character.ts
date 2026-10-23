@@ -48,7 +48,7 @@ export class Character implements Fighter {
   /** Unspent points from levelling up. */
   skillPoints = 0;
   /** Points spent on each skill, added on top of the base value. */
-  readonly skillBonus: Record<Skill, number> = { smallGuns: 0, meleeWeapons: 0, unarmed: 0 };
+  readonly skillBonus: Record<Skill, number> = { smallGuns: 0, meleeWeapons: 0, unarmed: 0, lockpick: 0 };
   /** Max HP gained from levelling up. */
   private bonusHitPoints = 0;
 

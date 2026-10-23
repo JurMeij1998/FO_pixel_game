@@ -1,8 +1,10 @@
 import type { MapDef } from '../core/gridMap';
+import { LOCKS } from '../core/locks';
 
-// Legend: . dirt   , dry grass   _ floor   # wall   o rock   ~ water
+// Legend: . dirt   , dry grass   _ floor   # wall   o rock   ~ water   / door
 //         P player start   a-z chests   A-Z creatures and people   1-9 exits (all defined below)
-// A new game starts inside Rosa's shack (top left), with Rosa (F) beside you.
+// A new game starts inside Rosa's shack (top left), with Rosa (F) beside you. The shed with
+// the metal locker (right) is locked with an easy lock: a few skill points in Lockpick open it.
 export const WASTELAND: MapDef = {
   name: 'Wasteland',
   rows: [
@@ -12,13 +14,13 @@ export const WASTELAND: MapDef = {
     'o.#___a___#.........,.......~~~o',
     'o.#_______#....,.M..........~~~o',
     'o.#__FP___#..........oo......~~o',
-    'o.####_####..,.......oo.......~o',
+    'o.####/####..,.......oo.......~o',
     'o.............................,1',
     'o..,..........,......,.........o',
     'o.........oo..........#######..o',
     'o...,.....oo..........#__b__#..o',
     'o.....................#_____#..o',
-    'o..~~~................###_###..o',
+    'o..~~~................###/###..o',
     'o.~~~~~.....,..............,...o',
     'o..~~~..R....c......,..........o',
     'o...R...,..........oo......X...o',
@@ -69,5 +71,8 @@ export const WASTELAND: MapDef = {
   exits: {
     '1': { to: 'forest' },
     '2': { to: 'village' },
+  },
+  doors: {
+    '25,12': { lock: LOCKS.easy },
   },
 };

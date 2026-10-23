@@ -8,6 +8,9 @@ import { addButton, bindCursorKeys, closeOverlay, drawPanel, PANEL } from '../ui
 
 const LEFT = PANEL.x + 30;
 const RIGHT = PANEL.x + 470;
+/** The skills list, under the derived stats; the skill points and the tag note go below it. */
+const SKILLS_TOP = 300;
+const SKILL_ROW = 30;
 
 /** The two lists the cursor walks: S.P.E.C.I.A.L. on the left, the skills on the right. */
 const SPECIAL_COLUMN = 0;
@@ -64,11 +67,11 @@ export class CharacterScene extends Phaser.Scene {
     this.add.text(RIGHT, 90, 'DERIVED', HEADER_TEXT);
     this.derived = this.add.text(RIGHT, 120, '', TEXT);
 
-    this.add.text(RIGHT, 300, 'SKILLS', HEADER_TEXT);
+    this.add.text(RIGHT, SKILLS_TOP - 32, 'SKILLS', HEADER_TEXT);
     this.skillTexts = [];
     this.plusButtons = [];
     SKILLS.forEach((skill, i) => {
-      const y = 332 + i * 30;
+      const y = SKILLS_TOP + i * SKILL_ROW;
       const text = this.add.text(RIGHT, y, '', TEXT).setInteractive({ useHandCursor: true });
       text.on('pointerdown', () => {
         this.cursor.focus(SKILL_COLUMN, skill);
@@ -77,8 +80,9 @@ export class CharacterScene extends Phaser.Scene {
       this.skillTexts.push(text);
       this.plusButtons.push(addButton(this, RIGHT + 300, y, '+', () => this.improve(skill)));
     });
-    this.pointsText = this.add.text(RIGHT, 432, '', TEXT);
-    this.add.text(RIGHT, 460, '* tagged: +20%, and each point adds 2%', DIM_TEXT);
+    const belowSkills = SKILLS_TOP + SKILLS.length * SKILL_ROW + 10;
+    this.pointsText = this.add.text(RIGHT, belowSkills, '', TEXT);
+    this.add.text(RIGHT, belowSkills + 28, '* tagged: +20%, and each point adds 2%', DIM_TEXT);
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 36, '', TEXT);
 
     bindCursorKeys(this, this.cursor, () => this.refresh());

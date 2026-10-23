@@ -38,7 +38,9 @@ Recipes for the common additions. Each lists where the pieces live and what is e
 3. Place them: a letter in a hand-made map's `creatures`, or a capital letter in a prefab's rows
    mapped in its `residents`. Behind a counter, the counter (`]`) goes between them and the
    shop floor so the player can talk across it. Give a chest `owner: '<group>'` to make taking
-   from it theft. `playabilityProblems` checks someone can reach a talking spot.
+   from it (or picking its lock) theft, and their house the same `owner` (a prefab's `owner`,
+   or a hand-made map's `doors` entry) to make picking its door's lock a crime too.
+   `playabilityProblems` checks someone can reach a talking spot.
 4. A new dialog action needs a case in `DialogScene.answer()`.
 
 ## Tile
@@ -47,7 +49,9 @@ Recipes for the common additions. Each lists where the pieces live and what is e
    which are prefab slots) to `LEGEND` in `src/core/gridMap.ts`.
 2. Decide whether it goes in `BLOCKING` (can't walk through) and `OPAQUE` (can't see or shoot
    through). TypeScript won't flag a missing entry here, so think it through: low obstacles
-   (water, logs, fences, hay, shelves) block walking only.
+   (water, logs, fences, hay, shelves) block walking only. Doors (`/`) are in neither: an
+   open door is walked and seen through, a closed one isn't (`GridMap.isWalkable`,
+   `blocksSight`), and map generation counts them as a way through.
 3. Add a painter to `TILE_PAINTERS` in `src/gfx/textures.ts`; TypeScript does flag a missing one.
    Paint the same ground as its usual surroundings underneath, or it shows as a square of a
    different colour (trees on brown dirt looked like green squares in the village).
@@ -64,7 +68,12 @@ Recipes for the common additions. Each lists where the pieces live and what is e
      `addExit(side, to, pathChar)` (call it for every requested exit; it rolls its own offset from
      a per-exit seed and returns the entry tile), `lock` tiles that nothing may be built on (roads).
    - `Prefab`: ASCII structure with `$` chest and `&` creature slots, an `entrance` just outside
-     its door; `flipVertical()` turns it around for the other side of a street.
+     its door (`/`); `flipVertical()` turns it around for the other side of a street. Walls
+     and doors around a floor make it a building with a roof (`core/buildings.ts`): give a
+     building a door, not a gap, or it has no roof. `doorLock: { lock, chance }` locks its
+     doors with that chance; `chest.lock` always locks the chest (`LOCKS` in core/locks.ts).
+     `owner` (a group) makes the building someone's: picking its doors' locks turns that
+     group hostile, as `chest.owner` does for the chest (taking from it, or picking it).
    - `LootTable` / `rollLoot`, `SpawnTable`.
    - `terrain.ts`: `scatter`, `smooth` (cellular automaton; groves, caves), `blob`, `border`,
      `windingPath`, `findSpot`, `findOpenTile`, `farFrom`, `hasRoomAround`, and

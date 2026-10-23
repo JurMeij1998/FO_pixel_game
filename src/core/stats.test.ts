@@ -7,7 +7,8 @@ describe('character sheet explanations', () => {
     for (const skill of SKILLS) expect(SKILL_EFFECTS[skill].length).toBeGreaterThan(10);
   });
 
-  it('say plainly when a stat does nothing yet', () => {
-    expect(SPECIAL_EFFECTS.perception).toMatch(/Not used yet/);
+  it('mention every skill a stat feeds into', () => {
+    expect(SPECIAL_EFFECTS.perception).toMatch(/Lockpick/);
+    expect(SPECIAL_EFFECTS.agility).toMatch(/Lockpick/);
   });
 });
