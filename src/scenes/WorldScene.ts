@@ -11,7 +11,7 @@ import { addPos, type GridPos } from '../core/grid';
 import type { Chest, Door, Exit, Owned } from '../core/gridMap';
 import { lockedMessage, lockKind, pickProblem, pinsFor, unlock, type Lockable } from '../core/locks';
 import type { Lootable } from '../core/loot';
-import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey } from '../gfx/textures';
+import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey, WORKBENCH } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
 import { ApGauge } from '../ui/apGauge';
 import { ENEMY_BAR_GAP, ENEMY_BAR_HEIGHT, enemyBar } from '../ui/healthBar';
@@ -97,7 +97,11 @@ export class WorldScene extends Phaser.Scene {
     const map = state.map;
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        this.add.image(x * TILE_SIZE, y * TILE_SIZE, tileTextureKey(map.tiles[y][x], x, y)).setOrigin(0);
+        const tile = map.tiles[y][x];
+        // A workbench stands on the ground around it, drawn like a chest.
+        const ground = tile === 'workbench' ? map.groundAt(x, y) : tile;
+        this.add.image(x * TILE_SIZE, y * TILE_SIZE, tileTextureKey(ground, x, y)).setOrigin(0);
+        if (tile === 'workbench') this.add.image(toPixel(x), toPixel(y), WORKBENCH).setDepth(DEPTH.prop);
       }
     }
     for (const chest of map.chests) {

@@ -268,6 +268,15 @@ export class GridMap {
     return this.exits.find((e) => e.x === x && e.y === y);
   }
 
+  /**
+   * The ground a prop standing on this tile (a workbench) is drawn on: its first walkable
+   * neighbour's, as for markers, so a bench in a barn stands on planks and one outside on dirt.
+   */
+  groundAt(x: number, y: number): TileType {
+    const neighbours = [this.tileAt(x - 1, y), this.tileAt(x + 1, y), this.tileAt(x, y - 1), this.tileAt(x, y + 1)];
+    return neighbours.find((t): t is TileType => t !== null && !BLOCKING.has(t) && t !== 'door') ?? 'dirt';
+  }
+
   doorAt(x: number, y: number): Door | undefined {
     return this.doors.find((d) => d.x === x && d.y === y);
   }
