@@ -155,8 +155,10 @@ blades and steel armour take **scrap metal**, the leather jacket and leather arm
 **leather** (from wild dogs' and mole rats' hides, houses and barns, or Gus). How much depends
 on how worn the item is and on the item (`durability.repairCost`: a knife 2 scrap from broken
 to perfect, the pistol 8, the hunting rifle 15, steel armour 12; leather armour 5 leather).
-Short of a full repair, what you have patches it up as far as it goes. W/S choose, E repairs,
-Esc closes.
+Short of a full repair, what you have patches it up as far as it goes. You can also
+**salvage** gear you don't want there: it's broken down for good, for a little of the
+material it's repaired with (1 piece below 50% condition, 2 from 50% up). W/S choose, E
+repairs, X salvages (press it twice: it asks first), Esc closes.
 
 **Steel armour** (AC +20, DR 40%, against leather armour's +15 and 25%) is heavy (30 lb) and
 dear: Gus sells one, and the forest's logging camp may have one lying about.
@@ -304,7 +306,7 @@ src/
                   (an id, plus a worn weapon's condition)
     condition.ts  Wear of weapons and armour: what it does below 35%, breaking, prices,
                   repair costs
-    repair.ts     Repairing gear at a workbench with scrap metal or leather
+    repair.ts     Repairing and salvaging gear at a workbench (scrap metal, leather)
     container.ts  ItemContainer: stacks of items (backpack, chest)
     character.ts  Character: skills, levels, equipment slots, magazines
     creature.ts   Creature and people definitions (people: dialog, group, trade) and instances

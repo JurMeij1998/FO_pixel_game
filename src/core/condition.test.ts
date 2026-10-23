@@ -19,7 +19,7 @@ import { rollLoot, FOUND_CONDITION } from './generation/tables';
 import { GridMap } from './gridMap';
 import { conditionOf, getItem, itemIdOf, itemKey } from './items';
 import { Random } from './random';
-import { repairables, repairItem } from './repair';
+import { repairables, repairItem, salvageItem, salvageYield } from './repair';
 import { loadGame, saveGame } from './save';
 import { repairCostLine, workbenchRows } from '../ui/workbench';
 import { describeItem, itemName } from '../ui/format';
@@ -345,5 +345,41 @@ describe('armour condition', () => {
   it('comes worn when found, like weapons', () => {
     const loot = rollLoot({ rolls: [3, 3], entries: [{ itemId: 'leather_armor', min: 1, max: 1, weight: 1 }] }, new Random(5));
     for (const [key] of loot) expect(conditionOf(key)).toBeLessThanOrEqual(FOUND_CONDITION[1]);
+  });
+});
+
+describe('salvaging at a workbench', () => {
+  it('gives 1 piece of the repair material below 50%, else 2', () => {
+    expect(salvageYield('10mm_pistol')).toEqual({ material: 'scrap_metal', amount: 2 });
+    expect(salvageYield('10mm_pistol@50')).toEqual({ material: 'scrap_metal', amount: 2 });
+    expect(salvageYield('10mm_pistol@49.9')).toEqual({ material: 'scrap_metal', amount: 1 });
+    expect(salvageYield('knife@0')).toEqual({ material: 'scrap_metal', amount: 1 });
+    expect(salvageYield('leather_armor@80')).toEqual({ material: 'leather', amount: 2 });
+    expect(salvageYield('steel_armor@10')).toEqual({ material: 'scrap_metal', amount: 1 });
+    expect(salvageYield('stimpak')).toBeNull();
+  });
+
+  it('breaks an item in the backpack down for good', () => {
+    const player = average();
+    player.backpack.add('leather_jacket@30');
+    expect(salvageItem(player, { key: 'leather_jacket@30' })).toMatchObject({ ok: true, message: 'You salvage the Leather Jacket for 1 leather.' });
+    expect(player.backpack.count('leather_jacket@30')).toBe(0);
+    expect(player.backpack.count('leather')).toBe(1);
+    expect(salvageItem(player, { key: 'leather_jacket@30' }).ok).toBe(false); // it's gone
+  });
+
+  it('takes an equipped gun off first, its rounds going back to the backpack', () => {
+    const player = armed('10mm_pistol@70');
+    const rounds = player.backpack.count('ammo_10mm');
+    expect(salvageItem(player, { slot: 'primary' })).toMatchObject({ ok: true, message: 'You salvage the 10mm Pistol for 2 scrap metal.' });
+    expect(player.equippedKey('primary')).toBeNull();
+    expect(player.backpack.count('10mm_pistol@70')).toBe(0);
+    expect(player.backpack.count('ammo_10mm')).toBe(rounds + 12);
+    expect(player.backpack.count('scrap_metal')).toBe(2);
+  });
+
+  it('refuses what has nothing to salvage', () => {
+    const player = average();
+    expect(salvageItem(player, { slot: 'armor' }).ok).toBe(false);
   });
 });
