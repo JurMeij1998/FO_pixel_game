@@ -132,12 +132,12 @@ export const GENERAL_STORE: Prefab = {
   residents: { G: 'shopkeeper', W: 'guard' },
 };
 
-/** Hay bales, a feed bin, and vermin. Wide double doors, never locked. */
+/** Hay bales, a feed bin, a workbench (!) to repair weapons at, and vermin. Wide double doors, never locked. */
 const BARN: Prefab = {
   name: 'barn',
   rows: [
     '%%%%%%%%%%%%%',
-    '%+++++++++++%',
+    '%+++++!+++++%',
     '%+[[+++++[[+%',
     '%+[[++&++[[+%',
     '%+++++++++++%',
@@ -197,7 +197,7 @@ const STREET_BUILDINGS: Array<{ prefab: Prefab; weight: number; unique?: boolean
 
 export const VILLAGE: Biome = {
   id: 'village',
-  version: 5,
+  version: 6,
   names: ['Dusty Hollow', 'New Plenty', 'Rustwater', 'Cinder Creek', 'Harmony Flats', 'Last Stop'],
   width: 48,
   height: 34,

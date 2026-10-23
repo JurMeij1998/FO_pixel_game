@@ -3,7 +3,7 @@ import { generateMap, type ExitRequest } from '../../core/generation/biome';
 import { GridMap } from '../../core/gridMap';
 import { LOCKS } from '../../core/locks';
 import { FOREST } from './forest';
-import { playabilityProblems } from './playability';
+import { playabilityProblems, workbenches } from './playability';
 
 const EXITS: ExitRequest[] = [{ side: 'west', to: 'wasteland' }];
 const SEEDS = Array.from({ length: 40 }, (_, i) => i * 7919 + 1);
@@ -51,6 +51,19 @@ describe('forest biome', () => {
     expect(count('Supply Crate')).toBeGreaterThan(SEEDS.length / 3);
     expect(count("Hunter's Footlocker")).toBeGreaterThan(0);
     expect(count('Abandoned Stash')).toBeGreaterThan(0);
+  });
+
+  it("has a workbench in the logging camp's cabin, where you can get at it", () => {
+    for (const seed of SEEDS) {
+      const map = GridMap.parse(generateMap(FOREST, seed, EXITS), 'forest');
+      const camps = map.chests.filter((c) => c.name === 'Supply Crate');
+      const benches = workbenches(map);
+      expect(benches.length).toBe(camps.length);
+      for (const bench of benches) {
+        expect(bench.reachable).toBe(true);
+        expect(map.buildingAt(bench.x, bench.y)).toBe(map.buildingAt(camps[0].x, camps[0].y));
+      }
+    }
   });
 
   it("roofs the logging camp's cabin and the hunter's cabin, and locks some hunter's cabins", () => {

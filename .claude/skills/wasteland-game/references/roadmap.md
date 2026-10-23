@@ -48,11 +48,9 @@ Roughly in the order discussed with the user:
   when someone can see you; owners for houses once villages have residents; closing doors in combat
   (today only walking into one opens it there); people opening doors outside combat (they
   stand still until a fight); lockpicks as an item that helps, as in Fallout.
-- **Weapon deterioration and maintenance.** Weapons wear with use and work worse as they do
-  (lower damage or hit chance, guns jamming), until repaired at a weapon workbench using scrap
-  metal or other materials. Needs a per-weapon condition, which items don't have today:
-  identical items share one stack (`ItemContainer`), so a weapon's condition has to live
-  somewhere else, e.g. per equipped slot like the loaded rounds, or stacks split by condition.
+- **More from weapon condition** (`core/condition.ts`, `core/repair.ts`): a Repair skill
+  (cheaper or better repairs), other materials than scrap metal, armour wearing too, traders
+  repairing for caps, and enemies' weapons (creature attacks don't wear today).
 - **Tagged skills and traits at character creation** (`scenes/CreationScene.ts`, rules in
   `core/creation.ts`): choosing the tagged skills, as in Fallout (every character still tags
   Small Guns and Melee Weapons), and perhaps traits.

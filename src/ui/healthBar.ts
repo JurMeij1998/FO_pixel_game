@@ -1,4 +1,5 @@
 import type { Character } from '../core/character';
+import { itemName } from './format';
 
 /**
  * The parts of the health bar and the gun line above it that aren't drawing, kept free of
@@ -57,11 +58,14 @@ export function isLowHealth(hitPoints: number, max: number): boolean {
 /**
  * The weapon in hand, for the line above the health bar: a gun's name with the rounds in its
  * magazine out of what it holds, and the spare rounds in the backpack ("Hunting Rifle 5/5 (+10)");
- * just the name for a melee weapon, or "Fists" with nothing in hand.
+ * just the name for a melee weapon, or "Fists" with nothing in hand. A worn weapon shows its
+ * condition after its name ("10mm Pistol (34%) 7/12 (+20)").
  */
 export function weaponLine(player: Character): string {
   const attack = player.attack;
+  const key = player.equippedKey(player.activeWeaponSlot);
+  const name = key ? itemName(key) : attack.name;
   const magazine = player.activeWeapon?.weapon?.magazineSize;
-  if (!attack.ammo || magazine === undefined) return attack.name;
-  return `${attack.name} ${player.loadedRounds()}/${magazine} (+${player.backpack.count(attack.ammo)})`;
+  if (!attack.ammo || magazine === undefined) return name;
+  return `${name} ${player.loadedRounds()}/${magazine} (+${player.backpack.count(attack.ammo)})`;
 }

@@ -1,6 +1,7 @@
 import type { Character } from './character';
 import type { ItemContainer } from './container';
-import { getItem } from './items';
+import { valueShare } from './condition';
+import { conditionOf, getItem } from './items';
 import { failure, success, type ActionResult } from './result';
 
 /** The currency. Traded as money, never as an item. */
@@ -8,11 +9,12 @@ export const CAPS = 'bottle_caps';
 
 /**
  * What one unit costs to buy, in caps. Traders sell above an item's value: 36% above at
- * Charisma 1, down to the plain value at 10 (+4% per point below 10).
+ * Charisma 1, down to the plain value at 10 (+4% per point below 10). A worn weapon is worth
+ * less (core/condition.ts), both ways.
  */
 export function buyPrice(itemId: string, charisma: number): number {
   const markup = 1 + 0.04 * (10 - clampCharisma(charisma));
-  return Math.max(1, Math.ceil(getItem(itemId).value * markup));
+  return Math.max(1, Math.ceil(worth(itemId) * markup));
 }
 
 /**
@@ -21,7 +23,12 @@ export function buyPrice(itemId: string, charisma: number): number {
  */
 export function sellPrice(itemId: string, charisma: number): number {
   const share = 0.25 + 0.03 * clampCharisma(charisma);
-  return Math.round(getItem(itemId).value * share);
+  return Math.round(worth(itemId) * share);
+}
+
+/** An item's value in caps, less for a worn weapon. Takes an item key. */
+function worth(key: string): number {
+  return getItem(key).value * valueShare(conditionOf(key));
 }
 
 function clampCharisma(charisma: number): number {

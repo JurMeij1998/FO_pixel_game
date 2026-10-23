@@ -79,6 +79,17 @@ drawn exactly like hand-made ones.
   keys, so renaming one loses that map's saved state.
 - Creatures are placed out of sight of the arrival point, so nothing attacks on arrival.
 
+**Items are strings: an id, or for a worn weapon an item key.** A weapon's condition lives in
+its key (`10mm_pistol@62.5`; `itemKey`, `conditionOf` in `core/items.ts`; a perfect one is just
+its id), so a worn weapon is its own stack and its condition goes wherever the string goes:
+containers, equipment slots, loot, barter, saves, list keys. That avoided giving
+`ItemContainer` item instances, and old saves (plain ids) load as perfect weapons. `getItem`
+takes either. Anything comparing items by id should go through `itemIdOf`; anything showing
+one should use `itemName(key)` (ui/format.ts), which adds the condition. Wear, its effects
+below 35% and repair costs are in `core/condition.ts`; a broken weapon refuses to attack with
+`AttackProblemCode` 'broken'. Only a worn gun rolls for a slow reload, so good guns don't
+shift combat's random numbers.
+
 **Saves store only what changes.** Format v2 (`core/save.ts`): world seed, current map, player,
 and per visited map only chest and creature state; generated maps are rebuilt from the seed and
 the state laid over them. `loadGame()` upgrades v1 saves, reads legacy creature ids, validates

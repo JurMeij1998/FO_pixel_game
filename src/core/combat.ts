@@ -1,4 +1,5 @@
 import type { Character } from './character';
+import { slowReloadChance } from './condition';
 import { capitalize, listNames, type Creature } from './creature';
 import { DIFFICULTIES, type Difficulty } from './difficulty';
 import type { AttackSound, Fighter } from './fighter';
@@ -44,7 +45,7 @@ export type CombatEvent =
 
 export type AttackEvent = Extract<CombatEvent, { type: 'attack' }>;
 
-export type AttackProblemCode = 'notYourTurn' | 'targetDead' | 'noAP' | 'outOfRange' | 'noLineOfSight' | 'empty';
+export type AttackProblemCode = 'notYourTurn' | 'targetDead' | 'broken' | 'noAP' | 'outOfRange' | 'noLineOfSight' | 'empty';
 export interface AttackProblem {
   code: AttackProblemCode;
   message: string;
@@ -140,6 +141,7 @@ export class Combat {
     if (target.isDead) return problem('targetDead', `${capitalize(target.theName)} is already dead.`);
     const attack = this.player.attack;
     // Kept short: they go to the message log when an attack is refused.
+    if (this.player.weaponBroken) return problem('broken', `Your ${attack.name} is broken. Repair it at a workbench.`);
     if (this.actionPoints < attack.apCost) return problem('noAP', `Not enough AP (attack costs ${attack.apCost}).`);
     if (distance(this.player.pos, target.pos) > attack.range) {
       return problem('outOfRange', `${capitalize(target.theName)} is out of range.`);
@@ -189,8 +191,11 @@ export class Combat {
     // Your shot stops at the first creature in its way: it hits them (at their own odds) or
     // misses, but never flies on through them to the target.
     const inTheWay = this.inTheWay(target);
-    if (!inTheWay) return done([this.resolveAttack(this.player, target)]); // the target stays selected until its death is shown; see ensureTarget()
-    const event = this.resolveAttack(this.player, inTheWay);
+    // The target stays selected until its death is shown; see ensureTarget().
+    const event = this.resolveAttack(this.player, inTheWay ?? target);
+    // Every attack wears the weapon (resolved with it as it was before this one).
+    this.reportWear(event, attack.name);
+    if (!inTheWay) return done([event]);
     event.message = `${capitalize(inTheWay.theName)} is in the way! ${event.message}`;
     if (event.hit && !inTheWay.hostile) {
       // Shooting a friendly bystander turns them (and their group) against you.
@@ -217,12 +222,39 @@ export class Combat {
     return null;
   }
 
+  /** Wears the weapon in hand by one attack, and adds to the attack's message if it just got badly worn or broke. */
+  private reportWear(event: AttackEvent, weapon: string): void {
+    const change = this.player.wearWeapon();
+    if (change === 'broke') event.message += ` Your ${weapon} breaks!`;
+    else if (change === 'worn') event.message += ` Your ${weapon} is badly worn.`;
+  }
+
+  /**
+   * Reloads the gun in hand for RELOAD_AP_COST AP. A badly worn gun can fight you and take
+   * twice that (core/condition.ts); without the AP for it, the reload eats the rest of your AP
+   * and doesn't get done.
+   */
   reload(): ActionResult {
     if (!this.isPlayerTurn) return failure("It isn't your turn.");
     if (this.actionPoints < RELOAD_AP_COST) return failure(`Reloading takes ${RELOAD_AP_COST} AP.`);
+    const problem = this.player.reloadProblem();
+    if (problem) return failure(problem);
+    // Only a worn gun rolls for it, so reloading a good one doesn't use up random numbers.
+    const chance = slowReloadChance(this.player.weaponCondition());
+    const slow = chance > 0 && this.rng() < chance;
+    if (!slow) {
+      this.actionPoints -= RELOAD_AP_COST;
+      return this.player.reload();
+    }
+    const name = this.player.activeWeapon!.name;
+    const cost = RELOAD_AP_COST * 2;
+    if (this.actionPoints < cost) {
+      this.actionPoints = 0;
+      return failure(`The worn ${name} jams halfway through reloading, and you run out of time. (${cost} AP)`);
+    }
+    this.actionPoints -= cost;
     const result = this.player.reload();
-    if (result.ok) this.actionPoints -= RELOAD_AP_COST;
-    return result;
+    return { ...result, message: `The worn ${name} fights you: ${result.message[0].toLowerCase()}${result.message.slice(1)} (${cost} AP)` };
   }
 
   /** Pays for something that isn't a move or an attack, such as opening the inventory. */

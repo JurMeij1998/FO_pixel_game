@@ -231,7 +231,7 @@ const DEFINITIONS: CreatureDef[] = [
     experience: 150,
     attack: { name: '10mm pistol', damageMin: 5, damageMax: 12, apCost: 5, range: 6, ranged: true, hitChance: 85, sound: 'pistol' },
     loot: [
-      ['10mm_pistol', 1],
+      ['10mm_pistol@60', 1], // his sidearm has seen some use (item keys: core/items.ts)
       ['ammo_10mm', 24],
       ['bottle_caps', 15],
     ],

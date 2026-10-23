@@ -1,4 +1,5 @@
 import type { MapDef } from '../core/gridMap';
+import { itemKey } from '../core/items';
 import { LOCKS } from '../core/locks';
 
 // Legend: . dirt   , dry grass   _ floor   # wall   o rock   ~ water   / door
@@ -39,7 +40,7 @@ export const WASTELAND: MapDef = {
     b: {
       name: 'Metal Locker',
       contents: [
-        ['10mm_pistol', 1],
+        [itemKey('10mm_pistol', 55), 1], // weapons left lying around are worn (core/condition.ts)
         ['ammo_10mm', 12],
         ['bottle_caps', 35],
       ],
@@ -54,9 +55,9 @@ export const WASTELAND: MapDef = {
     d: {
       name: 'Supply Cache',
       contents: [
-        ['hunting_rifle', 1],
+        [itemKey('hunting_rifle', 70), 1],
         ['leather_armor', 1],
-        ['spear', 1],
+        [itemKey('spear', 40), 1],
         ['ammo_223', 10],
         ['scrap_metal', 15],
       ],

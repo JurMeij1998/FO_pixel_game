@@ -357,6 +357,28 @@ const TILE_PAINTERS: Record<TileType, Painter> = {
     ctx.fillRect(11, 2, 1, 12);
   },
 
+  // A workbench seen from above, on the floorboards: a scarred wooden top with a vise at one
+  // end and a hammer and a wrench lying on it.
+  workbench: (ctx, rand) => {
+    TILE_PAINTERS.planks(ctx, rand);
+    ctx.fillStyle = '#3a2614';
+    ctx.fillRect(0, 2, TILE_SIZE, 12);
+    ctx.fillStyle = '#8a6438';
+    ctx.fillRect(1, 3, 14, 10);
+    speckle(ctx, rand, ['#6e4a28', '#9a7444'], 12);
+    ctx.fillStyle = '#5a5a58'; // the vise
+    ctx.fillRect(1, 4, 4, 5);
+    ctx.fillStyle = '#8a8a86';
+    ctx.fillRect(2, 5, 2, 3);
+    ctx.fillStyle = '#6a4626'; // the hammer's handle, and its head
+    ctx.fillRect(7, 9, 6, 1);
+    ctx.fillStyle = '#9a9a96';
+    ctx.fillRect(12, 7, 2, 4);
+    ctx.fillStyle = '#7a7a76'; // a wrench
+    ctx.fillRect(7, 5, 5, 1);
+    ctx.fillRect(12, 4, 2, 3);
+  },
+
   // A doorway's threshold: worn stone, seen when the door (drawn on top) stands open.
   door: (ctx, rand) => {
     fill(ctx, '#4e4a42');

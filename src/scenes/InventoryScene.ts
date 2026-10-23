@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
 import { playSound, type SoundName } from '../audio/sfx';
 import { EQUIP_SLOTS, type EquipSlot } from '../core/character';
-import { getItem, type ItemDef } from '../core/items';
+import { getItem } from '../core/items';
 import type { ActionResult } from '../core/result';
 import { state } from '../state';
-import { describeItem, sortedStacks, stackRows } from '../ui/format';
+import { describeItem, itemName, sortedStacks, stackRows } from '../ui/format';
 import { ListCursor } from '../ui/listCursor';
 import { quickAction } from '../ui/quickAction';
 import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
@@ -137,12 +137,13 @@ export class InventoryScene extends Phaser.Scene {
 
     for (const [slot, text] of this.slotTexts) {
       const item = player.equippedItem(slot);
+      const key = player.equippedKey(slot);
       const active = slot === player.activeWeaponSlot ? ' (in hand)' : '';
       const magazine = item?.weapon?.magazineSize;
       const rounds = magazine && slot !== 'armor' ? ` [${player.loadedRounds(slot)}/${magazine}]` : '';
       const selected = this.selection?.kind === 'slot' && this.selection.slot === slot;
       text
-        .setText(`${selected ? '>' : ' '} ${SLOT_LABELS[slot].padEnd(10)} ${item?.name ?? '-'}${rounds}${active}`)
+        .setText(`${selected ? '>' : ' '} ${SLOT_LABELS[slot].padEnd(10)} ${key ? itemName(key) : '-'}${rounds}${active}`)
         .setColor(selected ? COLORS.bright : COLORS.text);
     }
 
@@ -156,8 +157,8 @@ export class InventoryScene extends Phaser.Scene {
     );
     this.stats.setColor(overweight ? COLORS.warn : COLORS.text);
 
-    const item = this.selectedItem();
-    this.details.setText(item ? describeItem(item) : 'Select an item.').setColor(item ? COLORS.text : COLORS.dim);
+    const selectedKey = this.selectedKey();
+    this.details.setText(selectedKey ? describeItem(selectedKey) : 'Select an item.').setColor(selectedKey ? COLORS.text : COLORS.dim);
 
     this.actions = this.actionsForSelection();
     this.actionButtons.forEach((button, i) => {
@@ -167,10 +168,11 @@ export class InventoryScene extends Phaser.Scene {
     });
   }
 
-  private selectedItem(): ItemDef | null {
+  /** The selected item's key (its id, with its condition if worn), or null. */
+  private selectedKey(): string | null {
     if (!this.selection) return null;
-    if (this.selection.kind === 'backpack') return getItem(this.selection.itemId);
-    return state.player.equippedItem(this.selection.slot);
+    if (this.selection.kind === 'backpack') return this.selection.itemId;
+    return state.player.equippedKey(this.selection.slot);
   }
 
   private actionsForSelection(): Action[] {

@@ -7,8 +7,11 @@ Recipes for the common additions. Each lists where the pieces live and what is e
 1. Add an `ItemDef` to `DEFINITIONS` in `src/core/items.ts`: id, name, category, weight (lbs per
    unit), value (caps per unit), description.
 2. Weapons also need `weapon`: `skill` (`smallGuns` makes it ranged; melee otherwise, even with
-   reach > 1 like the spear), damage range, `apCost`, `range`, and `sound` (an `AttackSound`).
-   Guns additionally need `ammo` (an ammo item id) and `magazineSize`.
+   reach > 1 like the spear), damage range, `apCost`, `range`, `sound` (an `AttackSound`),
+   `wear` (condition lost per attack, in percent) and `repairCost` (scrap metal from broken to
+   perfect; better weapons cost more). Guns additionally need `ammo` (an ammo item id) and
+   `magazineSize`. To place a worn one, use its key: `itemKey('10mm_pistol', 55)`; found loot
+   comes worn by itself (`rollLoot`).
 3. Armor needs `armor: { armorClass, damageResist }`; consumables `consumable: { heal }`.
 4. Make it obtainable: add it to chest contents in a map, a creature's corpse `loot`, or a
    biome `LootTable`.
@@ -70,7 +73,7 @@ Recipes for the common additions. Each lists where the pieces live and what is e
    - `Prefab`: ASCII structure with `$` chest and `&` creature slots, an `entrance` just outside
      its door (`/`); `flipVertical()` turns it around for the other side of a street. Walls
      and doors around a floor make it a building with a roof (`core/buildings.ts`): give a
-     building a door, not a gap, or it has no roof. `doorLock: { lock, chance }` locks its
+     building a door, not a gap, or it has no roof. A workbench is `!` (repairs weapons; E at it). `doorLock: { lock, chance }` locks its
      doors with that chance; `chest.lock` always locks the chest (`LOCKS` in core/locks.ts).
      `owner` (a group) makes the building someone's: picking its doors' locks turns that
      group hostile, as `chest.owner` does for the chest (taking from it, or picking it).

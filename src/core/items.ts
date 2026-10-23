@@ -2,8 +2,10 @@ import type { AttackSound } from './fighter';
 import type { Skill } from './stats';
 
 /**
- * Static item definitions. Everything else refers to items by their string id;
- * containers only store (id, quantity) pairs.
+ * Static item definitions. Everything else refers to items by a string: the item's id, or for a
+ * worn weapon its id plus its condition ("10mm_pistol@62.5"; see itemKey). Containers store
+ * (key, quantity) pairs, so a worn weapon is its own stack, and its condition goes wherever it
+ * does: equipped, looted, sold, saved. getItem takes either.
  */
 export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'ammo' | 'misc';
 
@@ -20,6 +22,10 @@ export interface WeaponStats {
   /** Reach in tiles; 1 means melee. */
   range: number;
   sound: AttackSound;
+  /** Condition lost per attack, in percent of the weapon's full health (see core/condition.ts). */
+  wear: number;
+  /** Scrap metal a full repair takes, from broken to perfect; better weapons take more. */
+  repairCost: number;
 }
 
 export interface ArmorStats {
@@ -55,7 +61,7 @@ const DEFINITIONS: ItemDef[] = [
     weight: 1,
     value: 40,
     description: 'A short, sharp blade. Better than your fists.',
-    weapon: { skill: 'meleeWeapons', damageMin: 1, damageMax: 6, apCost: 3, range: 1, sound: 'swing' },
+    weapon: { skill: 'meleeWeapons', damageMin: 1, damageMax: 6, apCost: 3, range: 1, sound: 'swing', wear: 0.5, repairCost: 2 },
   },
   {
     id: 'spear',
@@ -64,7 +70,7 @@ const DEFINITIONS: ItemDef[] = [
     weight: 4,
     value: 80,
     description: 'A sharpened pole with a crude metal tip. Long reach.',
-    weapon: { skill: 'meleeWeapons', damageMin: 3, damageMax: 10, apCost: 4, range: 2, sound: 'swing' },
+    weapon: { skill: 'meleeWeapons', damageMin: 3, damageMax: 10, apCost: 4, range: 2, sound: 'swing', wear: 0.8, repairCost: 4 },
   },
   {
     id: '10mm_pistol',
@@ -73,7 +79,18 @@ const DEFINITIONS: ItemDef[] = [
     weight: 3,
     value: 250,
     description: 'A reliable semi-automatic sidearm. Chambered for 10mm.',
-    weapon: { skill: 'smallGuns', ammo: 'ammo_10mm', magazineSize: 12, damageMin: 5, damageMax: 12, apCost: 5, range: 6, sound: 'pistol' },
+    weapon: {
+      skill: 'smallGuns',
+      ammo: 'ammo_10mm',
+      magazineSize: 12,
+      damageMin: 5,
+      damageMax: 12,
+      apCost: 5,
+      range: 6,
+      sound: 'pistol',
+      wear: 1.5,
+      repairCost: 8,
+    },
   },
   {
     id: 'hunting_rifle',
@@ -82,7 +99,18 @@ const DEFINITIONS: ItemDef[] = [
     weight: 9,
     value: 1000,
     description: 'A bolt-action rifle chambered for .223. Slow, heavy and hard-hitting.',
-    weapon: { skill: 'smallGuns', ammo: 'ammo_223', magazineSize: 5, damageMin: 8, damageMax: 20, apCost: 6, range: 10, sound: 'rifle' },
+    weapon: {
+      skill: 'smallGuns',
+      ammo: 'ammo_223',
+      magazineSize: 5,
+      damageMin: 8,
+      damageMax: 20,
+      apCost: 6,
+      range: 10,
+      sound: 'rifle',
+      wear: 2.5,
+      repairCost: 15,
+    },
   },
   {
     id: 'leather_jacket',
@@ -163,8 +191,35 @@ const DEFINITIONS: ItemDef[] = [
 
 const ITEMS = new Map(DEFINITIONS.map((def) => [def.id, def]));
 
-export function getItem(id: string): ItemDef {
-  const def = ITEMS.get(id);
-  if (!def) throw new Error(`Unknown item id '${id}'`);
+/** Takes an item id or an item key ("10mm_pistol@62.5"): either way, the item it is. */
+export function getItem(key: string): ItemDef {
+  const def = ITEMS.get(itemIdOf(key));
+  if (!def) throw new Error(`Unknown item id '${key}'`);
   return def;
+}
+
+/** Condition in percent: 100 is perfect, 0 broken. Only weapons wear. */
+export const PERFECT = 100;
+const CONDITION_MARK = '@';
+
+/**
+ * The key for an item in some condition: its id when perfect (so perfect ones stack, and items
+ * that don't wear never change), else id@condition, condition rounded to a tenth and clamped.
+ */
+export function itemKey(itemId: string, condition: number): string {
+  const rounded = Math.round(Math.max(0, Math.min(PERFECT, condition)) * 10) / 10;
+  return rounded >= PERFECT ? itemId : `${itemId}${CONDITION_MARK}${rounded}`;
+}
+
+export function itemIdOf(key: string): string {
+  const at = key.indexOf(CONDITION_MARK);
+  return at < 0 ? key : key.slice(0, at);
+}
+
+/** A key's condition: what follows the @, or perfect without one (or with nonsense after it, from a bad save). */
+export function conditionOf(key: string): number {
+  const at = key.indexOf(CONDITION_MARK);
+  if (at < 0) return PERFECT;
+  const value = Number(key.slice(at + 1));
+  return Number.isFinite(value) ? Math.max(0, Math.min(PERFECT, value)) : PERFECT;
 }

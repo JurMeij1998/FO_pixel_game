@@ -22,7 +22,8 @@ export type TileType =
   | 'crops'
   | 'hay'
   | 'shelf'
-  | 'door';
+  | 'door'
+  | 'workbench';
 
 /** Map characters for each tile. Letters and digits are taken by markers, so tiles use symbols. */
 export const LEGEND: Readonly<Record<string, TileType>> = {
@@ -44,6 +45,7 @@ export const LEGEND: Readonly<Record<string, TileType>> = {
   '[': 'hay',
   ']': 'shelf',
   '/': 'door',
+  '!': 'workbench',
 };
 
 const BLOCKING: ReadonlySet<TileType> = new Set<TileType>([
@@ -56,6 +58,7 @@ const BLOCKING: ReadonlySet<TileType> = new Set<TileType>([
   'fence',
   'hay',
   'shelf',
+  'workbench',
 ]);
 /**
  * Tiles you can't see (or shoot) through. Low obstacles (water, logs, fences, hay, shelves)

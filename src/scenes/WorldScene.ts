@@ -796,6 +796,10 @@ export class WorldScene extends Phaser.Scene {
       this.openChest(chest);
       return;
     }
+    if (state.map.tileAt(x, y) === 'workbench') {
+      this.openOverlay('Workbench');
+      return;
+    }
     // A door in front of you, unless a corpse with something on it lies in the doorway: that's
     // what you'd reach for. (An emptied one leaves you the door, which then says it's in the way.)
     const door = state.map.doorAt(x, y);

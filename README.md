@@ -129,6 +129,29 @@ hostile, Gus and the guard for the store. Some village houses and hunter's cabin
 forest are locked up too; nobody lives there any more. People and raiders open
 unlocked doors to come after you in a fight; animals and ghouls are kept out by a closed one.
 
+## Weapon condition and repairs
+
+Every weapon has a condition, from 100% (perfect) down to 0% (broken), shown after its name
+in lists and on the HUD's weapon line once it's worn ("10mm Pistol (62%)"). Each attack
+wears the weapon in hand by its own amount (`wear` in `core/items.ts`: a knife 0.5%, the
+pistol 1.5%, the hunting rifle 2.5% per attack). At 35% or below it works worse, the more so
+the lower it gets (`core/condition.ts`):
+
+- a gun hits less often (down to -30%), does less damage (down to half), and a reload can
+  take twice the AP (up to a 50% chance); without the AP for it, the reload eats the AP left
+  and doesn't get done;
+- a melee weapon only does less damage.
+
+At 0% it's broken and can't be used until it's repaired. Each weapon keeps its own
+condition wherever it goes: worn ones don't stack with good ones, sell (and buy) for less,
+and weapons found in chests come worn (15-85%).
+
+Repair at a **workbench** (in a village's barn, the forest's logging camp, and the test
+maps): press E at it to see every weapon you carry with the scrap metal its repair takes.
+That depends on how worn it is and on the weapon (`repairCost`: a knife 2 scrap from broken
+to perfect, the pistol 8, the hunting rifle 15). Short of a full repair, the scrap you have
+patches it up as far as it goes. W/S choose, E repairs, Esc closes.
+
 ## Maps and biomes
 
 The world is a set of maps joined by exits (signposts on the map edge); walking onto one
@@ -268,7 +291,10 @@ src/
     stats.ts      S.P.E.C.I.A.L., skills and the Fallout formulas derived from them
     creation.ts   Character creation: the build (name, gender, stats, difficulty), point rules
     difficulty.ts Difficulty levels and what they change in combat
-    items.ts      Item definitions (weight, value, weapon/armor stats)
+    items.ts      Item definitions (weight, value, weapon/armor stats) and item keys
+                  (an id, plus a worn weapon's condition)
+    condition.ts  Weapon wear: what it does below 35%, breaking, prices, repair costs
+    repair.ts     Repairing weapons at a workbench with scrap metal
     container.ts  ItemContainer: stacks of items (backpack, chest)
     character.ts  Character: skills, levels, equipment slots, magazines
     creature.ts   Creature and people definitions (people: dialog, group, trade) and instances
@@ -294,9 +320,9 @@ src/
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting, and the pure logic
               behind the HUD and screens: AP gauge and its placement, health bars, the
               shared glow, dialog box, barter lists, the message log, creation screen keys
-  scenes/     Phaser scenes: Boot, Menu, Creation, World, Hud, Inventory, Loot, Lockpick, Dialog,
-              Barter, Character, Pause, GameOver, Controls; flow.ts switches between menus and
-              the game
+  scenes/     Phaser scenes: Boot, Menu, Creation, World, Hud, Inventory, Loot, Lockpick,
+              Workbench, Dialog, Barter, Character, Pause, GameOver, Controls; flow.ts switches
+              between menus and the game
   state.ts    The running game (player + map), loaded from the save if there is one
   storage.ts  localStorage access for the save
   main.ts     Phaser game config
