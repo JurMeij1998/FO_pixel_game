@@ -368,6 +368,13 @@ export class Combat {
     const verb = attacker === this.player ? 'hit' : 'hits';
     let message = `${subject} ${critical ? `critically ${verb}` : verb} ${object} for ${damage}.`;
     if (killed) message += target === this.player ? ' You die.' : ` ${capitalize((target as Creature).theName)} dies.`;
+    // Every hit you take wears your armour (the hit itself was taken with it as it was).
+    if (target === this.player && !killed) {
+      const armor = this.player.equippedItem('armor')?.name;
+      const change = this.player.wearArmor();
+      if (change === 'broke') message += ` Your ${armor} falls apart!`;
+      else if (change === 'worn') message += ` Your ${armor} is badly worn.`;
+    }
 
     let newLevel: number | null = null;
     // The player only ever attacks creatures. Some (Rosa) aren't worth any XP.

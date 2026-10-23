@@ -10,7 +10,7 @@ import {
   hitPenalty,
   isBroken,
   SCRAP,
-  scrapToRepair,
+  materialToRepair,
   slowReloadChance,
   valueShare,
   wornness,
@@ -19,9 +19,9 @@ import { rollLoot, FOUND_CONDITION } from './generation/tables';
 import { GridMap } from './gridMap';
 import { conditionOf, getItem, itemIdOf, itemKey } from './items';
 import { Random } from './random';
-import { repairables, repairWeapon } from './repair';
+import { repairables, repairItem } from './repair';
 import { loadGame, saveGame } from './save';
-import { workbenchRows } from '../ui/workbench';
+import { repairCostLine, workbenchRows } from '../ui/workbench';
 import { describeItem, itemName } from '../ui/format';
 import { weaponLine } from '../ui/healthBar';
 
@@ -91,12 +91,12 @@ describe('weapon condition', () => {
   });
 
   it('takes more scrap to repair the more worn, and the better the weapon', () => {
-    expect(scrapToRepair('knife')).toBe(0);
-    expect(scrapToRepair('knife@0')).toBe(2);
-    expect(scrapToRepair('10mm_pistol@0')).toBe(8);
-    expect(scrapToRepair('hunting_rifle@0')).toBe(15);
-    expect(scrapToRepair('10mm_pistol@50')).toBe(4);
-    expect(scrapToRepair('10mm_pistol@99')).toBe(1); // any wear takes at least one piece
+    expect(materialToRepair('knife')).toBe(0);
+    expect(materialToRepair('knife@0')).toBe(2);
+    expect(materialToRepair('10mm_pistol@0')).toBe(8);
+    expect(materialToRepair('hunting_rifle@0')).toBe(15);
+    expect(materialToRepair('10mm_pistol@50')).toBe(4);
+    expect(materialToRepair('10mm_pistol@99')).toBe(1); // any wear takes at least one piece
     expect(afterRepair('10mm_pistol@50', 2)).toBe('10mm_pistol@75');
     expect(afterRepair('10mm_pistol@50', 4)).toBe('10mm_pistol');
     expect(conditionLabel(62.3)).toBe('63%');
@@ -212,19 +212,22 @@ describe('repairing at a workbench', () => {
     expect(repairables(player).map((r) => r.key)).toEqual(['10mm_pistol@30', 'knife@0']);
     const rows = workbenchRows(player);
     expect(rows.map((r) => [r.label, r.detail])).toEqual([
-      ['10mm Pistol (30%) (in hand)', '6 scrap'],
-      ['Knife (broken)', '2 scrap'],
+      ['10mm Pistol (in hand)', '30%'],
+      ['Knife', 'broken'],
     ]);
+    expect(repairCostLine('10mm_pistol@30')).toBe('Repair costs: 6 scrap metal');
+    expect(repairCostLine('knife@0')).toBe('Repair costs: 2 scrap metal');
+    expect(repairCostLine('knife')).toBe(''); // nothing to repair: nothing shown
   });
 
   it('repairs fully with enough scrap metal, in hand or in the backpack', () => {
     const player = armed('10mm_pistol@50');
     player.backpack.add(SCRAP, 10);
-    expect(repairWeapon(player, { slot: 'primary' })).toMatchObject({ ok: true, repaired: '10mm_pistol' });
+    expect(repairItem(player, { slot: 'primary' })).toMatchObject({ ok: true, repaired: '10mm_pistol' });
     expect(player.equippedKey('primary')).toBe('10mm_pistol');
     expect(player.backpack.count(SCRAP)).toBe(6);
     player.backpack.add('knife@0');
-    expect(repairWeapon(player, { key: 'knife@0' }).ok).toBe(true);
+    expect(repairItem(player, { key: 'knife@0' }).ok).toBe(true);
     expect(player.backpack.count('knife')).toBe(1);
     expect(player.backpack.count('knife@0')).toBe(0);
   });
@@ -232,7 +235,7 @@ describe('repairing at a workbench', () => {
   it('patches a weapon up as far as the scrap goes', () => {
     const player = armed('hunting_rifle@0');
     player.backpack.add(SCRAP, 3);
-    const result = repairWeapon(player, { slot: 'primary' });
+    const result = repairItem(player, { slot: 'primary' });
     expect(result).toMatchObject({ ok: true, repaired: 'hunting_rifle@20' });
     expect(result.message).toMatch(/patch up the Hunting Rifle with 3 scrap metal: 20%\. A full repair takes 15\./);
     expect(player.backpack.count(SCRAP)).toBe(0);
@@ -240,10 +243,10 @@ describe('repairing at a workbench', () => {
 
   it("can't repair without scrap, or what's already perfect", () => {
     const player = armed('knife@50');
-    expect(repairWeapon(player, { slot: 'primary' })).toMatchObject({ ok: false, message: 'Repairing the Knife takes 1 scrap metal, and you have none.' });
+    expect(repairItem(player, { slot: 'primary' })).toMatchObject({ ok: false, message: 'Repairing the Knife takes 1 scrap metal, and you have none.' });
     player.backpack.add(SCRAP, 5);
-    repairWeapon(player, { slot: 'primary' });
-    expect(repairWeapon(player, { slot: 'primary' })).toMatchObject({ ok: false, message: 'The Knife is in perfect condition.' });
+    repairItem(player, { slot: 'primary' });
+    expect(repairItem(player, { slot: 'primary' })).toMatchObject({ ok: false, message: 'The Knife is in perfect condition.' });
   });
 });
 
@@ -268,5 +271,79 @@ describe('found weapons', () => {
     const game = { player, worldSeed: 1, difficulty: 'normal' as const, maps: { shed: map }, currentMap: 'shed' };
     const loaded = loadGame(JSON.parse(JSON.stringify(saveGame(game))), () => GridMap.parse({ name: 'shed', rows: ['#####', '#Pa_#', '#####'], chests: { a: { name: 'Box', contents: [['knife@44', 1]] } } }), 'shed');
     expect(loaded.maps.shed.chests[0].contents.count('knife@44')).toBe(1);
+  });
+});
+
+describe('armour condition', () => {
+  /** A tester wearing this armour (by key). */
+  const wearing = (key: string) => {
+    const player = average();
+    player.backpack.add(key);
+    player.equip(key, 'armor');
+    return player;
+  };
+  const shotAt = (key: string, rolls: number[]) => {
+    const map = GridMap.parse({ name: 'pit', rows: ['#####', '#PX.#', '#####'], chests: {}, creatures: { X: 'raider' } });
+    const player = wearing(key);
+    player.pos = { ...map.playerStart };
+    player.hitPoints = 999; // no dying mid-test
+    return { player, combat: new Combat(map, player, () => rolls.shift() ?? 0.99, 'normal') };
+  };
+
+  it('makes steel armour the strongest, repaired with scrap metal; leather with leather', () => {
+    const steel = getItem('steel_armor');
+    expect(steel.armor!.armorClass).toBeGreaterThan(getItem('leather_armor').armor!.armorClass);
+    expect(steel.armor!.damageResist).toBeGreaterThan(getItem('leather_armor').armor!.damageResist);
+    expect(steel.durability!.material).toBe('scrap_metal');
+    expect(getItem('leather_armor').durability!.material).toBe('leather');
+    expect(getItem('leather_jacket').durability!.material).toBe('leather');
+  });
+
+  it('protects less at 35% or below, and not at all once it has fallen apart', () => {
+    const good = wearing('leather_armor');
+    const worn = wearing('leather_armor@10');
+    const gone = wearing('leather_armor@0');
+    expect(worn.armorClass).toBeLessThan(good.armorClass);
+    expect(worn.damageResist).toBeLessThan(good.damageResist);
+    expect(gone.damageResist).toBe(0);
+    expect(gone.armorClass).toBe(average().armorClass); // just Agility
+    expect(wearing('leather_armor@40').damageResist).toBe(good.damageResist);
+  });
+
+  it('wears with every hit you take, not with misses', () => {
+    const hit = shotAt('steel_armor', [0, 0.99, 0]); // hits, no critical
+    hit.combat.endTurn();
+    expect(hit.player.slotCondition('armor')).toBeLessThan(100);
+    const missed = shotAt('steel_armor', [0.99]);
+    missed.combat.endTurn();
+    expect(missed.player.slotCondition('armor')).toBe(100);
+  });
+
+  it('says when it falls apart', () => {
+    const { player, combat } = shotAt('leather_jacket@1', [0, 0.99, 0, 0.99]);
+    const events = combat.endTurn();
+    const messages = events.map((e) => (e.type === 'attack' ? e.message : '')).join(' ');
+    expect(messages).toMatch(/Your Leather Jacket falls apart!/);
+    expect(player.damageResist).toBe(0);
+  });
+
+  it('is repaired at the workbench with its own material', () => {
+    const player = wearing('leather_armor@20');
+    player.backpack.add('steel_armor@50');
+    player.backpack.add('scrap_metal', 2);
+    player.backpack.add('leather', 10);
+    expect(workbenchRows(player).map((r) => [r.label, r.detail])).toEqual([
+      ['Leather Armor (wearing)', '20%'],
+      ['Steel Armor', '50%'],
+    ]);
+    expect(repairItem(player, { slot: 'armor' })).toMatchObject({ ok: true, message: 'You repair the Leather Armor with 4 leather: good as new.' });
+    expect(player.backpack.count('leather')).toBe(6);
+    expect(repairItem(player, { key: 'steel_armor@50' })).toMatchObject({ ok: true, repaired: 'steel_armor@66.7' });
+    expect(player.backpack.count('scrap_metal')).toBe(0);
+  });
+
+  it('comes worn when found, like weapons', () => {
+    const loot = rollLoot({ rolls: [3, 3], entries: [{ itemId: 'leather_armor', min: 1, max: 1, weight: 1 }] }, new Random(5));
+    for (const [key] of loot) expect(conditionOf(key)).toBeLessThanOrEqual(FOUND_CONDITION[1]);
   });
 });

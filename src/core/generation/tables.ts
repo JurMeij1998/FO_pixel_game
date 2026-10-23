@@ -16,10 +16,10 @@ export interface LootTable {
   entries: LootEntry[];
 }
 
-/** Found weapons come worn: each one gets its own condition, between these (in percent). */
+/** Found weapons and armour come worn: each one gets its own condition, between these (in percent). */
 export const FOUND_CONDITION: [min: number, max: number] = [15, 85];
 
-/** Rolls a chest's contents, as (item key, quantity) pairs: a found weapon's key carries its condition. */
+/** Rolls a chest's contents, as (item key, quantity) pairs: found gear's key carries its condition. */
 export function rollLoot(table: LootTable, rng: Random): Array<[itemKey: string, quantity: number]> {
   const totals = new Map<string, number>();
   const add = (key: string, quantity: number) => totals.set(key, (totals.get(key) ?? 0) + quantity);
@@ -27,7 +27,7 @@ export function rollLoot(table: LootTable, rng: Random): Array<[itemKey: string,
   for (let i = 0; i < rolls; i++) {
     const entry = rng.pickWeighted(table.entries);
     const quantity = rng.int(entry.min, entry.max);
-    if (!getItem(entry.itemId).weapon) add(entry.itemId, quantity);
+    if (!getItem(entry.itemId).durability) add(entry.itemId, quantity);
     else for (let n = 0; n < quantity; n++) add(itemKey(entry.itemId, rng.int(...FOUND_CONDITION)), 1);
   }
   return [...totals];

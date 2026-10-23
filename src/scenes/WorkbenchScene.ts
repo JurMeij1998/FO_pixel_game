@@ -1,22 +1,29 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
-import { SCRAP, scrapToRepair } from '../core/condition';
-import { repairWeapon } from '../core/repair';
+import { MATERIALS, materialToRepair } from '../core/condition';
+import { getItem } from '../core/items';
+import { repairItem } from '../core/repair';
 import { state } from '../state';
 import { describeItem } from '../ui/format';
 import { ListCursor } from '../ui/listCursor';
-import { COLORS, DIM_TEXT, HEADER_TEXT, TEXT } from '../ui/theme';
+import { CHAR_WIDTH, COLORS, DIM_TEXT, HEADER_TEXT, TEXT } from '../ui/theme';
 import { addButton, bindCursorKeys, closeOverlay, drawPanel, ListView, PANEL } from '../ui/widgets';
-import { workbenchRows, type WorkbenchRow } from '../ui/workbench';
+import { repairCostLine, workbenchRows, type WorkbenchRow } from '../ui/workbench';
 
 const LEFT = PANEL.x + 30;
 const RIGHT = PANEL.x + 500;
 const LIST_TOP = 130;
+/** The list's width in characters; its right-hand column (the condition) ends here. */
+const LIST_COLUMNS = 40;
+/** Rows of gear shown at once (the list scrolls); the inventory of materials goes below them. */
+const LIST_ROWS = 9;
+const INVENTORY_TOP = LIST_TOP + LIST_ROWS * 24 + 40;
 
 /**
- * A workbench: repair your weapons with scrap metal (core/repair.ts). The list has every weapon
- * you carry, in hand first, with what its repair takes; the right shows the chosen one and the
- * scrap you have. W/S (or the arrows) choose, E (or the Repair button) repairs, Esc closes.
+ * A workbench: repair your weapons and armour with scrap metal or leather (core/repair.ts). The
+ * list has all the gear you carry that wears, what's equipped first, with what its repair takes;
+ * the right shows the chosen item, and below the list (under INVENTORY) the materials you have. W/S (or the
+ * arrows) choose, E (or the Repair button) repairs what needs it, Esc closes.
  */
 export class WorkbenchScene extends Phaser.Scene {
   private cursor!: ListCursor;
@@ -24,7 +31,10 @@ export class WorkbenchScene extends Phaser.Scene {
   private rows: WorkbenchRow[] = [];
   private details!: Phaser.GameObjects.Text;
   private cost!: Phaser.GameObjects.Text;
-  private scrap!: Phaser.GameObjects.Text;
+  /** Only shown for something that needs repairing. */
+  private repairButton!: Phaser.GameObjects.Text;
+  /** One line per repair material, with how much of it you have on the right. */
+  private materials: Phaser.GameObjects.Text[] = [];
   private feedback!: Phaser.GameObjects.Text;
 
   constructor() {
@@ -37,16 +47,18 @@ export class WorkbenchScene extends Phaser.Scene {
 
     this.rows = workbenchRows(state.player);
     this.cursor = new ListCursor([this.rows.map((r) => r.key)]);
-    this.add.text(LEFT, LIST_TOP - 32, 'YOUR WEAPONS', HEADER_TEXT);
-    this.list = new ListView(this, LEFT, LIST_TOP, 40, 14, (key) => {
+    this.add.text(LEFT, LIST_TOP - 32, 'YOUR GEAR', HEADER_TEXT);
+    this.add.text(LEFT + LIST_COLUMNS * CHAR_WIDTH, LIST_TOP - 32, 'CONDITION', HEADER_TEXT).setOrigin(1, 0);
+    this.list = new ListView(this, LEFT, LIST_TOP, LIST_COLUMNS, LIST_ROWS, (key) => {
       this.cursor.focus(0, key);
       this.refresh();
     });
-    this.scrap = this.add.text(LEFT, LIST_TOP + 14 * 24 + 20, '', TEXT);
+    this.add.text(LEFT, INVENTORY_TOP - 32, 'INVENTORY', HEADER_TEXT);
+    this.materials = MATERIALS.map((_, i) => this.add.text(LEFT, INVENTORY_TOP + i * 24, '', TEXT));
 
     this.details = this.add.text(RIGHT, LIST_TOP - 32, '', { ...TEXT, wordWrap: { width: PANEL.x + PANEL.width - RIGHT - 30 } });
     this.cost = this.add.text(RIGHT, 380, '', TEXT);
-    addButton(this, RIGHT, 420, 'Repair', () => this.repair());
+    this.repairButton = addButton(this, RIGHT, 420, 'Repair', () => this.repair());
     this.feedback = this.add.text(LEFT, PANEL.y + PANEL.height - 40, '', { ...TEXT, wordWrap: { width: PANEL.width - 60 } });
 
     bindCursorKeys(this, this.cursor, () => this.refresh());
@@ -62,12 +74,13 @@ export class WorkbenchScene extends Phaser.Scene {
 
   private repair(): void {
     const row = this.selected;
-    if (!row) return;
-    const result = repairWeapon(state.player, row.target);
+    // Nothing to repair (it's perfect): E does nothing, as there's no Repair button either.
+    if (!row || materialToRepair(row.itemKey) === 0) return;
+    const result = repairItem(state.player, row.target);
     this.feedback.setText(result.message).setColor(result.ok ? COLORS.text : COLORS.warn);
     if (result.ok) playSound('reload');
     this.rows = workbenchRows(state.player);
-    // A weapon in the backpack has a new key once repaired (its condition is in it): keep the cursor on it.
+    // An item in the backpack has a new key once repaired (its condition is in it): keep the cursor on it.
     if (result.ok && 'key' in row.target) {
       const repaired = this.rows.find((r) => 'key' in r.target && r.itemKey === result.repaired);
       this.cursor.update([this.rows.map((r) => r.key)]);
@@ -82,22 +95,26 @@ export class WorkbenchScene extends Phaser.Scene {
     this.list.setRows(this.rows);
     if (this.cursor.selectedKey) this.list.reveal(this.cursor.selectedKey);
 
-    const have = state.player.backpack.count(SCRAP);
-    this.scrap.setText(`Scrap metal: ${have}`).setColor(have > 0 ? COLORS.text : COLORS.dim);
+    const backpack = state.player.backpack;
+    // Laid out like the gear list's rows: name on the left, amount in its right-hand column.
+    MATERIALS.forEach((material, i) => {
+      const amount = String(backpack.count(material));
+      this.materials[i]
+        .setText(`  ${getItem(material).name}`.padEnd(LIST_COLUMNS - amount.length) + amount)
+        .setColor(amount === '0' ? COLORS.dim : COLORS.text);
+    });
 
     const row = this.selected;
     if (!row) {
-      this.details.setText('You carry no weapons to repair.').setStyle(DIM_TEXT);
+      this.details.setText('You carry nothing that needs repairing.').setStyle(DIM_TEXT);
       this.cost.setText('');
+      this.repairButton.setVisible(false);
       return;
     }
     this.details.setText(describeItem(row.itemKey)).setColor(COLORS.text);
-    const needed = scrapToRepair(row.itemKey);
-    const text =
-      needed === 0 ? 'In perfect condition.'
-      : have >= needed ? `A full repair takes ${needed} scrap metal.`
-      : have > 0 ? `A full repair takes ${needed} scrap metal: you have ${have}, enough to patch it up.`
-      : `A full repair takes ${needed} scrap metal, and you have none.`;
-    this.cost.setText(text).setColor(needed === 0 || have > 0 ? COLORS.text : COLORS.warn);
+    // Nothing to repair: no cost line and no Repair button (E then just says it's in perfect condition).
+    const cost = repairCostLine(row.itemKey);
+    this.cost.setText(cost).setColor(COLORS.text);
+    this.repairButton.setVisible(cost !== '');
   }
 }

@@ -7,11 +7,13 @@ Recipes for the common additions. Each lists where the pieces live and what is e
 1. Add an `ItemDef` to `DEFINITIONS` in `src/core/items.ts`: id, name, category, weight (lbs per
    unit), value (caps per unit), description.
 2. Weapons also need `weapon`: `skill` (`smallGuns` makes it ranged; melee otherwise, even with
-   reach > 1 like the spear), damage range, `apCost`, `range`, `sound` (an `AttackSound`),
-   `wear` (condition lost per attack, in percent) and `repairCost` (scrap metal from broken to
-   perfect; better weapons cost more). Guns additionally need `ammo` (an ammo item id) and
-   `magazineSize`. To place a worn one, use its key: `itemKey('10mm_pistol', 55)`; found loot
-   comes worn by itself (`rollLoot`).
+   reach > 1 like the spear), damage range, `apCost`, `range` and `sound` (an `AttackSound`).
+   Guns additionally need `ammo` (an ammo item id) and `magazineSize`. Weapons and armour also
+   need `durability`: `wear` (condition lost per attack, or per hit taken for armour, in
+   percent), `repairCost` (how much material from broken to perfect; better gear costs more)
+   and `material` (`scrap_metal`, `leather`; a new one goes in `MATERIALS` in
+   core/condition.ts and `SHORT_MATERIAL` in ui/workbench.ts). To place a worn one, use its
+   key: `itemKey('10mm_pistol', 55)`; found loot comes worn by itself (`rollLoot`).
 3. Armor needs `armor: { armorClass, damageResist }`; consumables `consumable: { heal }`.
 4. Make it obtainable: add it to chest contents in a map, a creature's corpse `loot`, or a
    biome `LootTable`.

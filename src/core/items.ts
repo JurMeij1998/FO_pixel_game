@@ -22,10 +22,19 @@ export interface WeaponStats {
   /** Reach in tiles; 1 means melee. */
   range: number;
   sound: AttackSound;
-  /** Condition lost per attack, in percent of the weapon's full health (see core/condition.ts). */
+}
+
+/**
+ * How an item wears and is repaired (core/condition.ts): weapons with every attack, armour
+ * with every hit taken.
+ */
+export interface Durability {
+  /** Condition lost per use (an attack, or a hit taken), in percent of its full health. */
   wear: number;
-  /** Scrap metal a full repair takes, from broken to perfect; better weapons take more. */
+  /** How much `material` a full repair takes, from broken to perfect; better gear takes more. */
   repairCost: number;
+  /** The item a repair uses up: scrap metal for guns, blades and steel, leather for leather. */
+  material: string;
 }
 
 export interface ArmorStats {
@@ -51,6 +60,8 @@ export interface ItemDef {
   weapon?: WeaponStats;
   armor?: ArmorStats;
   consumable?: ConsumableStats;
+  /** Set for everything that wears: weapons and armour. */
+  durability?: Durability;
 }
 
 const DEFINITIONS: ItemDef[] = [
@@ -61,7 +72,8 @@ const DEFINITIONS: ItemDef[] = [
     weight: 1,
     value: 40,
     description: 'A short, sharp blade. Better than your fists.',
-    weapon: { skill: 'meleeWeapons', damageMin: 1, damageMax: 6, apCost: 3, range: 1, sound: 'swing', wear: 0.5, repairCost: 2 },
+    weapon: { skill: 'meleeWeapons', damageMin: 1, damageMax: 6, apCost: 3, range: 1, sound: 'swing' },
+    durability: { wear: 0.5, repairCost: 2, material: 'scrap_metal' },
   },
   {
     id: 'spear',
@@ -70,7 +82,8 @@ const DEFINITIONS: ItemDef[] = [
     weight: 4,
     value: 80,
     description: 'A sharpened pole with a crude metal tip. Long reach.',
-    weapon: { skill: 'meleeWeapons', damageMin: 3, damageMax: 10, apCost: 4, range: 2, sound: 'swing', wear: 0.8, repairCost: 4 },
+    weapon: { skill: 'meleeWeapons', damageMin: 3, damageMax: 10, apCost: 4, range: 2, sound: 'swing' },
+    durability: { wear: 0.8, repairCost: 4, material: 'scrap_metal' },
   },
   {
     id: '10mm_pistol',
@@ -88,9 +101,8 @@ const DEFINITIONS: ItemDef[] = [
       apCost: 5,
       range: 6,
       sound: 'pistol',
-      wear: 1.5,
-      repairCost: 8,
     },
+    durability: { wear: 1.5, repairCost: 8, material: 'scrap_metal' },
   },
   {
     id: 'hunting_rifle',
@@ -108,9 +120,8 @@ const DEFINITIONS: ItemDef[] = [
       apCost: 6,
       range: 10,
       sound: 'rifle',
-      wear: 2.5,
-      repairCost: 15,
     },
+    durability: { wear: 2.5, repairCost: 15, material: 'scrap_metal' },
   },
   {
     id: 'leather_jacket',
@@ -120,6 +131,7 @@ const DEFINITIONS: ItemDef[] = [
     value: 250,
     description: 'A worn black leather jacket. Offers a little protection.',
     armor: { armorClass: 8, damageResist: 20 },
+    durability: { wear: 2, repairCost: 3, material: 'leather' },
   },
   {
     id: 'leather_armor',
@@ -129,6 +141,17 @@ const DEFINITIONS: ItemDef[] = [
     value: 700,
     description: 'Tanned hides stitched over padding. Solid protection.',
     armor: { armorClass: 15, damageResist: 25 },
+    durability: { wear: 1.5, repairCost: 5, material: 'leather' },
+  },
+  {
+    id: 'steel_armor',
+    name: 'Steel Armor',
+    category: 'armor',
+    weight: 30,
+    value: 1800,
+    description: 'Plates of salvaged steel riveted onto a leather harness. Heavy, and very tough.',
+    armor: { armorClass: 20, damageResist: 40 },
+    durability: { wear: 0.8, repairCost: 12, material: 'scrap_metal' },
   },
   {
     id: 'stimpak',
@@ -180,6 +203,14 @@ const DEFINITIONS: ItemDef[] = [
     description: 'Fifty feet of frayed but sturdy rope.',
   },
   {
+    id: 'leather',
+    name: 'Leather',
+    category: 'misc',
+    weight: 1,
+    value: 8,
+    description: 'A tanned scrap of hide. Good for patching up leather armour.',
+  },
+  {
     id: 'scrap_metal',
     name: 'Scrap Metal',
     category: 'misc',
@@ -198,7 +229,7 @@ export function getItem(key: string): ItemDef {
   return def;
 }
 
-/** Condition in percent: 100 is perfect, 0 broken. Only weapons wear. */
+/** Condition in percent: 100 is perfect, 0 broken. Only weapons and armour wear (they have `durability`). */
 export const PERFECT = 100;
 const CONDITION_MARK = '@';
 

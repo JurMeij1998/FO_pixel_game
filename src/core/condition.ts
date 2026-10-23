@@ -1,15 +1,17 @@
 import { conditionOf, getItem, itemIdOf, itemKey, PERFECT } from './items';
 
 /**
- * Weapon condition: every attack wears the weapon in hand by its `wear` (percent of its full
- * health). At 35% or below it works worse, the more so the lower it gets: a gun hits less
- * often, does less damage and its reload can take twice the AP; a melee weapon only does less
- * damage. At 0% it's broken and can't be used until it's repaired at a workbench, with scrap
- * metal: the more worn the weapon, and the better it is, the more scrap. Pure, so it can be
- * tested; a condition travels with the item in its key (see itemKey in core/items.ts).
+ * Condition of weapons and armour (items with `durability`): every attack wears the weapon in
+ * hand, every hit taken the armour worn, by their `wear` (percent of their full health). At 35%
+ * or below they work worse, the more so the lower they get: a gun hits less often, does less
+ * damage and its reload can take twice the AP; a melee weapon only does less damage; armour
+ * protects less. At 0% a weapon is broken and can't be used, and armour has fallen apart and
+ * protects nothing, until repaired at a workbench with their `material` (scrap metal, leather):
+ * the more worn, and the better the item, the more it takes. Pure, so it can be tested; a
+ * condition travels with the item in its key (see itemKey in core/items.ts).
  */
 
-/** At or below this condition a weapon starts to work worse. */
+/** At or below this condition a weapon or armour starts to work worse. */
 export const WORN_AT = 35;
 /** A gun's hit chance falls by up to this much (in percentage points) as it nears 0%. */
 const MAX_HIT_PENALTY = 30;
@@ -17,9 +19,13 @@ const MAX_HIT_PENALTY = 30;
 const MIN_DAMAGE_SHARE = 0.5;
 /** A gun's chance of a reload taking double the AP, just before it breaks. */
 const MAX_SLOW_RELOAD = 0.5;
-/** What a broken weapon is still worth, as a share of its value; a perfect one is worth all of it. */
+/** What's left of armour's protection just before it falls apart. */
+const MIN_PROTECTION_SHARE = 0.5;
+/** What a broken item is still worth, as a share of its value; a perfect one is worth all of it. */
 const BROKEN_VALUE_SHARE = 0.1;
 export const SCRAP = 'scrap_metal';
+/** The materials repairs use, in the order the workbench lists them. */
+export const MATERIALS = [SCRAP, 'leather'] as const;
 
 /** How badly worn, from 0 (at 35% or better) to 1 (at 0%). */
 export function wornness(condition: number): number {
@@ -45,32 +51,37 @@ export function slowReloadChance(condition: number): number {
   return MAX_SLOW_RELOAD * wornness(condition);
 }
 
+/** The share of its Armor Class and Damage Resist armour still gives: none once it has fallen apart. */
+export function protectionShare(condition: number): number {
+  return isBroken(condition) ? 0 : 1 - (1 - MIN_PROTECTION_SHARE) * wornness(condition);
+}
+
 /** The share of its value an item in this condition is worth when bartering. */
 export function valueShare(condition: number): number {
   return BROKEN_VALUE_SHARE + (1 - BROKEN_VALUE_SHARE) * (condition / PERFECT);
 }
 
-/** The key the weapon has after one attack's wear (unchanged for anything that doesn't wear). */
+/** The key the item has after one use's wear (unchanged for anything that doesn't wear). */
 export function afterWear(key: string): string {
-  const wear = getItem(key).weapon?.wear;
+  const wear = getItem(key).durability?.wear;
   if (!wear) return key;
   return itemKey(itemIdOf(key), conditionOf(key) - wear);
 }
 
-/** Scrap metal it takes to repair this weapon to perfect: 0 if it is, or it isn't a weapon. */
-export function scrapToRepair(key: string): number {
-  const cost = getItem(key).weapon?.repairCost ?? 0;
+/** How much of its material it takes to repair this item to perfect: 0 if it is, or it doesn't wear. */
+export function materialToRepair(key: string): number {
+  const cost = getItem(key).durability?.repairCost ?? 0;
   return Math.ceil((cost * (PERFECT - conditionOf(key))) / PERFECT);
 }
 
-/** The key the weapon has after repairing it with this much scrap: each piece restores 100% / repairCost. */
-export function afterRepair(key: string, scrap: number): string {
-  const cost = getItem(key).weapon?.repairCost;
+/** The key the item has after repairing it with this much material: each piece restores 100% / repairCost. */
+export function afterRepair(key: string, material: number): string {
+  const cost = getItem(key).durability?.repairCost;
   if (!cost) return key;
-  return itemKey(itemIdOf(key), conditionOf(key) + (scrap * PERFECT) / cost);
+  return itemKey(itemIdOf(key), conditionOf(key) + (material * PERFECT) / cost);
 }
 
-/** How a weapon's condition reads in lists: "62%", or "broken". */
+/** How an item's condition reads in lists: "62%", or "broken". */
 export function conditionLabel(condition: number): string {
   return isBroken(condition) ? 'broken' : `${Math.ceil(condition)}%`;
 }

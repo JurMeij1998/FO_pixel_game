@@ -48,9 +48,9 @@ Roughly in the order discussed with the user:
   when someone can see you; owners for houses once villages have residents; closing doors in combat
   (today only walking into one opens it there); people opening doors outside combat (they
   stand still until a fight); lockpicks as an item that helps, as in Fallout.
-- **More from weapon condition** (`core/condition.ts`, `core/repair.ts`): a Repair skill
-  (cheaper or better repairs), other materials than scrap metal, armour wearing too, traders
-  repairing for caps, and enemies' weapons (creature attacks don't wear today).
+- **More from gear condition** (`core/condition.ts`, `core/repair.ts`): a Repair skill
+  (cheaper or better repairs), more materials, traders repairing for caps, and enemies'
+  weapons and armour (creatures don't wear today).
 - **Tagged skills and traits at character creation** (`scenes/CreationScene.ts`, rules in
   `core/creation.ts`): choosing the tagged skills, as in Fallout (every character still tags
   Small Guns and Melee Weapons), and perhaps traits.

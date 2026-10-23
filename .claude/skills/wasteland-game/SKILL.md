@@ -85,9 +85,10 @@ its id), so a worn weapon is its own stack and its condition goes wherever the s
 containers, equipment slots, loot, barter, saves, list keys. That avoided giving
 `ItemContainer` item instances, and old saves (plain ids) load as perfect weapons. `getItem`
 takes either. Anything comparing items by id should go through `itemIdOf`; anything showing
-one should use `itemName(key)` (ui/format.ts), which adds the condition. Wear, its effects
-below 35% and repair costs are in `core/condition.ts`; a broken weapon refuses to attack with
-`AttackProblemCode` 'broken'. Only a worn gun rolls for a slow reload, so good guns don't
+one should use `itemName(key)` (ui/format.ts), which adds the condition. What wears has
+`durability` (wear, repair cost, material): weapons per attack, armour per hit taken. Wear,
+its effects below 35% and repair costs are in `core/condition.ts`; a broken weapon refuses to
+attack with `AttackProblemCode` 'broken', and armour at 0% protects nothing. Only a worn gun rolls for a slow reload, so good guns don't
 shift combat's random numbers.
 
 **Saves store only what changes.** Format v2 (`core/save.ts`): world seed, current map, player,

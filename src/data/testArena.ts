@@ -117,8 +117,9 @@ function buildTestShop(): MapDef {
 /**
  * Sturdy and well equipped, so fights last long enough to watch the UI. 10 Agility gives 10 AP.
  * The hunting rifle is in hand, loaded; the pistol (loaded too) is in the other hand. Lockpick
- * 66%, enough for the store's crate (a hard lock) but not an expert one. A broken knife, a
- * badly worn spear and some scrap metal are in the pack, to try the workbench with.
+ * 66%, enough for the store's crate (a hard lock) but not an expert one. Worn steel armour on,
+ * and in the pack a broken knife, a badly worn spear, badly worn leather armour, scrap metal
+ * and leather, to try the workbench with.
  */
 export function testCharacter(): Character {
   const player = new Character('Tester', {
@@ -138,6 +139,9 @@ export function testCharacter(): Character {
     ['10mm_pistol', 1],
     [itemKey('spear', 30), 1],
     ['scrap_metal', 12],
+    [itemKey('steel_armor', 45), 1],
+    [itemKey('leather_armor', 20), 1],
+    ['leather', 3],
     ['hunting_rifle', 1],
     ['ammo_10mm', 48],
     ['ammo_223', 15],
@@ -147,6 +151,7 @@ export function testCharacter(): Character {
   }
   player.equip('hunting_rifle', 'primary');
   player.equip('10mm_pistol', 'secondary');
+  player.equip(itemKey('steel_armor', 45), 'armor');
   player.reload(); // the rifle, in hand
   player.swapWeapons();
   player.reload(); // the pistol

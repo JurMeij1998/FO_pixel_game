@@ -1,4 +1,4 @@
-import { afterWear, damageShare, hitPenalty, isBroken, WORN_AT } from './condition';
+import { afterWear, damageShare, hitPenalty, isBroken, protectionShare, WORN_AT } from './condition';
 import { ItemContainer } from './container';
 import type { Attack, Fighter } from './fighter';
 import { isGridPos, type GridPos } from './grid';
@@ -178,13 +178,15 @@ export class Character implements Fighter {
     return derived.carryCapacity(this.special);
   }
 
-  /** Base AC is Agility, plus whatever armor is worn. */
+  /** Base AC is Agility, plus whatever armor is worn (less of it when badly worn; core/condition.ts). */
   get armorClass(): number {
-    return this.special.agility + (this.equippedItem('armor')?.armor?.armorClass ?? 0);
+    const armorClass = this.equippedItem('armor')?.armor?.armorClass ?? 0;
+    return this.special.agility + Math.round(armorClass * protectionShare(this.slotCondition('armor')));
   }
 
   get damageResist(): number {
-    return this.equippedItem('armor')?.armor?.damageResist ?? 0;
+    const resist = this.equippedItem('armor')?.armor?.damageResist ?? 0;
+    return Math.round(resist * protectionShare(this.slotCondition('armor')));
   }
 
   /** In Fallout, Luck is the base critical chance. */
@@ -204,7 +206,7 @@ export class Character implements Fighter {
   get attack(): Attack {
     const weapon = this.activeWeapon;
     if (!weapon?.weapon) return { ...UNARMED, hitChance: this.skill('unarmed') };
-    const { skill, wear: _wear, repairCost: _repairCost, ...stats } = weapon.weapon;
+    const { skill, ...stats } = weapon.weapon;
     const ranged = skill === 'smallGuns';
     const condition = this.weaponCondition();
     const share = damageShare(condition);
@@ -216,6 +218,11 @@ export class Character implements Fighter {
 
   /** The condition of the weapon in a hand, in percent (100 for an empty hand: fists don't wear). */
   weaponCondition(slot: WeaponSlot = this.activeWeaponSlot): number {
+    return this.slotCondition(slot);
+  }
+
+  /** The condition of what's in a slot, in percent (100 for an empty one). */
+  slotCondition(slot: EquipSlot): number {
     const key = this.equipment[slot];
     return key ? conditionOf(key) : 100;
   }
@@ -230,12 +237,20 @@ export class Character implements Fighter {
    * broke, or it just got badly worn (35% or below), or nothing.
    */
   wearWeapon(): 'broke' | 'worn' | null {
-    const slot = this.activeWeaponSlot;
+    return this.wear(this.activeWeaponSlot);
+  }
+
+  /** Wears the armour worn by one hit taken; returns the same as wearWeapon. */
+  wearArmor(): 'broke' | 'worn' | null {
+    return this.wear('armor');
+  }
+
+  private wear(slot: EquipSlot): 'broke' | 'worn' | null {
     const key = this.equipment[slot];
     if (!key) return null;
     const before = conditionOf(key);
     this.equipment[slot] = afterWear(key);
-    const after = this.weaponCondition(slot);
+    const after = this.slotCondition(slot);
     if (isBroken(after) && !isBroken(before)) return 'broke';
     if (after <= WORN_AT && before > WORN_AT) return 'worn';
     return null;

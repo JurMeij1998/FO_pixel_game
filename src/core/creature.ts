@@ -78,7 +78,7 @@ const DEFINITIONS: CreatureDef[] = [
     sightRange: 5,
     experience: 40,
     attack: { name: 'bite', damageMin: 2, damageMax: 6, apCost: 4, range: 1, ranged: false, hitChance: 55, sound: 'bite' },
-    loot: [],
+    loot: [['leather', 1]], // its hide, for patching leather armour
   },
   {
     id: 'wild_dog',
@@ -91,7 +91,7 @@ const DEFINITIONS: CreatureDef[] = [
     sightRange: 6,
     experience: 35,
     attack: { name: 'bite', damageMin: 2, damageMax: 5, apCost: 3, range: 1, ranged: false, hitChance: 55, sound: 'bite' },
-    loot: [],
+    loot: [['leather', 1]], // its hide, for patching leather armour
   },
   {
     id: 'feral_ghoul',
@@ -146,6 +146,8 @@ const DEFINITIONS: CreatureDef[] = [
       ['ammo_223', 20],
       ['stimpak', 2],
       ['leather_jacket', 1],
+      ['steel_armor', 1],
+      ['leather', 4],
       ['bottle_caps', 300],
     ],
     dialog: {

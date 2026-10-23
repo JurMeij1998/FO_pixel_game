@@ -35,6 +35,7 @@ const HOUSE_LOOT: LootTable = {
     { itemId: 'rope', min: 1, max: 1, weight: 1 },
     { itemId: 'knife', min: 1, max: 1, weight: 1 },
     { itemId: 'scrap_metal', min: 1, max: 2, weight: 1 },
+    { itemId: 'leather', min: 1, max: 2, weight: 1 },
   ],
 };
 
@@ -60,6 +61,7 @@ const BARN_LOOT: LootTable = {
     { itemId: 'bottle_caps', min: 5, max: 15, weight: 2 },
     { itemId: 'spear', min: 1, max: 1, weight: 1 },
     { itemId: 'canteen', min: 1, max: 1, weight: 1 },
+    { itemId: 'leather', min: 1, max: 3, weight: 2 },
   ],
 };
 

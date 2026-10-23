@@ -40,7 +40,7 @@ export function stackRows(stacks: ReadonlyArray<Readonly<ItemStack>>): ListRow[]
   });
 }
 
-/** The details pane's text for an item, from its key: a weapon's condition included ("Condition 62%", or "broken"). */
+/** The details pane's text for an item, from its key: the condition of gear that wears included ("Condition 62%", or "broken"). */
 export function describeItem(key: string): string {
   const item = getItem(key);
   const lines = [item.name.toUpperCase(), item.description, ''];
@@ -48,9 +48,9 @@ export function describeItem(key: string): string {
     const w = item.weapon;
     lines.push(`Damage ${w.damageMin}-${w.damageMax}   AP ${w.apCost}   Range ${w.range}`);
     if (w.ammo) lines.push(`Ammo: ${getItem(w.ammo).name}   Magazine ${w.magazineSize}`);
-    lines.push(`Condition ${conditionLabel(conditionOf(key))}`);
   }
   if (item.armor) lines.push(`AC +${item.armor.armorClass}   DR ${item.armor.damageResist}%`);
+  if (item.durability) lines.push(`Condition ${conditionLabel(conditionOf(key))}`);
   if (item.consumable) lines.push(`Heals ${item.consumable.heal} HP`);
   lines.push(`Weight ${item.weight} lb   Value ${item.value} caps`);
   return lines.join('\n');
