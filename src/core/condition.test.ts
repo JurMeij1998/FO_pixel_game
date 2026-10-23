@@ -111,11 +111,10 @@ describe('weapon condition', () => {
     expect(sellPrice('10mm_pistol@0', 5)).toBeGreaterThan(0);
   });
 
-  it('describes a weapon\'s condition, and what it does', () => {
-    expect(describeItem('10mm_pistol')).toMatch(/Condition 100%\n/);
-    expect(describeItem('10mm_pistol@20')).toMatch(/badly worn, it hits less often, less hard, and can be slow to reload/);
-    expect(describeItem('knife@20')).toMatch(/badly worn, it hits less hard\n/);
-    expect(describeItem('knife@0')).toMatch(/broken: repair it at a workbench/);
+  it("shows a weapon's condition, and nothing more", () => {
+    expect(describeItem('10mm_pistol')).toMatch(/\nCondition 100%\n/);
+    expect(describeItem('10mm_pistol@20')).toMatch(/\nCondition 20%\n/);
+    expect(describeItem('knife@0')).toMatch(/\nCondition broken\n/);
   });
 });
 

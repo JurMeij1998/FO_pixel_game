@@ -1,4 +1,4 @@
-import { conditionLabel, isBroken, WORN_AT } from '../core/condition';
+import { conditionLabel } from '../core/condition';
 import type { ItemStack } from '../core/container';
 import { conditionOf, getItem, PERFECT, type ItemCategory } from '../core/items';
 import type { ListRow } from './widgets';
@@ -40,7 +40,7 @@ export function stackRows(stacks: ReadonlyArray<Readonly<ItemStack>>): ListRow[]
   });
 }
 
-/** The details pane's text for an item, from its key: a weapon's condition, and what wear does to it, included. */
+/** The details pane's text for an item, from its key: a weapon's condition included ("Condition 62%", or "broken"). */
 export function describeItem(key: string): string {
   const item = getItem(key);
   const lines = [item.name.toUpperCase(), item.description, ''];
@@ -48,13 +48,7 @@ export function describeItem(key: string): string {
     const w = item.weapon;
     lines.push(`Damage ${w.damageMin}-${w.damageMax}   AP ${w.apCost}   Range ${w.range}`);
     if (w.ammo) lines.push(`Ammo: ${getItem(w.ammo).name}   Magazine ${w.magazineSize}`);
-    const condition = conditionOf(key);
-    const state = isBroken(condition)
-      ? ': repair it at a workbench'
-      : condition <= WORN_AT
-        ? `: badly worn, ${w.ammo ? 'it hits less often, less hard, and can be slow to reload' : 'it hits less hard'}`
-        : '';
-    lines.push(`Condition ${conditionLabel(condition)}${state}`);
+    lines.push(`Condition ${conditionLabel(conditionOf(key))}`);
   }
   if (item.armor) lines.push(`AC +${item.armor.armorClass}   DR ${item.armor.damageResist}%`);
   if (item.consumable) lines.push(`Heals ${item.consumable.heal} HP`);
