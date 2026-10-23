@@ -97,11 +97,11 @@ describe('village biome', () => {
 });
 
 describe('village buildings', () => {
-  it("lock the store's crate with a good lock, but never the store or the barn", () => {
+  it("lock the store's crate with a hard lock, but never the store or the barn", () => {
     for (const seed of SEEDS.slice(0, 10)) {
       const map = GridMap.parse(generateMap(VILLAGE, seed, EXITS), 'village');
       const crate = map.chests.find((c) => c.owner === 'store')!;
-      expect(crate.lock).toBe(LOCKS.good);
+      expect(crate.lock).toBe(LOCKS.hard);
       const gus = map.creatures.find((c) => c.def.id === 'shopkeeper')!;
       const store = map.buildingAt(gus.pos.x, gus.pos.y)!;
       expect(store).toBeDefined();

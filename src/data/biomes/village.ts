@@ -87,7 +87,7 @@ const WOODEN_HOUSE: Prefab = {
   ],
   entrance: { x: 3, y: 5 },
   chest: { name: 'Dresser', loot: HOUSE_LOOT },
-  doorLock: { lock: LOCKS.simple, chance: 0.3 },
+  doorLock: { lock: LOCKS.easy, chance: 0.3 },
 };
 
 /** Two back rooms opening onto a front room. */
@@ -104,14 +104,14 @@ const BRICK_HOUSE: Prefab = {
   ],
   entrance: { x: 4, y: 6 },
   chest: { name: 'Cupboard', loot: HOUSE_LOOT },
-  doorLock: { lock: LOCKS.average, chance: 0.3 },
+  doorLock: { lock: LOCKS.medium, chance: 0.3 },
 };
 
 /**
  * A small shop, 3 by 4 inside: bookcases along the back, Gus (G) behind his counter, and the
  * stockroom crate behind it too, through the gap in the counter. You talk to Gus across the
  * counter from the shop floor. Taking from the crate is stealing from the store, and it's
- * locked with a good lock: picking it is breaking in, and turns the store against you too.
+ * locked with a hard lock: picking it is breaking in, and turns the store against you too.
  * The guard (W) stands outside, beside the door; the shop is open, so the door isn't locked
  * (but it is the store's).
  */
@@ -127,7 +127,7 @@ export const GENERAL_STORE: Prefab = {
     '  :W ',
   ],
   entrance: { x: 2, y: 6 },
-  chest: { name: 'Stockroom Crate', loot: STORE_LOOT, owner: 'store', lock: LOCKS.good },
+  chest: { name: 'Stockroom Crate', loot: STORE_LOOT, owner: 'store', lock: LOCKS.hard },
   owner: 'store',
   residents: { G: 'shopkeeper', W: 'guard' },
 };

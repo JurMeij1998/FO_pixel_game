@@ -1,14 +1,17 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
 import { GAME_WIDTH } from '../config';
-import { LockPuzzle, PIN_COUNT } from '../core/lockPuzzle';
+import { LockPuzzle } from '../core/lockPuzzle';
 import { RepeatGuard } from '../ui/repeatGuard';
 import { COLORS, TEXT } from '../ui/theme';
 import { addButton, closeOverlay, drawPanel, PANEL } from '../ui/widgets';
 
 export interface LockpickData {
-  /** What's being picked, for the title ("Door", "Stockroom Crate"). */
+  /** What's being picked ("Door", "Stockroom Crate") and how hard its lock is ("hard"), for the title. */
   title: string;
+  level: string;
+  /** How many pins the lock has: more for a harder one (pinsFor in core/locks.ts). */
+  pins: number;
   /** Called once the lock opens, just before the screen closes. Giving up (Esc) calls nothing. */
   onPicked: () => void;
 }
@@ -33,19 +36,19 @@ const BRASS = { light: 0xe0bc5c, base: 0xb88e34, dark: 0x8a6624, edge: 0x3e2c0c 
 const STEEL = { light: 0xd0d0c8, base: 0x9a9a92, edge: 0x2a2a26 };
 const SELECTED = Phaser.Display.Color.HexStringToColor(COLORS.bright).color;
 
-const pinX = (pin: number) => CENTER_X + (pin - (PIN_COUNT - 1) / 2) * PIN_SPACING;
 
 /**
- * Picking a lock: four pins stick out of the bottom of a padlock, to be pushed in in one order
- * (new each time, though the first pin you push always goes in; core/lockPuzzle.ts). The right
- * pin stays in; a wrong one drops every pin back out. A/D (or the arrow keys) choose a pin, E,
- * Space, W or Up push it in; 1-4 or a click push one directly. Esc gives up. Only opened for
- * locks the player has the skill to try.
+ * Picking a lock: 3 to 5 pins (more for a harder lock) stick out of the bottom of a padlock,
+ * to be pushed in in one order, new each time (core/lockPuzzle.ts). The right pin stays in; a
+ * wrong one drops every pin back out. A/D (or the arrow keys) choose a pin, E, Space, W or Up
+ * push it in; a number key or a click push one directly. Esc gives up. Only opened for locks
+ * the player has the skill to try.
  */
 export class LockpickScene extends Phaser.Scene {
   private puzzle!: LockPuzzle;
   private onPicked!: () => void;
   private title = '';
+  private level = '';
   private selected = 0;
   /** Set once the lock opens or the player gives up, so nothing acts while the screen closes. */
   private closed = false;
@@ -62,32 +65,33 @@ export class LockpickScene extends Phaser.Scene {
 
   init(data: LockpickData): void {
     this.title = data.title;
+    this.level = data.level;
     this.onPicked = data.onPicked;
-    this.puzzle = new LockPuzzle(Math.random);
+    this.puzzle = new LockPuzzle(data.pins, Math.random);
     this.selected = 0;
     this.closed = false;
   }
 
   create(): void {
-    drawPanel(this, `PICKING THE LOCK: ${this.title.toUpperCase()}`);
+    drawPanel(this, `${this.title} - ${this.level}`.toUpperCase()); // e.g. STOCKROOM CRATE - GOOD
     addButton(this, PANEL.x + PANEL.width - 130, PANEL.y + 18, 'Close', () => this.giveUp());
 
     this.shackle = this.drawShackle();
     // The pins first, so the body hides the part of them that's inside it.
     this.pins = [];
-    for (let pin = 0; pin < PIN_COUNT; pin++) this.pins.push(this.drawPin(pin));
+    for (let pin = 0; pin < this.puzzle.pinCount; pin++) this.pins.push(this.drawPin(pin));
     this.drawBody();
     this.highlight = this.add.graphics();
 
     const labels = PIN.outBottom + 18;
-    for (let pin = 0; pin < PIN_COUNT; pin++) {
+    for (let pin = 0; pin < this.puzzle.pinCount; pin++) {
       // Click anywhere on a pin's column: the body above it, or the pin itself.
       this.add
-        .zone(pinX(pin), BODY.top, PIN_SPACING - 6, PIN.outBottom + 6 - BODY.top)
+        .zone(this.pinX(pin), BODY.top, PIN_SPACING - 6, PIN.outBottom + 6 - BODY.top)
         .setOrigin(0.5, 0)
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => this.press(pin));
-      this.add.text(pinX(pin), labels, String(pin + 1), TEXT).setOrigin(0.5, 0);
+      this.add.text(this.pinX(pin), labels, String(pin + 1), TEXT).setOrigin(0.5, 0);
     }
     this.marker = this.add.text(0, labels + 22, '^', { ...TEXT, color: COLORS.bright }).setOrigin(0.5, 0);
     this.feedback = this.add.text(CENTER_X, labels + 54, '', TEXT).setOrigin(0.5, 0);
@@ -98,6 +102,11 @@ export class LockpickScene extends Phaser.Scene {
       this.onKey(event);
     });
     this.refresh();
+  }
+
+  /** A pin's x: the pins are spread evenly about the middle, however many there are. */
+  private pinX(pin: number): number {
+    return CENTER_X + (pin - (this.puzzle.pinCount - 1) / 2) * PIN_SPACING;
   }
 
   // --- Drawing -------------------------------------------------------------
@@ -129,9 +138,9 @@ export class LockpickScene extends Phaser.Scene {
     g.fillStyle(BRASS.base).fillRoundedRect(BODY_LEFT + 5, BODY.top + 4, BODY.width - 10, BODY.height - 16, BODY.radius - 4);
     g.fillStyle(BRASS.light, 0.55).fillRoundedRect(BODY_LEFT + 14, BODY.top + 8, BODY.width - 28, 9, 4); // light along the top
     g.fillStyle(BRASS.dark, 0.5).fillRect(BODY_LEFT + 10, BODY.top + BODY.height / 2 + 20, BODY.width - 20, 2); // a seam
-    for (let pin = 0; pin < PIN_COUNT; pin++) {
-      g.fillStyle(BRASS.edge).fillEllipse(pinX(pin), BODY_BOTTOM - 1, PIN.width + 10, 8);
-      g.fillStyle(0x000000).fillEllipse(pinX(pin), BODY_BOTTOM, PIN.width + 4, 5);
+    for (let pin = 0; pin < this.puzzle.pinCount; pin++) {
+      g.fillStyle(BRASS.edge).fillEllipse(this.pinX(pin), BODY_BOTTOM - 1, PIN.width + 10, 8);
+      g.fillStyle(0x000000).fillEllipse(this.pinX(pin), BODY_BOTTOM, PIN.width + 4, 5);
     }
     // Rivets in the corners.
     for (const [dx, dy] of [
@@ -155,7 +164,7 @@ export class LockpickScene extends Phaser.Scene {
     rod.fillStyle(STEEL.light).fillRect(-w / 2 + 5, top, 3, PIN.length - PIN.head);
     rod.fillStyle(STEEL.edge).fillRoundedRect(-w / 2 - 3, -PIN.head - 2, w + 6, PIN.head + 2, 4);
     rod.fillStyle(STEEL.light).fillRoundedRect(-w / 2 - 1, -PIN.head - 1, w + 2, PIN.head - 2, 3);
-    return this.add.container(pinX(pin), PIN.outBottom, [rod]);
+    return this.add.container(this.pinX(pin), PIN.outBottom, [rod]);
   }
 
   // --- Input ---------------------------------------------------------------
@@ -166,7 +175,7 @@ export class LockpickScene extends Phaser.Scene {
       return;
     }
     const digit = Number(event.key);
-    if (Number.isInteger(digit) && digit >= 1 && digit <= PIN_COUNT) {
+    if (Number.isInteger(digit) && digit >= 1 && digit <= this.puzzle.pinCount) {
       if (!event.repeat) this.press(digit - 1);
       return;
     }
@@ -190,7 +199,7 @@ export class LockpickScene extends Phaser.Scene {
   }
 
   private select(pin: number): void {
-    if (this.closed || pin < 0 || pin >= PIN_COUNT || pin === this.selected) return;
+    if (this.closed || pin < 0 || pin >= this.puzzle.pinCount || pin === this.selected) return;
     this.selected = pin;
     playSound('menuMove');
     this.refresh();
@@ -248,7 +257,7 @@ export class LockpickScene extends Phaser.Scene {
    * left to its own little animation (see nudge).
    */
   private refresh(nudged?: number): void {
-    for (let pin = 0; pin < PIN_COUNT; pin++) {
+    for (let pin = 0; pin < this.puzzle.pinCount; pin++) {
       if (pin === nudged) continue;
       const rod = this.pins[pin];
       const bottom = this.puzzle.isSet(pin) ? PIN.inBottom : PIN.outBottom;
@@ -259,7 +268,7 @@ export class LockpickScene extends Phaser.Scene {
       }
     }
     // A green frame around the chosen pin, below the lock, like the cursor on other screens.
-    const x = pinX(this.selected);
+    const x = this.pinX(this.selected);
     this.highlight
       .clear()
       .lineStyle(2, SELECTED)

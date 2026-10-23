@@ -10,10 +10,10 @@ import { failure, success, type ActionResult } from './result';
 
 /** Lockpick skill (in percent) each kind of lock needs. A new character has 10 + PE + AG. */
 export const LOCKS = {
-  simple: 25,
-  average: 40,
-  good: 60,
-  hard: 80,
+  easy: 25,
+  medium: 40,
+  hard: 60,
+  expert: 80,
 } as const;
 
 /** Anything that can be locked: `lock` is the Lockpick skill it needs, or null once it's open to anyone. */
@@ -21,11 +21,28 @@ export interface Lockable {
   lock: number | null;
 }
 
-/** "a simple lock", "a good lock"...: the hardest kind it is at least as hard as. */
+/**
+ * How many pins the lock's puzzle has (core/lockPuzzle.ts): 3 for an easy lock, 4 for a
+ * medium one, 5 for a hard or expert one.
+ */
+export function pinsFor(lock: number): number {
+  if (lock < LOCKS.medium) return 3;
+  if (lock < LOCKS.hard) return 4;
+  return 5;
+}
+
+export type LockKind = keyof typeof LOCKS;
+
+/** The kind of lock ("easy", "hard"...): the hardest kind it is at least as hard as. */
+export function lockKind(lock: number): LockKind {
+  const kinds = Object.entries(LOCKS) as Array<[LockKind, number]>;
+  return kinds.filter(([, needed]) => lock >= needed).pop()?.[0] ?? 'easy';
+}
+
+/** "an easy lock", "a medium lock"... */
 export function describeLock(lock: number): string {
-  const kinds = Object.entries(LOCKS) as Array<[keyof typeof LOCKS, number]>;
-  const kind = kinds.filter(([, needed]) => lock >= needed).pop()?.[0] ?? 'simple';
-  return `${kind === 'average' ? 'an' : 'a'} ${kind} lock`;
+  const kind = lockKind(lock);
+  return `${/^[aeiou]/.test(kind) ? 'an' : 'a'} ${kind} lock`;
 }
 
 /** What you're told when you find something locked: how hard it is, and whether you can pick it. */

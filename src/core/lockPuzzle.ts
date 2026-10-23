@@ -1,36 +1,32 @@
 /**
- * Picking a lock, as a puzzle: the lock has four pins that must be pressed in, in one order,
- * different every time you set to it. The very first pin you press always goes in (it becomes
- * the first of the order), so you get a foothold. After that, a pin pressed in its turn stays
- * in; any other pin and every pin that was in drops back out, and you start over (knowing what
- * you've learned). Once all of them are in, the lock opens. Pure, so it can be tested; the
- * lockpicking screen (scenes/LockpickScene.ts) draws it and passes on your presses.
+ * Picking a lock, as a puzzle: the lock has a few pins (more for a harder lock; see pinsFor in
+ * core/locks.ts) that must be pressed in, in one order, different every time you set to it. A
+ * pin pressed in its turn stays in; any other pin and every pin that was in drops back out,
+ * and you start over (knowing what you've learned). Once all of them are in, the lock opens.
+ * Pure, so it can be tested; the lockpicking screen (scenes/LockpickScene.ts) draws it and
+ * passes on your presses.
  */
-
-export const PIN_COUNT = 4;
 
 /** What pressing a pin did: it went in, it was the wrong one (all pins dropped), it was in already, or it opened the lock. */
 export type PinPress = 'set' | 'wrong' | 'alreadySet' | 'open';
 
 export class LockPuzzle {
-  /** The order the pins (0 to PIN_COUNT - 1) must go in. Its first pin is settled by the first press. */
-  private readonly sequence: number[];
+  /** The order the pins (0 to pinCount - 1) must go in. */
+  readonly order: readonly number[];
   private readonly pressed: number[] = [];
-  private touched = false;
 
   /** `rng` returns values in [0, 1); injectable so tests are deterministic. */
-  constructor(rng: () => number) {
+  constructor(
+    readonly pinCount: number,
+    rng: () => number,
+  ) {
     // Fisher-Yates: every order equally likely.
-    const order = Array.from({ length: PIN_COUNT }, (_, i) => i);
+    const order = Array.from({ length: pinCount }, (_, i) => i);
     for (let i = order.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
       [order[i], order[j]] = [order[j], order[i]];
     }
-    this.sequence = order;
-  }
-
-  get order(): readonly number[] {
-    return this.sequence;
+    this.order = order;
   }
 
   isSet(pin: number): boolean {
@@ -43,19 +39,13 @@ export class LockPuzzle {
   }
 
   get isOpen(): boolean {
-    return this.pressed.length === PIN_COUNT;
+    return this.pressed.length === this.pinCount;
   }
 
   press(pin: number): PinPress {
     if (this.isOpen) return 'open';
     if (this.isSet(pin)) return 'alreadySet';
-    if (!this.touched) {
-      // The first press ever: that pin is first, swapped in from wherever it was in the order.
-      this.touched = true;
-      const at = this.sequence.indexOf(pin);
-      [this.sequence[0], this.sequence[at]] = [this.sequence[at], this.sequence[0]];
-    }
-    if (pin !== this.sequence[this.pressed.length]) {
+    if (pin !== this.order[this.pressed.length]) {
       this.pressed.length = 0;
       return 'wrong';
     }

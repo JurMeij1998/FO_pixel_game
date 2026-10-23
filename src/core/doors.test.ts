@@ -51,9 +51,9 @@ describe('doors', () => {
   });
 
   it("don't open while locked", () => {
-    const map = GridMap.parse({ name: 'hut', rows: HUT, chests: {}, doors: { '2,2': { lock: LOCKS.average } } });
+    const map = GridMap.parse({ name: 'hut', rows: HUT, chests: {}, doors: { '2,2': { lock: LOCKS.medium } } });
     const door = map.doorAt(2, 2)!;
-    expect(door.lock).toBe(LOCKS.average);
+    expect(door.lock).toBe(LOCKS.medium);
     expect(map.openDoor(door)).toMatchObject({ ok: false, message: 'The door is locked.' });
     door.lock = null; // picked
     expect(map.openDoor(door).ok).toBe(true);
@@ -71,7 +71,7 @@ describe('doors', () => {
         rows: ['.%%%%.', '.%G+%.', '.%/%%.', '..PW..', '......'],
         chests: {},
         creatures: { G: 'shopkeeper', W: 'guard' },
-        doors: { '2,2': { lock: LOCKS.simple, owner: 'store' } },
+        doors: { '2,2': { lock: LOCKS.easy, owner: 'store' } },
       });
 
     it('turn their owners hostile when you pick the lock, as theft does', () => {
@@ -90,7 +90,7 @@ describe('doors', () => {
     });
 
     it('anger no one when they belong to no one', () => {
-      const map = GridMap.parse({ name: 'hut', rows: HUT, chests: {}, doors: { '2,2': { lock: LOCKS.simple } } });
+      const map = GridMap.parse({ name: 'hut', rows: HUT, chests: {}, doors: { '2,2': { lock: LOCKS.easy } } });
       expect(map.noticeLockpicking(map.doorAt(2, 2)!)).toEqual([]);
     });
   });
@@ -99,15 +99,15 @@ describe('doors', () => {
     const map = GridMap.parse({
       name: 'shed',
       rows: ['#####', '#Pa_#', '#####'],
-      chests: { a: { name: 'Safe', contents: [], lock: LOCKS.hard } },
+      chests: { a: { name: 'Safe', contents: [], lock: LOCKS.expert } },
     });
-    expect(map.chests[0].lock).toBe(LOCKS.hard);
+    expect(map.chests[0].lock).toBe(LOCKS.expert);
   });
 
-  it('are on the wasteland: an open shack, and a shed with a simple lock', () => {
+  it('are on the wasteland: an open shack, and a shed with an easy lock', () => {
     const map = GridMap.parse(WASTELAND, 'wasteland');
     expect(map.doors).toHaveLength(2);
-    expect(map.doors.map((d) => d.lock).sort()).toEqual([LOCKS.simple, null]);
+    expect(map.doors.map((d) => d.lock).sort()).toEqual([LOCKS.easy, null]);
   });
 
   describe('in combat', () => {
@@ -118,7 +118,7 @@ describe('doors', () => {
         rows: ['#####', '#.X.#', '##/##', '#...#', '#.P.#', '#####'],
         chests: {},
         creatures: { X: creatureId },
-        doors: locked ? { '2,2': { lock: LOCKS.simple } } : undefined,
+        doors: locked ? { '2,2': { lock: LOCKS.easy } } : undefined,
       });
       const p = player(map);
       const combat = new Combat(map, p, () => 0.99, 'normal'); // every attack misses

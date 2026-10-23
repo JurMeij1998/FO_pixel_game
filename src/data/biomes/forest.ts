@@ -108,7 +108,7 @@ const HUNTERS_CABIN: Prefab = {
   entrance: { x: 3, y: 5 },
   chest: { name: "Hunter's Footlocker", loot: HUNTER_LOOT },
   // The hunter locked up before leaving, more often than not.
-  doorLock: { lock: LOCKS.simple, chance: 0.6 },
+  doorLock: { lock: LOCKS.easy, chance: 0.6 },
 };
 
 /** Logs around an old fire, with someone's stash left behind. */

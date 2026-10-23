@@ -9,7 +9,7 @@ import type { LockpickData } from './LockpickScene';
 import type { Fighter } from '../core/fighter';
 import { addPos, type GridPos } from '../core/grid';
 import type { Chest, Door, Exit, Owned } from '../core/gridMap';
-import { canPick, lockedMessage, unlock, type Lockable } from '../core/locks';
+import { canPick, lockedMessage, lockKind, pinsFor, unlock, type Lockable } from '../core/locks';
 import type { Lootable } from '../core/loot';
 import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
@@ -887,6 +887,8 @@ export class WorldScene extends Phaser.Scene {
     }
     const data: LockpickData = {
       title: what,
+      level: lockKind(thing.lock!),
+      pins: pinsFor(thing.lock!),
       // Only once the world is back: a fight or the loot screen can't start under the lock screen.
       // (It's registered after the world's own resume handler, which autosaves, so a lock picked
       // into a fight isn't saved as open.)

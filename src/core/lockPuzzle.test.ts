@@ -1,22 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { LockPuzzle, PIN_COUNT } from './lockPuzzle';
+import { LockPuzzle } from './lockPuzzle';
 import { Random } from './random';
 
 describe('lock puzzle', () => {
-  it('has four pins, to press in one order of all four', () => {
-    const puzzle = new LockPuzzle(() => 0.5);
-    expect(PIN_COUNT).toBe(4);
-    expect([...puzzle.order].sort()).toEqual([0, 1, 2, 3]);
+  it('has its pins to press in one order of them all', () => {
+    for (const pins of [3, 4, 5]) {
+      const puzzle = new LockPuzzle(pins, () => 0.5);
+      expect(puzzle.pinCount).toBe(pins);
+      expect([...puzzle.order].sort()).toEqual(Array.from({ length: pins }, (_, i) => i));
+    }
   });
 
   it('picks the order at random', () => {
     const rng = new Random(7);
-    const orders = new Set(Array.from({ length: 50 }, () => new LockPuzzle(() => rng.next()).order.join('')));
+    const orders = new Set(Array.from({ length: 50 }, () => new LockPuzzle(4, () => rng.next()).order.join('')));
     expect(orders.size).toBeGreaterThan(10);
   });
 
   it('opens once every pin is pressed in its turn', () => {
-    const puzzle = new LockPuzzle(() => 0.3);
+    const puzzle = new LockPuzzle(4, () => 0.3);
     const [a, b, c, d] = puzzle.order;
     expect(puzzle.press(a)).toBe('set');
     expect(puzzle.press(b)).toBe('set');
@@ -27,8 +29,14 @@ describe('lock puzzle', () => {
     expect(puzzle.press(a)).toBe('open'); // nothing more to do
   });
 
+  it('needs all five pins of a five-pin lock', () => {
+    const puzzle = new LockPuzzle(5, () => 0.6);
+    for (const pin of puzzle.order.slice(0, 4)) expect(puzzle.press(pin)).toBe('set');
+    expect(puzzle.press(puzzle.order[4])).toBe('open');
+  });
+
   it('drops every pin that was in when the wrong one is pressed', () => {
-    const puzzle = new LockPuzzle(() => 0.3);
+    const puzzle = new LockPuzzle(4, () => 0.3);
     const [a, b, c] = puzzle.order;
     puzzle.press(a);
     puzzle.press(b);
@@ -42,26 +50,12 @@ describe('lock puzzle', () => {
     expect(puzzle.press(c)).toBe('set');
   });
 
-  it('always lets the very first pin pressed go in, whichever it is', () => {
-    for (let first = 0; first < 4; first++) {
-      for (const roll of [0, 0.3, 0.6, 0.99]) {
-        const puzzle = new LockPuzzle(() => roll);
-        expect(puzzle.press(first)).toBe('set');
-        expect(puzzle.order[0]).toBe(first);
-        expect([...puzzle.order].sort()).toEqual([0, 1, 2, 3]); // still every pin once
-      }
-    }
-  });
-
-  it('keeps that first pin first after a wrong one, and ignores a pin already in', () => {
-    const puzzle = new LockPuzzle(() => 0.9);
-    puzzle.press(2);
-    const [, b, c] = puzzle.order;
-    expect(puzzle.press(c)).toBe('wrong');
-    expect(puzzle.press(b)).toBe('wrong'); // after dropping, pin 2 must go in first again
-    expect(puzzle.press(2)).toBe('set');
-    expect(puzzle.press(2)).toBe('alreadySet');
-    expect(puzzle.press(b)).toBe('set');
-    expect(puzzle.setCount).toBe(2);
+  it('can get the very first pin wrong too, and ignores a pin already in', () => {
+    const puzzle = new LockPuzzle(4, () => 0.9);
+    const [a, b] = puzzle.order;
+    expect(puzzle.press(b)).toBe('wrong');
+    puzzle.press(a);
+    expect(puzzle.press(a)).toBe('alreadySet');
+    expect(puzzle.setCount).toBe(1);
   });
 });

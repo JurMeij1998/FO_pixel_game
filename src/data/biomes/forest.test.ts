@@ -68,7 +68,7 @@ describe('forest biome', () => {
           expect(doors.every((d) => d.lock === null)).toBe(true); // the raiders come and go
         } else {
           cabins++;
-          if (doors.every((d) => d.lock === LOCKS.simple)) locked++;
+          if (doors.every((d) => d.lock === LOCKS.easy)) locked++;
         }
       }
     }

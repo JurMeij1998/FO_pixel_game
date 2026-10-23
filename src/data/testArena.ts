@@ -46,11 +46,11 @@ export const TEST_ARENA: MapDef = {
     '1': { to: 'wasteland' },
   },
   doors: {
-    '17,11': { lock: LOCKS.good },
+    '17,11': { lock: LOCKS.hard },
   },
 };
 
-/** A one-room shack whose door has a hard lock (80%): beyond the test character's 66% Lockpick. */
+/** A one-room shack whose door has an expert lock (80%): beyond the test character's 66% Lockpick. */
 const LOCKED_SHACK: Prefab = {
   name: 'locked shack',
   rows: [
@@ -62,14 +62,14 @@ const LOCKED_SHACK: Prefab = {
   ],
   entrance: { x: 2, y: 4 },
   chest: { name: 'Footlocker', loot: { rolls: [1, 1], entries: [{ itemId: 'bottle_caps', min: 20, max: 20, weight: 1 }] } },
-  doorLock: { lock: LOCKS.hard, chance: 1 },
+  doorLock: { lock: LOCKS.expert, chance: 1 },
 };
 
 /**
  * The village store in a small yard, for trying out talking, bartering, stealing and
  * provoking. It's stamped from the same prefab as in the village (GENERAL_STORE), so it can't
- * drift from it: Gus behind his counter, the store's crate behind it (a good lock, which the
- * test character can pick, but which turns Gus and the guard hostile), the guard by the door. Left of the store, a shack with a hard lock
+ * drift from it: Gus behind his counter, the store's crate behind it (a hard lock, which the
+ * test character can pick, but which turns Gus and the guard hostile), the guard by the door. Left of the store, a shack with an expert lock
  * the test character can't pick, to see that refusal. You start on the shop floor facing Gus
  * across the counter. Only reachable in development; never saved.
  */
@@ -95,7 +95,7 @@ function buildTestShop(): MapDef {
 /**
  * Sturdy and well equipped, so fights last long enough to watch the UI. 10 Agility gives 10 AP.
  * The hunting rifle is in hand, loaded; the pistol (loaded too) is in the other hand. Lockpick
- * 66%, enough for the store's crate (a good lock) but not a hard one.
+ * 66%, enough for the store's crate (a hard lock) but not an expert one.
  */
 export function testCharacter(): Character {
   const player = new Character('Tester', {

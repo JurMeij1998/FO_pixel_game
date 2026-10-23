@@ -119,10 +119,10 @@ id is its first inside tile so saves can list the ones entered. A roof hides eve
 unentered building, including clicks on the people in it, and lifts the first time you step
 in (or when someone in it joins your fight). Lockpick skill is a gate (`core/locks.ts`): with
 less than a lock needs you can't try, and the message says what it takes, so the skill has a
-clear goal; with enough, the Lockpick overlay runs the pin puzzle (`core/lockPuzzle.ts`: four
-pins, a random order per attempt whose first pin is whichever you press first, a wrong pin
-drops them all). Its `onPicked` callback waits
-for the World's RESUME, after the World's own autosave, so a lock picked into a fight
+clear goal; with enough, the Lockpick overlay runs the pin puzzle (`core/lockPuzzle.ts`: 3 to
+5 pins by the lock's level (`pinsFor`), a random order per attempt, a wrong pin drops them all;
+letting the first press always count was tried and made it too easy). Its `onPicked` callback
+waits for the World's RESUME, after the World's own autosave, so a lock picked into a fight
 (an owned one) isn't saved as open, and loot or combat never start under the overlay. In combat, walking into a door opens it for a move's AP, and
 creatures with `opensDoors` (people, raiders) path through unlocked doors, opening them.
 
