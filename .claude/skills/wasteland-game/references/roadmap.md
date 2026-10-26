@@ -37,8 +37,12 @@ Roughly in the order discussed with the user:
 - **Touch controls** and mobile: an on-screen D-pad and action buttons, tap to attack and
   interact; package with Capacitor or as a PWA (Tauri or Electron for desktop).
 - **More people.** So far: Gus the village shopkeeper (dialog, Charisma-based barter), the
-  store's guard (both turn hostile on attack or theft), and Rosa in the starting shack, who
-  explains the area. Likely next: dialog that depends on state (quests, reputation), traders
+  store's guard (both turn hostile on attack or theft), Rosa in the starting shack, who
+  explains the area, and three quest givers (`core/quests.ts`): Mags and Silas in the
+  wasteland, Doc Mendez in the village clinic. Likely next: quest chains and quests in the
+  forest (a giver there needs a required prefab), a doctor who heals for caps, reputation
+  (dialog conditions beyond quests: `DialogCondition` in core/dialog.ts), quests from Gus or
+  Rosa, traders
   restocking over time, theft that needs a witness, creatures tracking ammo (the guard's
   pistol never runs dry), people taking sides in fights with monsters, and keeping the store
   out of a provoked guard's sight of the village entrances (today he can see some of them).
