@@ -11,7 +11,7 @@ export const CONTROL_ROWS: Array<[keys: string, exploring: string, combat: strin
   ['R', 'Reload', 'Reload (2 AP)'],
   ['Q', 'Swap weapon hands', 'Swap weapon hands'],
   ['Tab / I', 'Inventory', 'Inventory (4 AP)'],
-  ['C', 'Character sheet', '-'],
+  ['C / J', 'Character sheet / quests', '-'],
   ['Esc', 'Pause menu / close', 'Pause menu'],
   ['M', 'Sound on/off', 'Sound on/off'],
   ['Space (loot)', 'Take all and close', '-'],

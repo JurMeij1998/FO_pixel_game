@@ -169,6 +169,7 @@ export class WorldScene extends Phaser.Scene {
     // Not on key repeat: holding C would open and close the sheet over and over, and an Esc held
     // a moment too long after closing a screen would open the pause menu.
     keyboard.on('keydown-C', (event: KeyboardEvent) => !event.repeat && this.openCharacterSheet());
+    keyboard.on('keydown-J', (event: KeyboardEvent) => !event.repeat && this.openQuests());
     keyboard.on('keydown-R', () => this.reload());
     keyboard.on('keydown-ESC', (event: KeyboardEvent) => !event.repeat && this.openOverlay('Pause'));
     keyboard.on('keydown-Q', () => {
@@ -966,6 +967,16 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
     this.openOverlay('Character');
+  }
+
+  /** The quest list; until you've taken a quest on there's nothing to show, and J does nothing. */
+  private openQuests(): void {
+    if (this.busy || state.quests.ids.length === 0) return;
+    if (state.combat) {
+      postMessage(this, "There's no time for that now.");
+      return;
+    }
+    this.openOverlay('Quests');
   }
 
   private openInventory(): void {

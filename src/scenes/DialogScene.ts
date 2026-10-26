@@ -2,13 +2,20 @@ import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
 import { Conversation } from '../core/dialog';
 import type { Creature } from '../core/creature';
+import { questDialogWorld } from '../core/quests';
+import { state } from '../state';
 import { BOX_PADDING, BOX_WIDTH, BOX_X, dialogBoxLayout, ReplyMenu, speechText } from '../ui/dialogBox';
+import { postMessage } from '../ui/messages';
 import { COLORS, TEXT } from '../ui/theme';
 import { closeOverlay } from '../ui/widgets';
 
 /** The same green-on-black as the AP gauge: a black box with a green border, and green text. */
 const GREEN = COLORS.border;
 const BOX_TEXT = { ...TEXT, color: COLORS.text, lineSpacing: 4, wordWrap: { width: BOX_WIDTH - 2 * BOX_PADDING } };
+/** A quest taken on or handed in, under the line: brighter, so it stands out. */
+const NOTICE_TEXT = { ...BOX_TEXT, color: COLORS.bright };
+/** Between the line and the notice under it. */
+const NOTICE_GAP = 8;
 
 /** What the world gives the dialog: who you're talking to, and how to start a fight with them. */
 export interface DialogData {
@@ -31,6 +38,7 @@ export class DialogScene extends Phaser.Scene {
   private conversation!: Conversation;
   private box!: Phaser.GameObjects.Graphics;
   private speech!: Phaser.GameObjects.Text;
+  private notice!: Phaser.GameObjects.Text;
   private replies: Phaser.GameObjects.Text[] = [];
 
   constructor() {
@@ -40,7 +48,8 @@ export class DialogScene extends Phaser.Scene {
   init(data: DialogData): void {
     this.person = data.person;
     this.onAttack = data.onAttack;
-    this.conversation = new Conversation(data.person.def.dialog!);
+    // Lines and replies can depend on quests, and replies can take them on or hand them in.
+    this.conversation = new Conversation(data.person.def.dialog!, questDialogWorld(state));
     this.menu = new ReplyMenu(this.conversation);
     this.replies = [];
   }
@@ -48,6 +57,7 @@ export class DialogScene extends Phaser.Scene {
   create(): void {
     this.box = this.add.graphics();
     this.speech = this.add.text(BOX_X + BOX_PADDING, 0, '', BOX_TEXT);
+    this.notice = this.add.text(BOX_X + BOX_PADDING, 0, '', NOTICE_TEXT);
 
     const keyboard = this.input.keyboard!;
     // Ignore auto-repeat, so the key that started the conversation can't also answer.
@@ -78,9 +88,13 @@ export class DialogScene extends Phaser.Scene {
   private show(): void {
     for (const reply of this.replies) reply.destroy();
     this.speech.setText(speechText(this.person.name, this.conversation.text));
+    const notice = this.conversation.notice;
+    this.notice.setText(notice.join('\n')).setVisible(notice.length > 0);
+    const textHeight = this.speech.height + (notice.length > 0 ? NOTICE_GAP + this.notice.height : 0);
 
-    const layout = dialogBoxLayout(this.speech.height, this.conversation.replies.length);
+    const layout = dialogBoxLayout(textHeight, this.conversation.replies.length);
     this.speech.setY(layout.speechY);
+    this.notice.setY(layout.speechY + this.speech.height + NOTICE_GAP);
     this.replies = layout.replyY.map((y, i) =>
       this.add
         .text(BOX_X + BOX_PADDING, y, '', BOX_TEXT)
@@ -119,6 +133,8 @@ export class DialogScene extends Phaser.Scene {
     const answered = this.menu.answer(index);
     if (!answered) return;
     playSound('menuSelect');
+    // Also in the message log, for after the conversation.
+    for (const line of this.conversation.notice) postMessage(this, line);
     if (answered.action === 'leave') {
       this.leave();
     } else if (answered.action === 'attack') {
