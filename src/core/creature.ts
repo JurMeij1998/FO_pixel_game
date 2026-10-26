@@ -2,6 +2,7 @@ import { ItemContainer } from './container';
 import { validateDialog, type Dialog, type DialogReply } from './dialog';
 import type { Attack, Fighter } from './fighter';
 import type { GridPos } from './grid';
+import { isQuestId } from './quests';
 
 /**
  * Creatures and people. Most creatures are hostile from the start. People (Gus the
@@ -52,6 +53,45 @@ const ROSA_QUESTIONS: DialogReply[] = [
 
 /** After each answer you can ask Rosa something else. */
 const rosaAnswer = (text: string) => ({ text, replies: ROSA_QUESTIONS });
+
+/** Mags's replies, after every line; the quest ones only while they apply. */
+const MAGS_REPLIES: DialogReply[] = [
+  { text: 'I could clear out those roaches for you.', next: 'pests_offer', when: { quest: 'pond_pests', stage: 'new' } },
+  {
+    text: 'The radroaches by the pond are dead.',
+    next: 'pests_paid',
+    when: { quest: 'pond_pests', stage: 'ready' },
+    quest: { finish: 'pond_pests' },
+  },
+  {
+    text: 'Doc Mendez sent this medicine for you.',
+    next: 'medicine_paid',
+    when: { quest: 'medicine_for_mags', stage: 'ready' },
+    quest: { finish: 'medicine_for_mags' },
+  },
+  { text: 'Found anything good lately?', next: 'scavenging' },
+  { text: 'Goodbye.', action: 'leave' },
+];
+const magsLine = (text: string) => ({ text, replies: MAGS_REPLIES });
+
+const SILAS_REPLIES: DialogReply[] = [
+  { text: 'Need anything?', next: 'hides_offer', when: { quest: 'hides_for_silas', stage: 'new' } },
+  {
+    text: "Here's your leather.",
+    next: 'hides_paid',
+    when: { quest: 'hides_for_silas', stage: 'ready' },
+    quest: { finish: 'hides_for_silas' },
+  },
+  { text: "What's out east?", next: 'forest' },
+  { text: 'Goodbye.', action: 'leave' },
+];
+const silasLine = (text: string) => ({ text, replies: SILAS_REPLIES });
+
+const DOCTOR_REPLIES: DialogReply[] = [
+  { text: 'Anything I can help with?', next: 'medicine_offer', when: { quest: 'medicine_for_mags', stage: 'new' } },
+  { text: 'Goodbye.', action: 'leave' },
+];
+const doctorLine = (text: string) => ({ text, replies: DOCTOR_REPLIES });
 
 const DEFINITIONS: CreatureDef[] = [
   {
@@ -247,10 +287,157 @@ const DEFINITIONS: CreatureDef[] = [
       },
     },
   },
+  {
+    // A scavenger camped south of Rosa's shack. Wants the radroaches by the pond gone (quest
+    // pond_pests), and Doc Mendez's medicine is for her (medicine_for_mags). Fights with a knife.
+    id: 'mags',
+    name: 'Mags',
+    properName: true,
+    friendly: true,
+    opensDoors: true,
+    maxHitPoints: 16,
+    actionPoints: 6,
+    armorClass: 4,
+    damageResist: 0,
+    critChance: 3,
+    sightRange: 5,
+    experience: 30,
+    attack: { name: 'knife', damageMin: 1, damageMax: 5, apCost: 3, range: 1, ranged: false, hitChance: 50, sound: 'swing' },
+    loot: [
+      ['knife', 1],
+      ['scrap_metal', 2],
+      ['bottle_caps', 20],
+    ],
+    dialog: {
+      start: 'hello',
+      greetings: [
+        { when: { quest: 'pond_pests', stage: 'ready' }, node: 'heard' },
+        { when: { quest: 'pond_pests', stage: 'active' }, node: 'waiting' },
+        { when: { quest: 'pond_pests', stage: 'done' }, node: 'friend' },
+      ],
+      nodes: {
+        hello: magsLine(
+          "Name's Mags. I pick through what the old world left lying around. Watch yourself by the pond: " +
+            "radroaches. They've run me off my water twice this week, and my leg's not what it was.",
+        ),
+        waiting: magsLine('Those roaches are still out there. I can hear them clicking from here.'),
+        heard: magsLine('All that racket by the pond... was that you?'),
+        friend: magsLine('My water is my own again, thanks to you.'),
+        more: magsLine('Suit yourself.'),
+        pests_offer: {
+          text: "You'd do that? Kill every last one of them by the pond and I'll pay you 40 caps.",
+          replies: [
+            { text: 'Deal.', next: 'pests_deal', quest: { start: 'pond_pests' } },
+            { text: 'Maybe later.', next: 'more' },
+          ],
+        },
+        pests_deal: magsLine("Good. Mind their bites; they're nastier than they look."),
+        pests_paid: magsLine("Ha! I'll sleep better tonight. Here's your 40 caps, as promised."),
+        medicine_paid: magsLine('From the Doc? Bless him. Here, take something for your trouble.'),
+        scavenging: magsLine("Scrap, mostly. The good stuff's in the old supply cache to the southeast, but a raider sits on it."),
+      },
+    },
+  },
+  {
+    // A hunter by the water, northeast in the wasteland. Wants leather (quest hides_for_silas).
+    // Handy with his spear.
+    id: 'silas',
+    name: 'Silas',
+    properName: true,
+    friendly: true,
+    opensDoors: true,
+    maxHitPoints: 26,
+    actionPoints: 7,
+    armorClass: 6,
+    damageResist: 5,
+    critChance: 5,
+    sightRange: 6,
+    experience: 60,
+    attack: { name: 'spear', damageMin: 3, damageMax: 8, apCost: 4, range: 2, ranged: false, hitChance: 65, sound: 'swing' },
+    loot: [
+      ['spear@60', 1],
+      ['leather', 1],
+      ['bottle_caps', 15],
+    ],
+    dialog: {
+      start: 'hello',
+      greetings: [
+        { when: { quest: 'hides_for_silas', stage: 'ready' }, node: 'spotted' },
+        { when: { quest: 'hides_for_silas', stage: 'active' }, node: 'waiting' },
+        { when: { quest: 'hides_for_silas', stage: 'done' }, node: 'friend' },
+      ],
+      nodes: {
+        hello: silasLine("Easy, stranger. Name's Silas. I hunt, tan the hides, and sell them to Gus in the village."),
+        waiting: silasLine('Any luck with those hides?'),
+        spotted: silasLine('Is that leather in your pack?'),
+        friend: silasLine('My boots are holding up, thanks to you.'),
+        more: silasLine('Anything else?'),
+        hides_offer: {
+          text:
+            'As it happens, yes. Gus bought my last hides, and now I need leather to patch my boots. Bring ' +
+            "me 3 pieces and I'll pay you in caps and rifle rounds. Mole rats and wild dogs have good hides.",
+          replies: [
+            { text: "I'll find some.", next: 'hides_deal', quest: { start: 'hides_for_silas' } },
+            { text: 'Not now.', next: 'more' },
+          ],
+        },
+        hides_deal: silasLine('Good hunting.'),
+        hides_paid: silasLine('Fine hides. Here: 30 caps, and ten rounds for a hunting rifle.'),
+        forest: silasLine('The forest. Wild dogs hunt in packs there, and worse things shuffle about between the trees. Go armed.'),
+      },
+    },
+  },
+  {
+    // The village doctor, in the clinic. Asks you to take medicine to Mags (quest
+    // medicine_for_mags). The clinic's cabinet is his: taking from it turns him hostile.
+    id: 'doctor',
+    name: 'Doc Mendez',
+    properName: true,
+    friendly: true,
+    opensDoors: true,
+    group: 'clinic',
+    maxHitPoints: 18,
+    actionPoints: 6,
+    armorClass: 3,
+    damageResist: 0,
+    critChance: 2,
+    sightRange: 6,
+    experience: 30,
+    attack: { name: 'fists', damageMin: 1, damageMax: 3, apCost: 3, range: 1, ranged: false, hitChance: 45, sound: 'punch' },
+    loot: [
+      ['stimpak', 2],
+      ['bottle_caps', 30],
+    ],
+    dialog: {
+      start: 'hello',
+      greetings: [
+        { when: { quest: 'medicine_for_mags', stage: ['active', 'ready'] }, node: 'waiting' },
+        { when: { quest: 'medicine_for_mags', stage: 'done' }, node: 'thanks' },
+        { when: { quest: 'medicine_for_mags', stage: 'failed' }, node: 'too_late' },
+      ],
+      nodes: {
+        hello: doctorLine("I'm Doc Mendez. Stitches, splints, and the odd stimpak when I can get one. Hands off the cabinet."),
+        waiting: doctorLine('Has Mags had her medicine yet?'),
+        thanks: doctorLine('Mags sent word that you brought her the medicine. Thank you.'),
+        too_late: doctorLine("Mags won't be needing that medicine now. Shame."),
+        more: doctorLine('Anything else?'),
+        medicine_offer: {
+          text:
+            "Actually, yes. Mags, the scavenger out by Rosa's shack north of here, came in with a bad bite on " +
+            "her leg and left before I could give her this. Take it to her? She'll make it worth your while.",
+          replies: [
+            { text: "I'll take it to her.", next: 'medicine_deal', quest: { start: 'medicine_for_mags' } },
+            { text: 'Not now.', next: 'more' },
+          ],
+        },
+        medicine_deal: doctorLine('Thank you. Tell her to keep it clean and stay off that leg.'),
+      },
+    },
+  },
 ];
 
 const CREATURES = new Map(DEFINITIONS.map((def) => [def.id, def]));
-for (const def of DEFINITIONS) if (def.dialog) validateDialog(def.dialog, def.name);
+for (const def of DEFINITIONS) if (def.dialog) validateDialog(def.dialog, def.name, isQuestId);
 
 /**
  * The farthest any hostile creature can see; map generation keeps spawns beyond it from

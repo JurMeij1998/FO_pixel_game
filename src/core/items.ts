@@ -237,6 +237,15 @@ const DEFINITIONS: ItemDef[] = [
     value: 5,
     description: 'Twisted pieces of pre-war metal. Heavy.',
   },
+  {
+    // Doc Mendez's medicine for Mags (quest medicine_for_mags in core/quests.ts). Worthless to traders.
+    id: 'medicine_pouch',
+    name: 'Medicine Pouch',
+    category: 'misc',
+    weight: 1,
+    value: 0,
+    description: 'Bandages and ointment from Doc Mendez, wrapped up for Mags.',
+  },
 ];
 
 const ITEMS = new Map(DEFINITIONS.map((def) => [def.id, def]));
