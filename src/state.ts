@@ -2,6 +2,7 @@ import type { Character } from './core/character';
 import type { Combat } from './core/combat';
 import { createCharacter, newBuild, type CharacterBuild } from './core/creation';
 import type { GridMap } from './core/gridMap';
+import { QuestLog } from './core/quests';
 import { loadGame, saveGame, type GameData } from './core/save';
 import { testCharacter } from './data/testArena';
 import { buildKnownMap, buildMap, START_MAP, TEST_ARENA_MAP, TEST_SHOP_MAP } from './data/world';
@@ -22,7 +23,7 @@ function newGame(build: CharacterBuild = newBuild()) {
   const worldSeed = Math.floor(Math.random() * 2 ** 31);
   const map = buildMap(START_MAP, worldSeed);
   player.pos = { ...map.playerStart };
-  return toState({ player, worldSeed, difficulty: build.difficulty, maps: { [START_MAP]: map }, currentMap: START_MAP });
+  return toState({ player, worldSeed, difficulty: build.difficulty, quests: new QuestLog(), maps: { [START_MAP]: map }, currentMap: START_MAP });
 }
 
 function toState(game: GameData) {
@@ -30,6 +31,7 @@ function toState(game: GameData) {
     player: game.player,
     worldSeed: game.worldSeed,
     difficulty: game.difficulty,
+    quests: game.quests,
     maps: game.maps,
     map: game.maps[game.currentMap],
   };
@@ -105,7 +107,7 @@ function startSandbox(mapId: string, player: Character): void {
   const map = buildMap(mapId, worldSeed);
   player.pos = { ...map.playerStart };
   Object.assign(state, {
-    ...toState({ player, worldSeed, difficulty: 'normal', maps: { [mapId]: map }, currentMap: mapId }),
+    ...toState({ player, worldSeed, difficulty: 'normal', quests: new QuestLog(), maps: { [mapId]: map }, currentMap: mapId }),
     combat: null,
     loadedFromSave: false,
     sandbox: true,
@@ -133,6 +135,7 @@ export function autosave(): void {
       player: state.player,
       worldSeed: state.worldSeed,
       difficulty: state.difficulty,
+      quests: state.quests,
       maps: state.maps,
       currentMap: state.map.id,
     }),
