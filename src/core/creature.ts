@@ -78,7 +78,7 @@ const DEFINITIONS: CreatureDef[] = [
     sightRange: 5,
     experience: 40,
     attack: { name: 'bite', damageMin: 2, damageMax: 6, apCost: 4, range: 1, ranged: false, hitChance: 55, sound: 'bite' },
-    loot: [],
+    loot: [['leather', 1]], // its hide, for patching leather armour
   },
   {
     id: 'wild_dog',
@@ -91,7 +91,7 @@ const DEFINITIONS: CreatureDef[] = [
     sightRange: 6,
     experience: 35,
     attack: { name: 'bite', damageMin: 2, damageMax: 5, apCost: 3, range: 1, ranged: false, hitChance: 55, sound: 'bite' },
-    loot: [],
+    loot: [['leather', 1]], // its hide, for patching leather armour
   },
   {
     id: 'feral_ghoul',
@@ -146,6 +146,9 @@ const DEFINITIONS: CreatureDef[] = [
       ['ammo_223', 20],
       ['stimpak', 2],
       ['leather_jacket', 1],
+      ['steel_armor', 1],
+      ['leather', 4],
+      ['repair_kit', 3],
       ['bottle_caps', 300],
     ],
     dialog: {
@@ -155,6 +158,7 @@ const DEFINITIONS: CreatureDef[] = [
           text: 'Welcome to my store, stranger. Look around all you like, but if you break anything, you buy it!',
           replies: [
             { text: "Let's barter.", next: 'anything_else', action: 'barter' },
+            { text: 'Can you fix up my gear?', next: 'anything_else', action: 'repair' },
             { text: 'Goodbye.', action: 'leave' },
           ],
         },
@@ -162,6 +166,7 @@ const DEFINITIONS: CreatureDef[] = [
           text: 'Anything else?',
           replies: [
             { text: "Let's barter.", action: 'barter' },
+            { text: 'Can you fix up my gear?', action: 'repair' },
             { text: 'Goodbye.', action: 'leave' },
           ],
         },
@@ -231,7 +236,7 @@ const DEFINITIONS: CreatureDef[] = [
     experience: 150,
     attack: { name: '10mm pistol', damageMin: 5, damageMax: 12, apCost: 5, range: 6, ranged: true, hitChance: 85, sound: 'pistol' },
     loot: [
-      ['10mm_pistol', 1],
+      ['10mm_pistol@60', 1], // his sidearm has seen some use (item keys: core/items.ts)
       ['ammo_10mm', 24],
       ['bottle_caps', 15],
     ],

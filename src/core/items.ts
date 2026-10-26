@@ -2,10 +2,18 @@ import type { AttackSound } from './fighter';
 import type { Skill } from './stats';
 
 /**
- * Static item definitions. Everything else refers to items by their string id;
- * containers only store (id, quantity) pairs.
+ * Static item definitions. Everything else refers to items by a string: the item's id, or for
+ * worn gear (weapons, armour) its id plus its condition ("10mm_pistol@62.5"; see itemKey).
+ * Containers store (key, quantity) pairs, so a worn item is its own stack, and its condition
+ * goes wherever it does: equipped, looted, sold, saved. getItem takes either.
  */
 export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'ammo' | 'misc';
+
+/**
+ * Below this condition a weapon or armour works worse (core/condition.ts). It lives here, not
+ * there, because the repair kit's definition uses it.
+ */
+export const WORN_AT = 35;
 
 export interface WeaponStats {
   skill: Skill;
@@ -22,6 +30,19 @@ export interface WeaponStats {
   sound: AttackSound;
 }
 
+/**
+ * How an item wears and is repaired (core/condition.ts): weapons with every attack, armour
+ * with every hit taken.
+ */
+export interface Durability {
+  /** Condition lost per use (an attack, or a hit taken), in percent of its full health. */
+  wear: number;
+  /** How much `material` a full repair takes, from broken to perfect; better gear takes more. */
+  repairCost: number;
+  /** The item a repair uses up: scrap metal for guns, blades and steel, leather for leather. */
+  material: string;
+}
+
 export interface ArmorStats {
   /** Added to the wearer's Armor Class (the chance to be missed). */
   armorClass: number;
@@ -30,7 +51,10 @@ export interface ArmorStats {
 }
 
 export interface ConsumableStats {
-  heal: number;
+  /** Hit points it restores. */
+  heal?: number;
+  /** Patches the most worn piece of equipped gear up to this condition (a repair kit; core/condition.ts). */
+  patchUpTo?: number;
 }
 
 export interface ItemDef {
@@ -45,6 +69,8 @@ export interface ItemDef {
   weapon?: WeaponStats;
   armor?: ArmorStats;
   consumable?: ConsumableStats;
+  /** Set for everything that wears: weapons and armour. */
+  durability?: Durability;
 }
 
 const DEFINITIONS: ItemDef[] = [
@@ -56,6 +82,7 @@ const DEFINITIONS: ItemDef[] = [
     value: 40,
     description: 'A short, sharp blade. Better than your fists.',
     weapon: { skill: 'meleeWeapons', damageMin: 1, damageMax: 6, apCost: 3, range: 1, sound: 'swing' },
+    durability: { wear: 0.5, repairCost: 2, material: 'scrap_metal' },
   },
   {
     id: 'spear',
@@ -65,6 +92,7 @@ const DEFINITIONS: ItemDef[] = [
     value: 80,
     description: 'A sharpened pole with a crude metal tip. Long reach.',
     weapon: { skill: 'meleeWeapons', damageMin: 3, damageMax: 10, apCost: 4, range: 2, sound: 'swing' },
+    durability: { wear: 0.8, repairCost: 4, material: 'scrap_metal' },
   },
   {
     id: '10mm_pistol',
@@ -73,7 +101,17 @@ const DEFINITIONS: ItemDef[] = [
     weight: 3,
     value: 250,
     description: 'A reliable semi-automatic sidearm. Chambered for 10mm.',
-    weapon: { skill: 'smallGuns', ammo: 'ammo_10mm', magazineSize: 12, damageMin: 5, damageMax: 12, apCost: 5, range: 6, sound: 'pistol' },
+    weapon: {
+      skill: 'smallGuns',
+      ammo: 'ammo_10mm',
+      magazineSize: 12,
+      damageMin: 5,
+      damageMax: 12,
+      apCost: 5,
+      range: 6,
+      sound: 'pistol',
+    },
+    durability: { wear: 1.5, repairCost: 8, material: 'scrap_metal' },
   },
   {
     id: 'hunting_rifle',
@@ -82,7 +120,17 @@ const DEFINITIONS: ItemDef[] = [
     weight: 9,
     value: 1000,
     description: 'A bolt-action rifle chambered for .223. Slow, heavy and hard-hitting.',
-    weapon: { skill: 'smallGuns', ammo: 'ammo_223', magazineSize: 5, damageMin: 8, damageMax: 20, apCost: 6, range: 10, sound: 'rifle' },
+    weapon: {
+      skill: 'smallGuns',
+      ammo: 'ammo_223',
+      magazineSize: 5,
+      damageMin: 8,
+      damageMax: 20,
+      apCost: 6,
+      range: 10,
+      sound: 'rifle',
+    },
+    durability: { wear: 2.5, repairCost: 15, material: 'scrap_metal' },
   },
   {
     id: 'leather_jacket',
@@ -92,6 +140,7 @@ const DEFINITIONS: ItemDef[] = [
     value: 250,
     description: 'A worn black leather jacket. Offers a little protection.',
     armor: { armorClass: 8, damageResist: 20 },
+    durability: { wear: 2, repairCost: 3, material: 'leather' },
   },
   {
     id: 'leather_armor',
@@ -101,6 +150,17 @@ const DEFINITIONS: ItemDef[] = [
     value: 700,
     description: 'Tanned hides stitched over padding. Solid protection.',
     armor: { armorClass: 15, damageResist: 25 },
+    durability: { wear: 1.5, repairCost: 5, material: 'leather' },
+  },
+  {
+    id: 'steel_armor',
+    name: 'Steel Armor',
+    category: 'armor',
+    weight: 30,
+    value: 1800,
+    description: 'Plates of salvaged steel riveted onto a leather harness. Heavy, and very tough.',
+    armor: { armorClass: 20, damageResist: 40 },
+    durability: { wear: 0.8, repairCost: 12, material: 'scrap_metal' },
   },
   {
     id: 'stimpak',
@@ -110,6 +170,16 @@ const DEFINITIONS: ItemDef[] = [
     value: 175,
     description: 'A healing chemical injected straight into the bloodstream.',
     consumable: { heal: 15 },
+  },
+  {
+    id: 'repair_kit',
+    name: 'Repair Kit',
+    category: 'consumable',
+    weight: 2,
+    value: 60,
+    description: 'Tape, wire, rivets and a few tools. Patches worn gear up enough to keep it working.',
+    // Back to working order, no further: that takes a workbench.
+    consumable: { patchUpTo: WORN_AT },
   },
   {
     id: 'ammo_10mm',
@@ -152,6 +222,14 @@ const DEFINITIONS: ItemDef[] = [
     description: 'Fifty feet of frayed but sturdy rope.',
   },
   {
+    id: 'leather',
+    name: 'Leather',
+    category: 'misc',
+    weight: 1,
+    value: 8,
+    description: 'A tanned scrap of hide. Good for patching up leather armour.',
+  },
+  {
     id: 'scrap_metal',
     name: 'Scrap Metal',
     category: 'misc',
@@ -163,8 +241,44 @@ const DEFINITIONS: ItemDef[] = [
 
 const ITEMS = new Map(DEFINITIONS.map((def) => [def.id, def]));
 
-export function getItem(id: string): ItemDef {
-  const def = ITEMS.get(id);
-  if (!def) throw new Error(`Unknown item id '${id}'`);
+/** Takes an item id or an item key ("10mm_pistol@62.5"): either way, the item it is. */
+export function getItem(key: string): ItemDef {
+  const def = ITEMS.get(itemIdOf(key));
+  if (!def) throw new Error(`Unknown item id '${key}'`);
   return def;
+}
+
+/** Condition in percent: 100 is perfect, 0 broken. Only weapons and armour wear (they have `durability`). */
+export const PERFECT = 100;
+const CONDITION_MARK = '@';
+
+/**
+ * The key for an item in some condition: its id when perfect (so perfect ones stack, and items
+ * that don't wear never change), else id@condition, condition rounded to a tenth and clamped.
+ */
+export function itemKey(itemId: string, condition: number): string {
+  const rounded = Math.round(Math.max(0, Math.min(PERFECT, condition)) * 10) / 10;
+  return rounded >= PERFECT ? itemId : `${itemId}${CONDITION_MARK}${rounded}`;
+}
+
+/**
+ * The key written the way itemKey writes it, for keys from outside (a save): "knife@100" and
+ * "knife@abc" become "knife", "knife@50.0" becomes "knife@50", and something that doesn't wear
+ * loses any condition, so equal items stack. Throws on unknown ids, like getItem.
+ */
+export function normalKey(key: string): string {
+  return getItem(key).durability ? itemKey(itemIdOf(key), conditionOf(key)) : itemIdOf(key);
+}
+
+export function itemIdOf(key: string): string {
+  const at = key.indexOf(CONDITION_MARK);
+  return at < 0 ? key : key.slice(0, at);
+}
+
+/** A key's condition: what follows the @, or perfect without one (or with nonsense after it, from a bad save). */
+export function conditionOf(key: string): number {
+  const at = key.indexOf(CONDITION_MARK);
+  if (at < 0) return PERFECT;
+  const value = Number(key.slice(at + 1));
+  return Number.isFinite(value) ? Math.max(0, Math.min(PERFECT, value)) : PERFECT;
 }

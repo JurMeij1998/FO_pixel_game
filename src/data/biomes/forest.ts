@@ -36,6 +36,8 @@ const CAMP_LOOT: LootTable = {
     { itemId: 'spear', min: 1, max: 1, weight: 1 },
     { itemId: '10mm_pistol', min: 1, max: 1, weight: 1 },
     { itemId: 'leather_armor', min: 1, max: 1, weight: 1 },
+    { itemId: 'steel_armor', min: 1, max: 1, weight: 1 },
+    { itemId: 'repair_kit', min: 1, max: 2, weight: 1 },
   ],
 };
 
@@ -72,13 +74,13 @@ const WILDLIFE: SpawnTable = [
 
 // Legend plus: ' ' keep terrain, '$' chest, '&' creature (see Prefab). Doors are '/'.
 
-/** A raider-held logging camp: a cabin with the supply crate, log piles, and guards. */
+/** A raider-held logging camp: a cabin with the supply crate and a workbench (!), log piles, and guards. */
 const LOGGING_CAMP: Prefab = {
   name: 'logging camp',
   rows: [
     '.............',
     '.%%%%%%..==..',
-    '.%++++%......',
+    '.%+++!%......',
     '.%+$++%..==..',
     '.%++++%......',
     '.%%/%%%..&...',
@@ -127,7 +129,7 @@ const CAMPSITE: Prefab = {
 
 export const FOREST: Biome = {
   id: 'forest',
-  version: 3,
+  version: 4,
   names: ['Blackroot Woods', 'Whispering Pines', 'Deadwood Forest', 'The Old Growth', 'Ashen Timberland', 'Hollow Pines'],
   width: 44,
   height: 32,

@@ -7,9 +7,18 @@ Recipes for the common additions. Each lists where the pieces live and what is e
 1. Add an `ItemDef` to `DEFINITIONS` in `src/core/items.ts`: id, name, category, weight (lbs per
    unit), value (caps per unit), description.
 2. Weapons also need `weapon`: `skill` (`smallGuns` makes it ranged; melee otherwise, even with
-   reach > 1 like the spear), damage range, `apCost`, `range`, and `sound` (an `AttackSound`).
-   Guns additionally need `ammo` (an ammo item id) and `magazineSize`.
-3. Armor needs `armor: { armorClass, damageResist }`; consumables `consumable: { heal }`.
+   reach > 1 like the spear), damage range, `apCost`, `range` and `sound` (an `AttackSound`).
+   Guns additionally need `ammo` (an ammo item id) and `magazineSize`. Weapons and armour also
+   need `durability`: `wear` (condition lost per attack, or per hit taken for armour, in
+   percent), `repairCost` (how much material from broken to perfect; better gear costs more)
+   and `material` (`scrap_metal`, `leather`; a new one goes in `MATERIALS` in
+   core/condition.ts; it needs an item of its own in `DEFINITIONS`, named as messages should
+   say it). To place a worn one, use its
+   key: `itemKey('10mm_pistol', 55)`; found loot comes worn by itself (`rollLoot`).
+3. Armor needs `armor: { armorClass, damageResist }`. Consumables need `consumable` with what
+   they do: `heal` (HP) and/or `patchUpTo` (a repair kit's condition); a new effect goes in
+   `Character.use()`, its details line in `describeItem` (ui/format.ts) and its sound in
+   `useSound` (ui/quickAction.ts).
 4. Make it obtainable: add it to chest contents in a map, a creature's corpse `loot`, or a
    biome `LootTable`.
 
@@ -41,7 +50,29 @@ Recipes for the common additions. Each lists where the pieces live and what is e
    from it (or picking its lock) theft, and their house the same `owner` (a prefab's `owner`,
    or a hand-made map's `doors` entry) to make picking its door's lock a crime too.
    `playabilityProblems` checks someone can reach a talking spot.
-4. A new dialog action needs a case in `DialogScene.answer()`.
+4. Replies can carry an `action`: `barter` (opens the barter screen with their pack) and
+   `repair` (opens the workbench screen in trader mode: they repair for caps) exist today. The
+   Dialog scene sleeps while that screen is open, and the screen wakes it on close, so the
+   conversation goes on. Update the reply lists in `ui/dialogBox.test.ts` and, for stock,
+   `ui/trade.test.ts`.
+
+## Dialog action
+
+1. Add it to `DialogAction` in `src/core/dialog.ts`.
+2. Handle it in `DialogScene.answer()`. For a screen: `this.scene.sleep()` then
+   `this.scene.launch('<Scene>', { ... })`, and have that scene `wake('Dialog')` when it
+   closes (see `WorkbenchScene.close()` or the barter screen).
+
+## Skill
+
+1. Add it to `Skill` and `SKILLS` in `src/core/stats.ts`, with its name in `SKILL_NAMES`, its
+   starting value in `baseSkill` (from S.P.E.C.I.A.L.; Fallout's formulas where there is
+   one), and its explanation in `SKILL_EFFECTS`. Mention it in the text of the stats it
+   depends on (`SPECIAL_EFFECTS`).
+2. Add it to `skillBonus` in `core/character.ts`; the character sheet lists `SKILLS` by itself.
+3. Use it through `player.skill('<id>')`, and pass the number into pure functions rather than
+   the character (as `materialToRepair(key, skill)` does), so they're easy to test.
+4. Describe it in the README section of the system it belongs to (as Lockpick and Repair are).
 
 ## Tile
 
@@ -70,7 +101,7 @@ Recipes for the common additions. Each lists where the pieces live and what is e
    - `Prefab`: ASCII structure with `$` chest and `&` creature slots, an `entrance` just outside
      its door (`/`); `flipVertical()` turns it around for the other side of a street. Walls
      and doors around a floor make it a building with a roof (`core/buildings.ts`): give a
-     building a door, not a gap, or it has no roof. `doorLock: { lock, chance }` locks its
+     building a door, not a gap, or it has no roof. A workbench is `!` (repairs weapons; E at it). `doorLock: { lock, chance }` locks its
      doors with that chance; `chest.lock` always locks the chest (`LOCKS` in core/locks.ts).
      `owner` (a group) makes the building someone's: picking its doors' locks turns that
      group hostile, as `chest.owner` does for the chest (taking from it, or picking it).

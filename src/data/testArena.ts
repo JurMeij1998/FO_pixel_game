@@ -2,6 +2,7 @@ import { Character } from '../core/character';
 import { MapBuilder, type Prefab } from '../core/generation/mapBuilder';
 import { border } from '../core/generation/terrain';
 import type { MapDef } from '../core/gridMap';
+import { itemKey } from '../core/items';
 import { LOCKS } from '../core/locks';
 import { Random } from '../core/random';
 import { GENERAL_STORE } from './biomes/village';
@@ -10,15 +11,16 @@ import { GENERAL_STORE } from './biomes/village';
  * A small room for trying out combat UI (such as the AP gauge): a fight starts as soon as you
  * arrive, and the start is boxed in so floating UI has to work around things. Chests sit
  * directly above (b) and below (c) the start, a radroach three tiles to the right, more
- * creatures further out, and an exit signpost. Bottom right, a small brick shack with a good
- * lock (60%) on its door, which the test character (66% Lockpick) can pick, mid-fight or after,
- * and a strongbox (d) inside under its roof. Only reachable in development; never saved.
+ * creatures further out, an exit signpost and a workbench (top). Bottom right, a small brick
+ * shack with a hard lock (60%) on its door, which the test character (66% Lockpick) can pick,
+ * mid-fight or after, and a strongbox (d) inside under its roof. Only reachable in development;
+ * never saved.
  */
 export const TEST_ARENA: MapDef = {
   name: 'Test Arena',
   rows: [
     '######################',
-    '#....................#',
+    '#.........!..........#',
     '#..a.........~~~.....#',
     '#............~~~..M..#',
     '#....................#',
@@ -88,7 +90,7 @@ const TWO_ROOM_HOUSE: Prefab = {
  * drift from it: Gus behind his counter, the store's crate behind it (a hard lock, which the
  * test character can pick, but which turns Gus and the guard hostile), the guard by the door. Left of the store, a shack with an expert lock
  * the test character can't pick, to see that refusal; right of it, a two-room house with a door
- * between the rooms. You start on the shop floor facing Gus across the counter. Only reachable
+ * between the rooms, and a workbench in the yard. You start on the shop floor facing Gus across the counter. Only reachable
  * in development; never saved.
  */
 export const TEST_SHOP: MapDef = buildTestShop();
@@ -100,6 +102,7 @@ function buildTestShop(): MapDef {
   const entrance = b.stamp(GENERAL_STORE, store.x, store.y, new Random(1));
   b.stamp(LOCKED_SHACK, 1, 3, new Random(1));
   b.stamp(TWO_ROOM_HOUSE, 13, 2, new Random(1));
+  b.set(17, 8, '!'); // a workbench in the yard, to repair weapons at
   const exit = b.addExit('south', 'wasteland', ':');
   // A path from the door down to the exit: down, across, and down again.
   const pathY = exit.y - 1;
@@ -114,7 +117,9 @@ function buildTestShop(): MapDef {
 /**
  * Sturdy and well equipped, so fights last long enough to watch the UI. 10 Agility gives 10 AP.
  * The hunting rifle is in hand, loaded; the pistol (loaded too) is in the other hand. Lockpick
- * 66%, enough for the store's crate (a hard lock) but not an expert one.
+ * 66%, enough for the store's crate (a hard lock) but not an expert one. Worn steel armour on,
+ * and in the pack a broken knife, a badly worn spear, badly worn leather armour, scrap metal,
+ * leather and two repair kits, to try the workbench and field repairs with.
  */
 export function testCharacter(): Character {
   const player = new Character('Tester', {
@@ -130,9 +135,14 @@ export function testCharacter(): Character {
   player.taggedSkills.add('meleeWeapons');
   player.skillBonus.lockpick = 40;
   for (const [itemId, quantity] of [
-    ['knife', 1],
+    [itemKey('knife', 0), 1],
     ['10mm_pistol', 1],
-    ['spear', 1],
+    [itemKey('spear', 30), 1],
+    ['scrap_metal', 12],
+    [itemKey('steel_armor', 45), 1],
+    [itemKey('leather_armor', 20), 1],
+    ['leather', 3],
+    ['repair_kit', 2],
     ['hunting_rifle', 1],
     ['ammo_10mm', 48],
     ['ammo_223', 15],
@@ -142,6 +152,7 @@ export function testCharacter(): Character {
   }
   player.equip('hunting_rifle', 'primary');
   player.equip('10mm_pistol', 'secondary');
+  player.equip(itemKey('steel_armor', 45), 'armor');
   player.reload(); // the rifle, in hand
   player.swapWeapons();
   player.reload(); // the pistol

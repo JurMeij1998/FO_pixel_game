@@ -3,7 +3,7 @@
  * leads to another node or ends with an action the scene carries out (opening the barter
  * screen, attacking, or leaving).
  */
-export type DialogAction = 'barter' | 'attack' | 'leave';
+export type DialogAction = 'barter' | 'repair' | 'attack' | 'leave';
 
 export interface DialogReply {
   text: string;

@@ -59,13 +59,14 @@ export const SPECIAL_NAMES: Record<keyof Special, string> = {
   luck: 'Luck',
 };
 
-export type Skill = 'smallGuns' | 'meleeWeapons' | 'unarmed' | 'lockpick';
-export const SKILLS: readonly Skill[] = ['smallGuns', 'meleeWeapons', 'unarmed', 'lockpick'];
+export type Skill = 'smallGuns' | 'meleeWeapons' | 'unarmed' | 'lockpick' | 'repair';
+export const SKILLS: readonly Skill[] = ['smallGuns', 'meleeWeapons', 'unarmed', 'lockpick', 'repair'];
 export const SKILL_NAMES: Record<Skill, string> = {
   smallGuns: 'Small Guns',
   meleeWeapons: 'Melee Weapons',
   unarmed: 'Unarmed',
   lockpick: 'Lockpick',
+  repair: 'Repair',
 };
 
 /** Tagged skills start 20 points higher, as in Fallout 2. */
@@ -82,6 +83,8 @@ export function baseSkill(special: Special, skill: Skill): number {
       return 30 + 2 * (special.agility + special.strength);
     case 'lockpick':
       return 10 + special.perception + special.agility;
+    case 'repair':
+      return 3 * special.intelligence;
   }
 }
 
@@ -96,7 +99,7 @@ export const SPECIAL_EFFECTS: Record<keyof Special, string> = {
   perception: 'Awareness and keen senses. Lockpick: +1% per point.',
   endurance: 'Toughness and stamina. Max HP: +2 per point. HP gained per level: 3, plus 1 per 2 points.',
   charisma: 'Presence and charm. Better prices when bartering: you buy for less and sell for more.',
-  intelligence: 'Knowledge and wits. Skill points per level: 5, plus 2 per point.',
+  intelligence: 'Knowledge and wits. Skill points per level: 5, plus 2 per point. Repair: +3% per point.',
   agility:
     'Speed and coordination. Action points: 5, plus 1 per 2 points. Armor Class: +1 per point. ' +
     'Small Guns: +4% per point; Melee Weapons and Unarmed: +2% per point; Lockpick: +1% per point.',
@@ -111,4 +114,7 @@ export const SKILL_EFFECTS: Record<Skill, string> = {
   lockpick:
     'Opening locked doors and chests: you can pick any lock that needs no more than your skill. ' +
     'Based on Perception and Agility.',
+  repair:
+    'Fixing gear at a workbench: the higher, the less scrap metal or leather a repair takes, and ' +
+    'the more salvaging gives. Based on Intelligence.',
 };

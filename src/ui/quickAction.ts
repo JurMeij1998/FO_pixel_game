@@ -1,6 +1,6 @@
 import type { SoundName } from '../audio/sfx';
 import type { Character, EquipSlot, WeaponSlot } from '../core/character';
-import { getItem } from '../core/items';
+import { getItem, type ItemDef } from '../core/items';
 import { failure, success, type ActionResult } from '../core/result';
 
 /**
@@ -50,8 +50,13 @@ export function quickAction(player: Character, row: InventoryRow): QuickAction {
   }
   const { itemId } = row;
   const item = getItem(itemId);
-  if (item.consumable) return { run: () => player.use(itemId), sound: 'stimpak' };
+  if (item.consumable) return { run: () => player.use(itemId), sound: useSound(item) };
   if (item.category === 'weapon') return { run: () => equipWeapon(player, itemId), sound: 'equip' };
   if (item.category === 'armor') return { run: () => player.equip(itemId, 'armor'), sound: 'equip' };
   return { run: () => failure(`There's nothing to do with the ${item.name} here.`) };
+}
+
+/** What using a consumable sounds like: a stimpak's hiss, or the clink of a repair kit's tools. */
+export function useSound(item: ItemDef): SoundName {
+  return item.consumable?.heal ? 'stimpak' : 'reload';
 }

@@ -1,7 +1,8 @@
+import { afterWear, damageShare, hitPenalty, isBroken, protectionShare, WORN_AT } from './condition';
 import { ItemContainer } from './container';
 import type { Attack, Fighter } from './fighter';
 import { isGridPos, type GridPos } from './grid';
-import { getItem, type ItemDef } from './items';
+import { conditionOf, getItem, itemIdOf, itemKey, normalKey, type ItemDef } from './items';
 import { failure, success, type ActionResult } from './result';
 import * as derived from './stats';
 import { SKILL_NAMES, SKILLS, SPECIAL_KEYS, type Skill, type Special } from './stats';
@@ -48,7 +49,7 @@ export class Character implements Fighter {
   /** Unspent points from levelling up. */
   skillPoints = 0;
   /** Points spent on each skill, added on top of the base value. */
-  readonly skillBonus: Record<Skill, number> = { smallGuns: 0, meleeWeapons: 0, unarmed: 0, lockpick: 0 };
+  readonly skillBonus: Record<Skill, number> = { smallGuns: 0, meleeWeapons: 0, unarmed: 0, lockpick: 0, repair: 0 };
   /** Max HP gained from levelling up. */
   private bonusHitPoints = 0;
 
@@ -117,8 +118,7 @@ export class Character implements Fighter {
     c.activeWeaponSlot = data.activeWeaponSlot;
     for (const slot of EQUIP_SLOTS) {
       const id = data.equipment[slot];
-      if (id) getItem(id); // throws on unknown ids
-      c.equipment[slot] = id;
+      c.equipment[slot] = id ? normalKey(id) : id; // throws on unknown ids
     }
     c.backpack.setData(data.backpack);
     c.level = nonNegativeInteger(data.level, 1) || 1;
@@ -177,13 +177,15 @@ export class Character implements Fighter {
     return derived.carryCapacity(this.special);
   }
 
-  /** Base AC is Agility, plus whatever armor is worn. */
+  /** Base AC is Agility, plus whatever armor is worn (less of it when badly worn; core/condition.ts). */
   get armorClass(): number {
-    return this.special.agility + (this.equippedItem('armor')?.armor?.armorClass ?? 0);
+    const armorClass = this.equippedItem('armor')?.armor?.armorClass ?? 0;
+    return this.special.agility + Math.round(armorClass * protectionShare(this.slotCondition('armor')));
   }
 
   get damageResist(): number {
-    return this.equippedItem('armor')?.armor?.damageResist ?? 0;
+    const resist = this.equippedItem('armor')?.armor?.damageResist ?? 0;
+    return Math.round(resist * protectionShare(this.slotCondition('armor')));
   }
 
   /** In Fallout, Luck is the base critical chance. */
@@ -196,12 +198,73 @@ export class Character implements Fighter {
     return derived.baseSkill(this.special, skill) + tag + this.skillBonus[skill];
   }
 
-  /** The attack made with the weapon in hand, or with fists if that hand is empty. */
+  /**
+   * The attack made with the weapon in hand, or with fists if that hand is empty. A badly worn
+   * weapon (core/condition.ts) does less damage and, if it's a gun, hits less often.
+   */
   get attack(): Attack {
     const weapon = this.activeWeapon;
     if (!weapon?.weapon) return { ...UNARMED, hitChance: this.skill('unarmed') };
     const { skill, ...stats } = weapon.weapon;
-    return { name: weapon.name, ...stats, ranged: skill === 'smallGuns', hitChance: this.skill(skill) };
+    const ranged = skill === 'smallGuns';
+    const condition = this.weaponCondition();
+    const share = damageShare(condition);
+    const damageMin = Math.max(1, Math.round(stats.damageMin * share));
+    const damageMax = Math.max(damageMin, Math.round(stats.damageMax * share));
+    const hitChance = this.skill(skill) - hitPenalty(condition, ranged);
+    return { name: weapon.name, ...stats, damageMin, damageMax, ranged, hitChance };
+  }
+
+  /** The condition of the weapon in a hand, in percent (100 for an empty hand: fists don't wear). */
+  weaponCondition(slot: WeaponSlot = this.activeWeaponSlot): number {
+    return this.slotCondition(slot);
+  }
+
+  /** The condition of what's in a slot, in percent (100 for an empty one). */
+  slotCondition(slot: EquipSlot): number {
+    const key = this.equipment[slot];
+    return key ? conditionOf(key) : 100;
+  }
+
+  /** Whether the weapon in hand is broken: it can't be used until it's repaired. */
+  get weaponBroken(): boolean {
+    return this.activeWeapon !== null && isBroken(this.weaponCondition());
+  }
+
+  /**
+   * Wears the weapon in hand by one attack. Returns what happened to it worth telling: it just
+   * broke, or it just got badly worn (below 35%), or nothing.
+   */
+  wearWeapon(): 'broke' | 'worn' | null {
+    return this.wear(this.activeWeaponSlot);
+  }
+
+  /** Wears the armour worn by one hit taken; returns the same as wearWeapon. */
+  wearArmor(): 'broke' | 'worn' | null {
+    return this.wear('armor');
+  }
+
+  private wear(slot: EquipSlot): 'broke' | 'worn' | null {
+    const key = this.equipment[slot];
+    if (!key) return null;
+    const before = conditionOf(key);
+    this.equipment[slot] = afterWear(key);
+    const after = this.slotCondition(slot);
+    if (isBroken(after) && !isBroken(before)) return 'broke';
+    if (after < WORN_AT && before >= WORN_AT) return 'worn';
+    return null;
+  }
+
+  /** The key (id, with its condition) of what's in a slot, or null. */
+  equippedKey(slot: EquipSlot): string | null {
+    return this.equipment[slot];
+  }
+
+  /** Swaps what's in a slot for the same item in another condition, e.g. once it's repaired. */
+  replaceEquipped(slot: EquipSlot, key: string): void {
+    const current = this.equipment[slot];
+    if (!current || itemIdOf(current) !== itemIdOf(key)) throw new Error(`No ${itemIdOf(key)} in the ${slot} slot`);
+    this.equipment[slot] = key;
   }
 
   /** Equipped items count towards the carry weight too. */
@@ -258,20 +321,30 @@ export class Character implements Fighter {
     return this.loaded[slot];
   }
 
-  /** Fills the magazine of the gun in hand from the backpack, as far as the ammo goes. */
-  reload(): ActionResult {
+  /** Why the gun in hand can't be reloaded (not a gun, full, no ammo), or null if it can. */
+  reloadProblem(): string | null {
     const slot = this.activeWeaponSlot;
     const item = this.equippedItem(slot);
     const weapon = item?.weapon;
-    if (!item || !weapon?.ammo || !weapon.magazineSize) return failure("That doesn't need reloading.");
-    const missing = weapon.magazineSize - this.loaded[slot];
-    if (missing === 0) return failure(`The ${item.name} is already fully loaded.`);
-    const amount = Math.min(missing, this.backpack.count(weapon.ammo));
-    if (amount === 0) return failure(`You have no ${getItem(weapon.ammo).name} left.`);
+    if (!item || !weapon?.ammo || !weapon.magazineSize) return "That doesn't need reloading.";
+    if (this.weaponBroken) return `Your ${item.name} is broken. Repair it at a workbench.`;
+    if (this.loaded[slot] === weapon.magazineSize) return `The ${item.name} is already fully loaded.`;
+    if (this.backpack.count(weapon.ammo) === 0) return `You have no ${getItem(weapon.ammo).name} left.`;
+    return null;
+  }
 
-    this.backpack.remove(weapon.ammo, amount);
+  /** Fills the magazine of the gun in hand from the backpack, as far as the ammo goes. */
+  reload(): ActionResult {
+    const problem = this.reloadProblem();
+    if (problem) return failure(problem);
+    const slot = this.activeWeaponSlot;
+    const item = this.equippedItem(slot)!;
+    const weapon = item.weapon!;
+    const amount = Math.min(weapon.magazineSize! - this.loaded[slot], this.backpack.count(weapon.ammo!));
+
+    this.backpack.remove(weapon.ammo!, amount);
     this.loaded[slot] += amount;
-    return success(`You reload the ${item.name} (${this.loaded[slot]}/${weapon.magazineSize}).`);
+    return success(`You reload the ${item.name} (${this.loaded[slot]}/${weapon.magazineSize!}).`);
   }
 
   /** Uses one round from the gun in hand. Returns false if the magazine is empty. */
@@ -299,13 +372,33 @@ export class Character implements Fighter {
   use(itemId: string): ActionResult {
     const item = getItem(itemId);
     if (this.backpack.count(itemId) === 0) return failure(`You don't have a ${item.name}.`);
-    if (!item.consumable) return failure(`You can't use the ${item.name}.`);
+    const patchUpTo = item.consumable?.patchUpTo;
+    if (patchUpTo !== undefined) return this.patchUp(item, patchUpTo);
+    const heal = item.consumable?.heal;
+    if (heal === undefined) return failure(`You can't use the ${item.name}.`);
     if (this.hitPoints >= this.maxHitPoints) return failure('You are already at full health.');
 
     this.backpack.remove(itemId);
-    const healed = Math.min(item.consumable.heal, this.maxHitPoints - this.hitPoints);
+    const healed = Math.min(heal, this.maxHitPoints - this.hitPoints);
     this.hitPoints += healed;
     return success(`You use the ${item.name} and heal ${healed} HP.`);
+  }
+
+  /**
+   * A repair kit (`kit`): patches the most worn piece of equipped gear (either hand, the armour)
+   * up to `upTo`, if anything is below it, using up the kit.
+   */
+  private patchUp(kit: ItemDef, upTo: number): ActionResult {
+    const worn = EQUIP_SLOTS.filter((slot) => {
+      const key = this.equipment[slot];
+      return key !== null && getItem(key).durability !== undefined && conditionOf(key) < upTo;
+    }).sort((a, b) => this.slotCondition(a) - this.slotCondition(b));
+    const slot = worn[0];
+    if (!slot) return failure(`None of your gear is worn badly enough to need the ${kit.name}.`);
+    const key = this.equipment[slot]!;
+    this.backpack.remove(kit.id);
+    this.equipment[slot] = itemKey(itemIdOf(key), upTo);
+    return success(`You patch up the ${getItem(key).name} with the ${kit.name}: ${upTo}%.`);
   }
 
   /** Throws one away. There are no piles on the ground yet, so it is gone for good. */

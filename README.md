@@ -129,6 +129,53 @@ hostile, Gus and the guard for the store. Some village houses and hunter's cabin
 forest are locked up too; nobody lives there any more. People and raiders open
 unlocked doors to come after you in a fight; animals and ghouls are kept out by a closed one.
 
+## Weapon and armour condition, and repairs
+
+Every weapon and every piece of armour has a condition, from 100% (perfect) down to 0%
+(broken), shown after its name in lists and on the HUD's weapon line once it's worn
+("10mm Pistol (62%)"). Each attack wears the weapon in hand, and each hit you take the armour
+you wear, by their own amount (`durability.wear` in `core/items.ts`: a knife 0.5%, the
+pistol 1.5%, the hunting rifle 2.5% per attack; a leather jacket 2%, leather armour 1.5%,
+steel armour 0.8% per hit). Below 35% they work worse, the more so the lower they get
+(`core/condition.ts`):
+
+- a gun hits less often (down to -30%), does less damage (down to half), and a reload can
+  take twice the AP (up to a 50% chance); without the AP for it, the reload eats the AP left
+  and doesn't get done;
+- a melee weapon only does less damage;
+- armour protects less (down to half its AC and DR).
+
+At 0% a weapon is broken and can't be used, and armour has fallen apart and protects
+nothing, until repaired. Each item keeps its own condition wherever it goes: worn ones don't
+stack with good ones, sell (and buy) for less, and gear found in chests comes worn (15-85%).
+
+Repair at a **workbench** (in a village's barn, the forest's logging camp, and the test
+maps): press E at it to see all your gear that wears, with what its repair takes. Guns,
+blades and steel armour take **scrap metal**, the leather jacket and leather armour
+**leather** (from wild dogs' and mole rats' hides, houses and barns, or Gus). How much depends
+on how worn the item is and on the item (`durability.repairCost`: a knife 2 scrap from broken
+to perfect, the pistol 8, the hunting rifle 15, steel armour 12; leather armour 5 leather).
+Short of a full repair, what you have patches it up as far as it goes. You can also
+**salvage** gear you don't want there: it's broken down for good, for a little of the
+material it's repaired with (1 piece below 50% condition, 2 from 50% up). W/S choose, E
+repairs, X salvages (press it twice: it asks first), Esc closes.
+
+**Steel armour** (AC +20, DR 40%, against leather armour's +15 and 25%) is heavy (30 lb) and
+dear: Gus sells one, and the forest's logging camp may have one lying about.
+
+The **Repair** skill (3 x Intelligence: 15% for an average character) sets what repairs take:
+the listed costs are for 15%, each point above makes them 1% cheaper (half at 65%, at least
+1 piece) and below dearer, and every 35% above 15% adds a piece to what salvaging gives.
+
+A **Repair Kit** patches your most worn piece of equipped gear (either hand, or the armour)
+back up to 35% (working order again), wherever you are: use it from the inventory. Gus sells them, and they turn up
+in houses, barns and the logging camp. And **Gus repairs** too: ask him "Can you fix up my
+gear?" and he repairs anything to perfect for caps (half its value times how worn it is, so
+a broken pistol costs half the pistol's value, with the same Charisma markup as his prices), no materials or skill needed.
+
+Badly worn gear shows on the HUD before it breaks: the weapon line turns orange-red below
+35%, and worn armour gets a line of its own above it.
+
 ## Maps and biomes
 
 The world is a set of maps joined by exits (signposts on the map edge); walking onto one
@@ -268,7 +315,11 @@ src/
     stats.ts      S.P.E.C.I.A.L., skills and the Fallout formulas derived from them
     creation.ts   Character creation: the build (name, gender, stats, difficulty), point rules
     difficulty.ts Difficulty levels and what they change in combat
-    items.ts      Item definitions (weight, value, weapon/armor stats)
+    items.ts      Item definitions (weight, value, weapon/armor stats) and item keys
+                  (an id, plus worn gear's condition)
+    condition.ts  Wear of weapons and armour: what it does below 35%, breaking, prices,
+                  repair costs
+    repair.ts     Repairing and salvaging gear at a workbench (scrap metal, leather)
     container.ts  ItemContainer: stacks of items (backpack, chest)
     character.ts  Character: skills, levels, equipment slots, magazines
     creature.ts   Creature and people definitions (people: dialog, group, trade) and instances
@@ -292,11 +343,12 @@ src/
   gfx/        Procedurally generated placeholder pixel art
   audio/      Synthesised sound effects
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting, and the pure logic
-              behind the HUD and screens: AP gauge and its placement, health bars, the
-              shared glow, dialog box, barter lists, the message log, creation screen keys
-  scenes/     Phaser scenes: Boot, Menu, Creation, World, Hud, Inventory, Loot, Lockpick, Dialog,
-              Barter, Character, Pause, GameOver, Controls; flow.ts switches between menus and
-              the game
+              behind the HUD and screens: AP gauge and its placement, health bars and worn-gear
+              warnings, the shared glow, dialog box, barter lists, workbench rows, the message
+              log, creation screen keys
+  scenes/     Phaser scenes: Boot, Menu, Creation, World, Hud, Inventory, Loot, Lockpick,
+              Workbench, Dialog, Barter, Character, Pause, GameOver, Controls; flow.ts switches
+              between menus and the game
   state.ts    The running game (player + map), loaded from the save if there is one
   storage.ts  localStorage access for the save
   main.ts     Phaser game config
@@ -304,3 +356,20 @@ src/
 
 Everything rules-related lives in `core/`, so it can be tested without a browser, and the
 rendering layer can change (or be ported) without touching the rules.
+
+## Working on the code
+
+The project skill in `.claude/skills/wasteland-game/` is the developer guide, written for
+Claude Code sessions but just as readable by people:
+
+- `SKILL.md`: the architecture and why it's built this way, design decisions (including ones
+  tried and rejected), pitfalls, and working conventions.
+- `references/workflow.md`: feature branches and squash-merged PRs, several sessions working
+  side by side (worktrees, dev server ports, files that often conflict), the docs every
+  feature updates, and checking changes in headless Chrome.
+- `references/extending.md`: recipes for adding items, creatures, people, dialog actions,
+  skills, tiles, biomes and sounds.
+- `references/roadmap.md`: planned features, and what past reviews fixed.
+
+Every feature updates this README, the skill and the roadmap in its own branch, so they
+always describe `main`.

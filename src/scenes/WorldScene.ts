@@ -11,7 +11,7 @@ import { addPos, type GridPos } from '../core/grid';
 import type { Chest, Door, Exit, Owned } from '../core/gridMap';
 import { lockedMessage, lockKind, pickProblem, pinsFor, unlock, type Lockable } from '../core/locks';
 import type { Lootable } from '../core/loot';
-import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey } from '../gfx/textures';
+import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey, WORKBENCH } from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
 import { ApGauge } from '../ui/apGauge';
 import { ENEMY_BAR_GAP, ENEMY_BAR_HEIGHT, enemyBar } from '../ui/healthBar';
@@ -97,7 +97,11 @@ export class WorldScene extends Phaser.Scene {
     const map = state.map;
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        this.add.image(x * TILE_SIZE, y * TILE_SIZE, tileTextureKey(map.tiles[y][x], x, y)).setOrigin(0);
+        const tile = map.tiles[y][x];
+        // A workbench stands on the ground around it, drawn like a chest.
+        const ground = tile === 'workbench' ? map.groundAt(x, y) : tile;
+        this.add.image(x * TILE_SIZE, y * TILE_SIZE, tileTextureKey(ground, x, y)).setOrigin(0);
+        if (tile === 'workbench') this.add.image(toPixel(x), toPixel(y), WORKBENCH).setDepth(DEPTH.prop);
       }
     }
     for (const chest of map.chests) {
@@ -796,6 +800,10 @@ export class WorldScene extends Phaser.Scene {
       this.openChest(chest);
       return;
     }
+    if (state.map.tileAt(x, y) === 'workbench') {
+      this.openOverlay('Workbench');
+      return;
+    }
     // A door in front of you, unless a corpse with something on it lies in the doorway: that's
     // what you'd reach for. (An emptied one leaves you the door, which then says it's in the way.)
     const door = state.map.doorAt(x, y);
@@ -931,8 +939,12 @@ export class WorldScene extends Phaser.Scene {
     this.fightWith(angered);
   }
 
-  /** Pauses the world and shows a screen on top of it; the screen resumes the world when it closes. */
-  private openOverlay(key: string, data?: object): void {
+  /**
+   * Pauses the world and shows a screen on top of it; the screen resumes the world when it
+   * closes. Always with data: Phaser hands a screen launched without any the data of its
+   * previous launch, which made a barn workbench open as Gus's repair counter.
+   */
+  private openOverlay(key: string, data: object = {}): void {
     if (this.busy) return;
     this.scene.pause();
     this.scene.launch(key, data);

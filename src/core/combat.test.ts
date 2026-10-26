@@ -411,7 +411,7 @@ describe('Combat with people', () => {
     const raider = new Creature('raider@7,1', getCreatureDef('raider'), { ...guard.pos });
     expect(combat.hitChance(guard, player)).toBeGreaterThan(combat.hitChance(raider, player) + 30);
     expect(guard.attack.ranged).toBe(true);
-    expect(guard.contents.count('10mm_pistol')).toBe(1);
+    expect(guard.contents.count('10mm_pistol@60')).toBe(1); // a used one
   });
 });
 

@@ -39,12 +39,15 @@ describe('click modifiers', () => {
 describe('barter screen lists', () => {
   it("shows Gus's stock with buying prices, and leaves his caps out", () => {
     const { theirs } = barterRows(customer(0), gus().inventory);
-    // Sorted like every list: armour, aid, then ammo by name.
+    // Sorted like every list: armour, aid, ammo, then the rest, each by name.
     expect(theirs).toEqual([
       { key: 'leather_jacket', label: 'Leather Jacket', detail: '300c' },
+      { key: 'steel_armor', label: 'Steel Armor', detail: '2160c' },
+      { key: 'repair_kit', label: 'Repair Kit x3', detail: '72c' },
       { key: 'stimpak', label: 'Stimpak x2', detail: '210c' },
       { key: 'ammo_223', label: '.223 Rounds x20', detail: '5c' },
       { key: 'ammo_10mm', label: '10mm Rounds x40', detail: '3c' },
+      { key: 'leather', label: 'Leather x4', detail: '10c' },
     ]);
   });
 

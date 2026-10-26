@@ -3,7 +3,7 @@ import { generateMap, type ExitRequest } from '../../core/generation/biome';
 import { flipVertical } from '../../core/generation/mapBuilder';
 import { GridMap } from '../../core/gridMap';
 import { LOCKS } from '../../core/locks';
-import { playabilityProblems } from './playability';
+import { playabilityProblems, workbenches } from './playability';
 import { VILLAGE } from './village';
 
 const EXITS: ExitRequest[] = [{ side: 'north', to: 'wasteland' }];
@@ -93,6 +93,23 @@ describe('village biome', () => {
       expect(byTheDoor).toBe(true);
       expect(reachable.has(`${guard.pos.x},${guard.pos.y}`)).toBe(true);
     }
+  });
+});
+
+describe('village workbench', () => {
+  it('stands in the barn, where you can get at it', () => {
+    let withBarn = 0;
+    for (const seed of SEEDS) {
+      const map = GridMap.parse(generateMap(VILLAGE, seed, EXITS), 'village');
+      const benches = workbenches(map);
+      const barn = map.chests.some((c) => c.name === 'Feed Bin');
+      expect(benches.length).toBe(barn ? 1 : 0);
+      if (!barn) continue;
+      withBarn++;
+      expect(benches[0].reachable).toBe(true);
+      expect(map.buildingAt(benches[0].x, benches[0].y)).toBeDefined();
+    }
+    expect(withBarn).toBeGreaterThan(SEEDS.length / 2);
   });
 });
 

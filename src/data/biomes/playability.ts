@@ -45,3 +45,17 @@ export function playabilityProblems(map: GridMap): string[] {
   }
   return problems;
 }
+
+/** Every workbench on the map, and whether a tile beside it can be walked to from the start. */
+export function workbenches(map: GridMap): Array<{ x: number; y: number; reachable: boolean }> {
+  const reachable = map.reachableFrom(map.playerStart);
+  const found: Array<{ x: number; y: number; reachable: boolean }> = [];
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (map.tileAt(x, y) !== 'workbench') continue;
+      const beside = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => reachable.has(`${x + dx},${y + dy}`));
+      found.push({ x, y, reachable: beside });
+    }
+  }
+  return found;
+}

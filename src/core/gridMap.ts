@@ -22,7 +22,8 @@ export type TileType =
   | 'crops'
   | 'hay'
   | 'shelf'
-  | 'door';
+  | 'door'
+  | 'workbench';
 
 /** Map characters for each tile. Letters and digits are taken by markers, so tiles use symbols. */
 export const LEGEND: Readonly<Record<string, TileType>> = {
@@ -44,6 +45,7 @@ export const LEGEND: Readonly<Record<string, TileType>> = {
   '[': 'hay',
   ']': 'shelf',
   '/': 'door',
+  '!': 'workbench',
 };
 
 const BLOCKING: ReadonlySet<TileType> = new Set<TileType>([
@@ -56,6 +58,7 @@ const BLOCKING: ReadonlySet<TileType> = new Set<TileType>([
   'fence',
   'hay',
   'shelf',
+  'workbench',
 ]);
 /**
  * Tiles you can't see (or shoot) through. Low obstacles (water, logs, fences, hay, shelves)
@@ -263,6 +266,15 @@ export class GridMap {
 
   exitAt(x: number, y: number): Exit | undefined {
     return this.exits.find((e) => e.x === x && e.y === y);
+  }
+
+  /**
+   * The ground a prop standing on this tile (a workbench) is drawn on: its first walkable
+   * neighbour's, as for markers, so a bench in a barn stands on planks and one outside on dirt.
+   */
+  groundAt(x: number, y: number): TileType {
+    const neighbours = [this.tileAt(x - 1, y), this.tileAt(x + 1, y), this.tileAt(x, y - 1), this.tileAt(x, y + 1)];
+    return neighbours.find((t): t is TileType => t !== null && !BLOCKING.has(t) && t !== 'door') ?? 'dirt';
   }
 
   doorAt(x: number, y: number): Door | undefined {

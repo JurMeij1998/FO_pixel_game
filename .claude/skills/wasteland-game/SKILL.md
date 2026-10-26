@@ -1,6 +1,6 @@
 ---
 name: wasteland-game
-description: Architecture, design decisions, working conventions and roadmap for this repo's Fallout-inspired top-down pixel RPG (TypeScript + Phaser 3 + Vite, rules in src/core, procedural art and sound, ASCII and generated maps, seeded biomes, localStorage saves). Use it for any work in this repo, even small-looking changes - adding or changing items, creatures, tiles, maps, biomes, combat, UI or HUD, sounds, saves or menus; fixing bugs; reviewing code; or planning and discussing what to build next. It explains why things are built the way they are, the pitfalls already hit, how to verify changes, and the known backlog.
+description: Architecture, design decisions, working conventions and roadmap for this repo's Fallout-inspired top-down pixel RPG (TypeScript + Phaser 3 + Vite, rules in src/core, procedural art and sound, ASCII and generated maps, seeded biomes, localStorage saves). Use it for any work in this repo, even small-looking changes - adding or changing items, creatures, tiles, maps, biomes, combat, UI or HUD, sounds, saves or menus; fixing bugs; reviewing code; starting a feature branch, committing or opening a PR; working alongside other sessions; or planning and discussing what to build next. It explains why things are built the way they are, the pitfalls already hit, how to verify changes, and the known backlog.
 ---
 
 # Wasteland: a Fallout-style pixel RPG
@@ -11,10 +11,16 @@ Points and line of sight, XP and levelling, hand-made and randomly generated map
 exits, autosave, and synthesised sound. Runs in the browser on PC for now; mobile comes later.
 
 `README.md` has the player-facing overview, controls and file layout. This skill is about
-**why** the code is shaped the way it is, so changes fit in. Two reference files go deeper:
+**why** the code is shaped the way it is, so changes fit in. Several Claude sessions may work
+on the repo at once; this skill and the README are all the context a new one gets, so keep
+them current (see "Docs are part of every feature" in `references/workflow.md`). Three
+reference files go deeper:
 
-- `references/extending.md`: step-by-step recipes for adding an item, creature, tile, biome or
-  sound. Read it before adding any of those.
+- `references/workflow.md`: how a feature goes from branch to squash-merged PR, working
+  alongside other sessions (worktrees, ports, conflict hot spots), the docs every feature
+  updates, and how to check a change in headless Chrome. Read it before starting a feature.
+- `references/extending.md`: step-by-step recipes for adding an item, creature, person,
+  dialog action, skill, tile, biome or sound. Read it before adding any of those.
 - `references/roadmap.md`: what the past reviews fixed (and must stay fixed) and the planned
   features. Read it before planning work, before touching map generation, saves, travel or the
   AP gauge, and when the user asks what's next.
@@ -79,6 +85,27 @@ drawn exactly like hand-made ones.
   keys, so renaming one loses that map's saved state.
 - Creatures are placed out of sight of the arrival point, so nothing attacks on arrival.
 
+**Items are strings: an id, or for worn gear an item key.** A weapon's or armour's condition
+lives in its key (`10mm_pistol@62.5`; `itemKey`, `conditionOf` in `core/items.ts`; a perfect one is just
+its id), so a worn item is its own stack and its condition goes wherever the string goes:
+containers, equipment slots, loot, barter, saves, list keys. That avoided giving
+`ItemContainer` item instances, and old saves (plain ids) load as perfect weapons. Containers
+and loaded equipment rewrite keys with `normalKey`, so "knife@50.0" and "knife@50" stack. `getItem`
+takes either. Anything comparing items by id should go through `itemIdOf`; anything showing
+one should use `itemName(key)` (ui/format.ts), which adds the condition. What wears has
+`durability` (wear, repair cost, material): weapons per attack, armour per hit taken. Wear,
+its effects below 35% and repair costs are in `core/condition.ts`; a broken weapon refuses to
+attack with `AttackProblemCode` 'broken', and armour at 0% protects nothing. Repair costs
+scale with the Repair skill (`repairShare`; listed costs are for 15%), and so does salvage
+(`salvageYield`: 1 piece below 50%, else 2, plus one per 35% of Repair above 15). A Repair
+Kit (`consumable.patchUpTo`) patches the most worn equipped item up to 35% anywhere; it only
+gets you out of trouble, never back to good. The HUD warns below 35%, where the effects start (`weaponWorn`,
+`armorWarning` in ui/healthBar.ts) instead of popping messages. The workbench screen
+doubles as a trader's repair service (opened from dialog action 'repair' with `{ trader }`):
+caps instead of materials (`repairForCaps`, `repairPrice`), no salvage, and closing wakes the
+conversation like the barter screen. Only a worn gun rolls for a slow reload, so good guns don't
+shift combat's random numbers.
+
 **Saves store only what changes.** Format v2 (`core/save.ts`): world seed, current map, player,
 and per visited map only chest and creature state; generated maps are rebuilt from the seed and
 the state laid over them. `loadGame()` upgrades v1 saves, reads legacy creature ids, validates
@@ -127,8 +154,9 @@ waits for the World's RESUME, after the World's own autosave, so a lock picked i
 creatures with `opensDoors` (people, raiders) path through unlocked doors, opening them.
 
 **UI structure.** The world is drawn at integer zoom 3 (`WORLD_ZOOM`) for crisp pixels. HUD,
-menus and overlays are separate 1:1 scenes; overlays pause the World while open. Dialog
-sleeps while the barter screen is open and wakes when it closes, so the conversation goes on.
+menus and overlays are separate 1:1 scenes; overlays pause the World while open, and are always launched with data (`openOverlay` passes
+`{}`), since Phaser hands a screen launched without any its previous launch's data. Dialog
+sleeps while the barter or trader-repair screen is open and wakes when it closes, so the conversation goes on.
 `ui/widgets.ts` has `ListView` (pooled rows, click modifiers) and `MenuList` (keyboard and
 mouse, ignores key auto-repeat so a held key from the previous screen can't pick an option).
 The AP gauge (`ui/apGauge.ts`) lives in world space: the AP number in a round pixel seal with a
@@ -157,11 +185,17 @@ door) with 1000 caps to spend: for dialog, barter, theft and provoking.
 
 **Verify changes for real.** Run `npx tsc --noEmit`, `npx vitest run` and `npm run build`, then
 look at the actual game: drive headless Chrome with `playwright-core` (install it in the
-session scratchpad, not as a project dependency), take screenshots (crop and enlarge for pixel
-detail) and assert on the save in `localStorage`. To set up a scenario, edit the save in
-`localStorage` and reload through the menu (Esc, Quit, Continue). A passing test suite has
-repeatedly missed things a screenshot caught: tiles in green squares, a dimmed card showing a
-hidden sprite through itself, a misplaced arrival point.
+session scratchpad, not as a project dependency; a driver template is in
+`references/workflow.md`), take screenshots (crop and enlarge for pixel detail) and assert on
+the save in `localStorage`. To set up a scenario, edit the save in `localStorage` and reload
+through the menu (Esc, Quit, Continue). A passing test suite has repeatedly missed things a
+screenshot caught: tiles in green squares, a dimmed card showing a hidden sprite through
+itself, a misplaced arrival point.
+
+**Branches and PRs.** Every feature gets its own `feature/<name>` branch (in its own worktree
+when other sessions are active), a read-only review agent before merging, and one PR that the
+user squash-merges on GitHub. `gh` isn't installed, so push and hand over the compare link and
+a description to paste. Details in `references/workflow.md`.
 
 **Keep every edit self-consistent.** The user usually has `npm run dev` running. If a change is
 spread over several saves (say, a call added before its import), Vite's watcher can miss the
@@ -176,4 +210,18 @@ change first; say what's unpushed instead.
 
 **The user** is a C++ developer who reads TypeScript fine, writes in Dutch or English (reply
 in the same language), prefers simple, clean UI (a busy "combat card" with HP, damage and ammo
-was built and rejected for the minimal AP seal), and likes to iterate visually in the test arena.
+was built and rejected for the minimal AP seal), and likes to iterate visually in the test arena
+and test shop. Things they asked to be cut back, so new screens start that way:
+- **Short UI text.** Item details show "Condition 62%", not what a worn weapon does or where
+  to fix it; the workbench says "Repair costs: 4 scrap metal" and nothing at all when there's
+  nothing to repair (not "none"). Lists show values in a column under a header ("YOUR GEAR"
+  / "CONDITION", "INVENTORY"), not as prose.
+- **Hide what can't be used.** A button that would do nothing (Repair on a perfect item) isn't
+  shown, and its key does nothing either, not even a message. Action buttons stack vertically.
+- **Sizes match their neighbours:** the workbench was shrunk to a chest's size.
+- **Puzzles shouldn't be trivial:** "the first lock pin always goes in" was built and reverted.
+- **No spam from held keys:** a held arrow or E against something that refuses must not
+  repeat its message and sound (E ignores key repeat; walking remembers what it bumped into,
+  `WorldScene.bumpedInto`).
+- They like to be offered a few ideas when a feature is done ("what else can we do here?"),
+  and put the ones they defer on the roadmap.

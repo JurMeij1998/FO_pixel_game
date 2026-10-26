@@ -55,7 +55,7 @@ describe('dialog box text', () => {
   it("opens on Gus's greeting, with barter selected", () => {
     const conversation = new Conversation(getCreatureDef('shopkeeper').dialog!);
     expect(conversation.text).toContain('if you break anything, you buy it!');
-    expect(new ReplyMenu(conversation).labels).toEqual(["> Let's barter.", '  Goodbye.', '  *Attack*']);
+    expect(new ReplyMenu(conversation).labels).toEqual(["> Let's barter.", '  Can you fix up my gear?', '  Goodbye.', '  *Attack*']);
   });
 
   it("gives the guard's warning with just Leave and *Attack*, Leave selected", () => {
@@ -148,7 +148,9 @@ describe('reply selection', () => {
   it("takes Gus from his greeting to 'Anything else?' after bartering", () => {
     const menu = menuFor(getCreatureDef('shopkeeper').dialog!);
     expect(menu.answer()).toEqual({ action: 'barter' });
-    expect(menu.labels).toEqual(["> Let's barter.", '  Goodbye.', '  *Attack*']);
+    expect(menu.labels).toEqual(["> Let's barter.", '  Can you fix up my gear?', '  Goodbye.', '  *Attack*']);
+    menu.move(1);
+    expect(menu.answer()).toEqual({ action: 'repair' });
     menu.move(1);
     expect(menu.answer()).toEqual({ action: 'leave' });
   });

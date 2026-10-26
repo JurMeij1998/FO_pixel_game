@@ -35,6 +35,8 @@ const HOUSE_LOOT: LootTable = {
     { itemId: 'rope', min: 1, max: 1, weight: 1 },
     { itemId: 'knife', min: 1, max: 1, weight: 1 },
     { itemId: 'scrap_metal', min: 1, max: 2, weight: 1 },
+    { itemId: 'leather', min: 1, max: 2, weight: 1 },
+    { itemId: 'repair_kit', min: 1, max: 1, weight: 1 },
   ],
 };
 
@@ -60,6 +62,8 @@ const BARN_LOOT: LootTable = {
     { itemId: 'bottle_caps', min: 5, max: 15, weight: 2 },
     { itemId: 'spear', min: 1, max: 1, weight: 1 },
     { itemId: 'canteen', min: 1, max: 1, weight: 1 },
+    { itemId: 'leather', min: 1, max: 3, weight: 2 },
+    { itemId: 'repair_kit', min: 1, max: 1, weight: 1 },
   ],
 };
 
@@ -132,12 +136,12 @@ export const GENERAL_STORE: Prefab = {
   residents: { G: 'shopkeeper', W: 'guard' },
 };
 
-/** Hay bales, a feed bin, and vermin. Wide double doors, never locked. */
+/** Hay bales, a feed bin, a workbench (!) to repair weapons at, and vermin. Wide double doors, never locked. */
 const BARN: Prefab = {
   name: 'barn',
   rows: [
     '%%%%%%%%%%%%%',
-    '%+++++++++++%',
+    '%+++++!+++++%',
     '%+[[+++++[[+%',
     '%+[[++&++[[+%',
     '%+++++++++++%',
@@ -197,7 +201,7 @@ const STREET_BUILDINGS: Array<{ prefab: Prefab; weight: number; unique?: boolean
 
 export const VILLAGE: Biome = {
   id: 'village',
-  version: 5,
+  version: 6,
   names: ['Dusty Hollow', 'New Plenty', 'Rustwater', 'Cinder Creek', 'Harmony Flats', 'Last Stop'],
   width: 48,
   height: 34,

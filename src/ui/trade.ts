@@ -1,7 +1,6 @@
 import { buyItem, buyPrice, CAPS, capsOf, sellItem, sellPrice } from '../core/barter';
 import type { Character } from '../core/character';
 import type { ItemContainer } from '../core/container';
-import { getItem } from '../core/items';
 import { transferQuantity, type TransferAmount } from '../core/loot';
 import type { ActionResult } from '../core/result';
 import { describeItem, sortedStacks, stackLabel } from './format';
@@ -21,7 +20,7 @@ export function amountFor(modifiers: ClickModifiers): TransferAmount {
 export function priceRows(container: ItemContainer, price: (itemId: string) => number): ListRow[] {
   return sortedStacks(container.items)
     .filter((stack) => stack.itemId !== CAPS)
-    .map(({ itemId, quantity }) => ({ key: itemId, label: stackLabel(getItem(itemId), quantity), detail: `${price(itemId)}c` }));
+    .map(({ itemId, quantity }) => ({ key: itemId, label: stackLabel(itemId, quantity), detail: `${price(itemId)}c` }));
 }
 
 /** The barter screen's two lists: your pack with what it sells for, their stock with what it costs. */
@@ -47,10 +46,10 @@ export function barterHeaders(player: Character, traderName: string, stock: Item
  */
 export function barterDetail(player: Character, traderName: string, side: 'yours' | 'theirs', itemId: string): string {
   const charisma = player.special.charisma;
-  if (side === 'theirs') return `${describeItem(getItem(itemId))}\n${traderName} sells it for ${buyPrice(itemId, charisma)} caps each.`;
+  if (side === 'theirs') return `${describeItem(itemId)}\n${traderName} sells it for ${buyPrice(itemId, charisma)} caps each.`;
   const price = sellPrice(itemId, charisma);
   const offer = price > 0 ? `${traderName} pays ${price} caps each.` : `${traderName} isn't interested.`;
-  return `${describeItem(getItem(itemId))}\n${offer}`;
+  return `${describeItem(itemId)}\n${offer}`;
 }
 
 /** A click on the barter screen: on your list it sells, on theirs it buys, as much as the modifiers say. */
