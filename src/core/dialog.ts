@@ -15,8 +15,11 @@ export interface DialogCondition {
   stage: QuestStage | QuestStage[];
 }
 
-/** Takes a quest on, or hands it in (which only works once it's ready). */
-export type QuestStep = { start: string } | { finish: string };
+/**
+ * Takes a quest on, hands it in (which only works once it's ready), or hands over a delivery's
+ * item again when you've lost it.
+ */
+export type QuestStep = { start: string } | { finish: string } | { resupply: string };
 
 export interface DialogReply {
   text: string;
@@ -80,7 +83,7 @@ export function validateDialog(dialog: Dialog, owner: string, isQuest: (id: stri
       if (reply.next) check(reply.next, `a reply in '${id}'`);
       else if (!reply.action) throw new Error(`${owner}: reply '${reply.text}' in '${id}' goes nowhere`);
       if (reply.when) checkQuest(reply.when.quest, `a reply in '${id}'`);
-      if (reply.quest) checkQuest('start' in reply.quest ? reply.quest.start : reply.quest.finish, `a reply in '${id}'`);
+      if (reply.quest) checkQuest(Object.values(reply.quest)[0], `a reply in '${id}'`);
     }
   }
 }

@@ -333,3 +333,26 @@ describe('quests in a save', () => {
     expect(person(loaded, 'wasteland', 'silas').canTalk).toBe(true);
   });
 });
+
+describe('review fixes', () => {
+  it("isn't offered when the one it's for is already dead", () => {
+    const world = withVillage();
+    person(world, 'wasteland', 'mags').hitPoints = 0;
+    expect(questStage('medicine_for_mags', world)).toBe('failed');
+    const conversation = talk(world, getCreatureDef('doctor').dialog!);
+    expect(replyTexts(conversation)).not.toContain('Anything I can help with?');
+  });
+
+  it('the doctor makes up another pouch if you lost yours, and only then', () => {
+    const world = withVillage();
+    const doctor = getCreatureDef('doctor').dialog!;
+    startQuest('medicine_for_mags', world);
+    expect(replyTexts(talk(world, doctor))).not.toContain('I lost the medicine.');
+    world.player.backpack.remove('medicine_pouch');
+    const conversation = talk(world, doctor);
+    say(conversation, 'I lost the medicine.');
+    expect(conversation.notice).toEqual(['You got the Medicine Pouch.']);
+    expect(world.player.backpack.count('medicine_pouch')).toBe(1);
+    expect(replyTexts(conversation)).not.toContain('I lost the medicine.');
+  });
+});

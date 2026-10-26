@@ -89,6 +89,13 @@ const silasLine = (text: string) => ({ text, replies: SILAS_REPLIES });
 
 const DOCTOR_REPLIES: DialogReply[] = [
   { text: 'Anything I can help with?', next: 'medicine_offer', when: { quest: 'medicine_for_mags', stage: 'new' } },
+  {
+    // Active, for a delivery, means you don't have the pouch any more.
+    text: 'I lost the medicine.',
+    next: 'medicine_again',
+    when: { quest: 'medicine_for_mags', stage: 'active' },
+    quest: { resupply: 'medicine_for_mags' },
+  },
   { text: 'Goodbye.', action: 'leave' },
 ];
 const doctorLine = (text: string) => ({ text, replies: DOCTOR_REPLIES });
@@ -431,6 +438,7 @@ const DEFINITIONS: CreatureDef[] = [
           ],
         },
         medicine_deal: doctorLine('Thank you. Tell her to keep it clean and stay off that leg.'),
+        medicine_again: doctorLine("Lost it? Here, I made up another. Try to hang on to this one."),
       },
     },
   },

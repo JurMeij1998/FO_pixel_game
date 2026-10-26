@@ -144,10 +144,11 @@ older saves: an empty log; unknown ids and statuses are dropped). The stage a qu
 (`questStage`: new, active, ready, done, failed) is computed each time from the log, the
 backpack, the creatures on the maps and whether the one who hands it in is alive and friendly,
 so it can't drift from the world: loading a save, a scene restart or a person turning hostile
-need no bookkeeping. `finishQuest` only pays when the stage is 'ready' and flips it to 'done'
-first, so a reward can't be had twice. A kill goal is "every creature of that kind on that map
-dead" (no kill counter to keep in step with combat events); the giver and finisher are looked
-up by creature id on a named map, so givers in generated maps must be guaranteed there (the
+need no bookkeeping. `finishQuest` only pays when the stage is 'ready' and marks it 'done' in
+the same call, so a reward can't be had twice. A kill goal is "every creature of that kind on that map
+dead" (no kill counter to keep in step with combat events); the finisher (giver, or a delivery's
+recipient) is looked up by creature id on a named map, and a quest whose finisher is dead or
+hostile is 'failed', even before it's offered; givers and finishers in generated maps must be guaranteed there (the
 village's clinic is a `required` street building). Dialog depends on quests through
 `when` conditions on replies and `greetings` (the first that holds replaces `start`), and a
 reply's `quest` step (start / finish) runs before moving to `next`, so that line already sees
@@ -155,7 +156,9 @@ the new state. `Conversation` asks a `DialogWorld` (`questDialogWorld(state)`) f
 keeping `dialog.ts` free of game state; without one (`NO_WORLD`) quest replies stay hidden,
 which is why Gus's and the guard's reply lists in tests didn't change. What a step brings
 about (new quest, reward, level-up) shows under the person's line and goes to the message log.
-The quest list (J) does nothing until a quest has been taken on, like other unusable keys.
+A delivery's item can be dropped, so its giver hands out another (`{ resupply }`) while the
+quest is 'active' (taken on, item gone). The quest list (J) does nothing until a quest has been
+taken on, like other unusable keys.
 
 **Doors, locks and roofs.** Doors are a tile (`/`) plus per-map state (`GridMap.doors`:
 open, and the lock's required skill or null), so generation treats a doorway as passable while

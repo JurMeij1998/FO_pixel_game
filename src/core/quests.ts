@@ -63,7 +63,7 @@ const DEFINITIONS: QuestDef[] = [
     giver: { creature: 'mags', map: WASTELAND },
     goal: { kind: 'kill', creature: 'radroach', map: WASTELAND },
     reward: { caps: 40, experience: 100 },
-    objective: 'Kill the radroaches by the pond, southwest of the shack.',
+    objective: 'Kill the radroaches by the pond, south of the shack.',
     whenReady: 'Tell Mags the radroaches are dead.',
   },
   {
@@ -81,8 +81,8 @@ const DEFINITIONS: QuestDef[] = [
     giver: { creature: 'doctor', map: VILLAGE },
     goal: { kind: 'deliver', itemId: 'medicine_pouch', to: { creature: 'mags', map: WASTELAND } },
     reward: { caps: 25, items: [['stimpak', 1]], experience: 75 },
-    objective: 'Take the medicine pouch to Mags, south of the shack in the wasteland.',
-    whenReady: 'Take the medicine pouch to Mags, south of the shack in the wasteland.',
+    objective: 'Get another medicine pouch from Doc Mendez, and take it to Mags.',
+    whenReady: 'Take the medicine pouch to Mags, southeast of the shack in the wasteland.',
   },
 ];
 
@@ -184,10 +184,11 @@ export function questStage(id: string, world: QuestWorld): QuestStage {
   const def = getQuest(id);
   const status = world.quests.status(id);
   if (status === 'done') return 'done';
-  if (status === null) return 'new';
-  // Dead, turned hostile, or gone from their map: no one is left to hand it in to.
+  // Dead, turned hostile, or gone from their map: no one is left to hand it in to. Not even
+  // offered then (a delivery to someone you've already killed).
   const finisher = findPerson(finisherOf(def), world.maps);
   if (finisher === null || (finisher && (finisher.isDead || finisher.hostile))) return 'failed';
+  if (status === null) return 'new';
   return goalMet(def, world) ? 'ready' : 'active';
 }
 
@@ -201,6 +202,17 @@ export function startQuest(id: string, world: QuestWorld): string[] {
     lines.push(`You got the ${getItem(def.goal.itemId).name}.`);
   }
   return lines;
+}
+
+/**
+ * For a delivery whose item you no longer have (dropped): the giver hands you another. Returns
+ * the lines to show, or none if there was nothing to replace.
+ */
+export function resupplyQuest(id: string, world: QuestWorld): string[] {
+  const def = getQuest(id);
+  if (def.goal.kind !== 'deliver' || questStage(id, world) !== 'active') return [];
+  world.player.backpack.add(def.goal.itemId);
+  return [`You got the ${getItem(def.goal.itemId).name}.`];
 }
 
 /**
@@ -239,7 +251,12 @@ export function conditionHolds(condition: DialogCondition, world: QuestWorld): b
 export function questDialogWorld(world: QuestWorld): DialogWorld {
   return {
     holds: (condition) => conditionHolds(condition, world),
-    take: (step: QuestStep) => ('start' in step ? startQuest(step.start, world) : finishQuest(step.finish, world)),
+    take: (step: QuestStep) =>
+      'start' in step
+        ? startQuest(step.start, world)
+        : 'resupply' in step
+          ? resupplyQuest(step.resupply, world)
+          : finishQuest(step.finish, world),
   };
 }
 

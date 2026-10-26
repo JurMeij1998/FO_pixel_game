@@ -6,7 +6,7 @@ import { LOCKS } from '../core/locks';
 //         P player start   a-z chests   A-Z creatures and people   1-9 exits (all defined below)
 // A new game starts inside Rosa's shack (top left), with Rosa (F) beside you. The shed with
 // the metal locker (right) is locked with an easy lock: a few skill points in Lockpick open it.
-// Mags (K) scavenges south of the shack, Silas (H) hunts by the water in the northeast; both
+// Mags (K) scavenges southeast of the shack, Silas (H) hunts by the water in the northeast; both
 // have a quest for you (core/quests.ts).
 export const WASTELAND: MapDef = {
   name: 'Wasteland',

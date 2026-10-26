@@ -75,6 +75,8 @@ export class DialogScene extends Phaser.Scene {
     // Coming back from the barter or repair screen: the conversation goes on where it was.
     const onWake = () => {
       keyboard.resetKeys();
+      // The replies on offer may have changed meanwhile (they depend on quests): keep one selected.
+      this.menu.select(Math.min(this.menu.selected, this.conversation.replies.length - 1));
       this.show();
     };
     this.events.on(Phaser.Scenes.Events.WAKE, onWake);
@@ -130,9 +132,12 @@ export class DialogScene extends Phaser.Scene {
   }
 
   private answer(index: number): void {
+    const level = state.player.level;
     const answered = this.menu.answer(index);
     if (!answered) return;
     playSound('menuSelect');
+    // A quest's XP can level you up, as a kill can: the same jingle.
+    if (state.player.level > level) this.time.delayedCall(250, () => playSound('levelUp'));
     // Also in the message log, for after the conversation.
     for (const line of this.conversation.notice) postMessage(this, line);
     if (answered.action === 'leave') {

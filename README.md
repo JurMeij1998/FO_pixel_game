@@ -109,15 +109,16 @@ you're on it and after. Taking a quest on or handing it in shows under their lin
 message log). **J** lists your quests: the open ones first, with what's left to do, then the
 finished and failed ones, dimmed.
 
-- **Mags**, a scavenger camped south of Rosa's shack: kill the radroaches by the pond
+- **Mags**, a scavenger camped southeast of Rosa's shack: kill the radroaches by the pond
   (*Pond Pests*: 40 caps, 100 XP).
 - **Silas**, a hunter by the water in the northeast of the wasteland: bring him 3 leather
   (*Hides for Silas*: 30 caps, 10 .223 rounds, 75 XP).
 - **Doc Mendez**, in every village's clinic: take a medicine pouch to Mags (*Medicine for
-  Mags*: she pays 25 caps and a stimpak, 75 XP). The clinic's medicine cabinet is his.
+  Mags*: she pays 25 caps and a stimpak, 75 XP; lose the pouch and he makes up another). The
+  clinic's medicine cabinet is his.
 
 A quest fails if the one who'd hand it in (the giver, or for a delivery who it's for) is
-dead or has turned on you. Only which quests you've taken on and finished is saved; whether
+dead or has turned on you (and isn't offered at all then). Only which quests you've taken on and finished is saved; whether
 you have the items, whether the radroaches are dead and whether someone is still around is
 read from the game, so it can't get out of step with it.
 
