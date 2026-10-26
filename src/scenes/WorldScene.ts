@@ -8,10 +8,19 @@ import type { DialogData } from './DialogScene';
 import type { LockpickData } from './LockpickScene';
 import type { Fighter } from '../core/fighter';
 import { addPos, type GridPos } from '../core/grid';
-import type { Chest, Door, Exit, Owned } from '../core/gridMap';
+import type { Chest, Door, Exit, ExitLook, Owned } from '../core/gridMap';
 import { lockedMessage, lockKind, pickProblem, pinsFor, unlock, type Lockable } from '../core/locks';
 import type { Lootable } from '../core/loot';
-import { DOOR_CLOSED, DOOR_LOCKED, DOOR_OPEN, roofTextureKey, roofVariant, tileTextureKey, WORKBENCH } from '../gfx/textures';
+import {
+  DARKNESS,
+  DOOR_CLOSED,
+  DOOR_LOCKED,
+  DOOR_OPEN,
+  propTextureKey,
+  roofTextureKey,
+  roofVariant,
+  tileTextureKey,
+} from '../gfx/textures';
 import { autosave, state, travelTo } from '../state';
 import { ApGauge } from '../ui/apGauge';
 import { ENEMY_BAR_GAP, ENEMY_BAR_HEIGHT, enemyBar } from '../ui/healthBar';
@@ -33,8 +42,17 @@ const STEP: Record<Direction, GridPos> = {
 const MOVE_DURATION_MS = 140;
 
 // Roofs go over everything inside a building, health bars included; the AP gauge and effects
-// stay on top.
-const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, marker: 4, healthBars: 5, roof: 6, gauge: 9, effects: 10 };
+// stay on top. Underground, the darkness covers the map and creatures but not the target
+// marker and health bars, so a fight in the dark can still be followed.
+const DEPTH = { prop: 1, corpse: 1, creature: 2, player: 3, darkness: 3.5, marker: 4, healthBars: 5, roof: 6, gauge: 9, effects: 10 };
+
+/** The sprite an exit is drawn with. */
+const EXIT_SPRITES: Record<ExitLook, string> = {
+  signpost: 'signpost',
+  cave: 'cave_mouth',
+  stairsUp: 'stairs_up',
+  stairsDown: 'stairs_down',
+};
 /** How long a roof takes to fade away when you first step inside. */
 const ROOF_FADE_MS = 300;
 /** A pause after opening a door by walking into it, so a held key doesn't stride straight through. */
@@ -77,6 +95,8 @@ export class WorldScene extends Phaser.Scene {
   private apGauge!: ApGauge;
   /** Whether the camera bounds currently leave the extra room combat needs at the top. */
   private combatBounds = false;
+  /** On an underground map, the darkness around the lit area by the player; null elsewhere. */
+  private darkness: Phaser.GameObjects.Image | null = null;
   private keys!: Record<Direction, Phaser.Input.Keyboard.Key[]>;
 
   constructor() {
@@ -98,17 +118,20 @@ export class WorldScene extends Phaser.Scene {
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const tile = map.tiles[y][x];
-        // A workbench stands on the ground around it, drawn like a chest.
-        const ground = tile === 'workbench' ? map.groundAt(x, y) : tile;
+        // A workbench, a boulder or rubble stands on the ground around it, drawn like a chest.
+        const prop = propTextureKey(tile, x, y);
+        const ground = prop ? map.groundAt(x, y) : tile;
         this.add.image(x * TILE_SIZE, y * TILE_SIZE, tileTextureKey(ground, x, y)).setOrigin(0);
-        if (tile === 'workbench') this.add.image(toPixel(x), toPixel(y), WORKBENCH).setDepth(DEPTH.prop);
+        if (prop) this.add.image(toPixel(x), toPixel(y), prop).setDepth(DEPTH.prop);
       }
     }
     for (const chest of map.chests) {
       const image = this.add.image(toPixel(chest.x), toPixel(chest.y), chestTexture(chest));
       this.chestImages.set(chest.id, image);
     }
-    for (const exit of map.exits) this.add.image(toPixel(exit.x), toPixel(exit.y), 'signpost').setDepth(DEPTH.prop);
+    for (const exit of map.exits) {
+      this.add.image(toPixel(exit.x), toPixel(exit.y), EXIT_SPRITES[exit.look ?? 'signpost']).setDepth(DEPTH.prop);
+    }
     for (const door of map.doors) {
       // Drawn for a wall running left to right; turned a quarter in one running up and down.
       const image = this.add.image(toPixel(door.x), toPixel(door.y), doorTexture(door)).setDepth(DEPTH.prop);
@@ -130,6 +153,8 @@ export class WorldScene extends Phaser.Scene {
       if (!map.entered.has(building.id)) this.roofs.set(building.id, this.drawRoof(building));
     }
     this.player = this.add.image(toPixel(start.x), toPixel(start.y), this.playerTexture('down')).setDepth(DEPTH.player);
+    // Underground, only the area around the player is lit; the darkness follows them (update()).
+    this.darkness = map.dark ? this.add.image(this.player.x, this.player.y, DARKNESS).setDepth(DEPTH.darkness) : null;
     // Start facing whoever is right there to talk to (Rosa at the start of a game, Gus in the
     // test shop), so E talks to them straight away.
     const towardsSomeone = (['up', 'down', 'left', 'right'] as const).find((d) => state.map.personFacing(start, STEP[d]));
@@ -193,6 +218,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    this.darkness?.setPosition(this.player.x, this.player.y);
     if (this.combatBounds !== (state.combat !== null)) {
       this.combatBounds = state.combat !== null;
       this.setCameraBounds();
@@ -248,7 +274,11 @@ export class WorldScene extends Phaser.Scene {
       this.cameras.main.fadeIn(FADE_MS);
       return;
     }
-    postMessage(this, `You make your way to ${map.name}.`);
+    const message =
+      exit.look === 'stairsUp' ? 'You climb the stairs.'
+      : exit.look === 'stairsDown' ? 'You go down the stairs.'
+      : `You make your way to ${map.name}.`;
+    postMessage(this, message);
     this.scene.restart(); // create() draws the new map and fades back in
   }
 
@@ -518,7 +548,8 @@ export class WorldScene extends Phaser.Scene {
     this.steps++;
     // The position is already updated to the tile being stepped onto.
     const ground = state.map.tileAt(state.player.pos.x, state.player.pos.y);
-    playSound(ground === 'floor' || ground === 'planks' ? 'stepFloor' : 'stepGravel');
+    const hard = ground === 'floor' || ground === 'planks' || ground === 'pavement' || ground === 'asphalt';
+    playSound(hard ? 'stepFloor' : 'stepGravel');
     const vertical = this.facing === 'up' || this.facing === 'down';
     const texture = this.playerTexture(this.facing === 'up' ? 'up_walk' : this.facing === 'down' ? 'down_walk' : 'side_walk');
     // Mirroring the up/down stride swaps which leg is lifted, so the legs alternate step by step.

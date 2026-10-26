@@ -66,6 +66,36 @@ const SIGNPOST_PALETTE = {
   p: '#5e3c1c', // post
 };
 
+const CAVE_MOUTH_PALETTE = {
+  k: '#1a1814', // outline
+  R: '#8e8a7f', // lit rock
+  r: '#6e6a62', // rock
+  d: '#4a4640', // rock in shade
+  '0': '#08070a', // the dark inside
+};
+
+const STAIRS_PALETTE = {
+  k: '#1c1b19', // outline and step edges
+  W: '#b4b0a6', // nearest step, lit
+  w: '#9a968c',
+  S: '#8a867c',
+  s: '#74716a',
+  D: '#66635d',
+  d: '#55524c',
+  G: '#4a4843',
+  g: '#3e3c38',
+  '0': '#08070a', // the stairwell going down
+};
+
+const RADSCORPION_PALETTE = {
+  k: '#1e0e06', // outline
+  R: '#b0562a', // shell highlight
+  r: '#8a3a1a', // shell
+  c: '#6a2a10', // claws
+  y: '#d8c040', // stinger
+  l: '#3a1a0a', // legs
+};
+
 const GHOUL_PALETTE = {
   k: '#1a1a14', // outline
   s: '#8a9a6a', // rotting skin
@@ -347,6 +377,94 @@ export const SPRITES: Record<string, PixelSprite> = {
       '.......pp.......',
       '......pppp......',
       '................',
+    ],
+  },
+  // An exit into (or out of) a cave: an opening in the rock.
+  cave_mouth: {
+    palette: CAVE_MOUTH_PALETTE,
+    rows: [
+      '................',
+      '....kkkkkkkk....',
+      '..kkRRRRRRRRkk..',
+      '.kRRrrrrrrrrRRk.',
+      '.kRrrkkkkkkrrRk.',
+      'kRrrk000000krrRk',
+      'kRrk00000000krrk',
+      'krrk00000000krdk',
+      'krrk00000000krdk',
+      'krdk00000000kddk',
+      'krdk00000000kddk',
+      'kddk00000000kddk',
+      'kddk00000000kddk',
+      'kkkk00000000kkkk',
+      '....00000000....',
+      '................',
+    ],
+  },
+  // Stairs to the floor above: steps rising towards the top of the tile.
+  stairs_up: {
+    palette: STAIRS_PALETTE,
+    rows: [
+      '................',
+      '.....kkkkkk.....',
+      '.....kWWWWk.....',
+      '.....kwwwwk.....',
+      '...kkkkkkkkkk...',
+      '...kSSSSSSSSk...',
+      '...kssssssssk...',
+      '..kkkkkkkkkkkk..',
+      '..kDDDDDDDDDDk..',
+      '..kddddddddddk..',
+      '.kkkkkkkkkkkkkk.',
+      '.kGGGGGGGGGGGGk.',
+      '.kggggggggggggk.',
+      '.kkkkkkkkkkkkkk.',
+      '................',
+      '................',
+    ],
+  },
+  // Stairs to the floor below: steps going down into the dark.
+  stairs_down: {
+    palette: STAIRS_PALETTE,
+    rows: [
+      '................',
+      '.kkkkkkkkkkkkkk.',
+      '.kWWWWWWWWWWWWk.',
+      '.kwwwwwwwwwwwwk.',
+      '.kkkkkkkkkkkkkk.',
+      '.kkSSSSSSSSSSkk.',
+      '.kksssssssssskk.',
+      '.kkkkkkkkkkkkkk.',
+      '.kkkDDDDDDDDkkk.',
+      '.kkkddddddddkkk.',
+      '.kkkkkkkkkkkkkk.',
+      '.kkkk000000kkkk.',
+      '.kkkk000000kkkk.',
+      '.kkkkkkkkkkkkkk.',
+      '................',
+      '................',
+    ],
+  },
+  // Seen from above, tail curled over its back, claws forward.
+  radscorpion: {
+    palette: RADSCORPION_PALETTE,
+    rows: [
+      '.......kk.......',
+      '......kyyk......',
+      '......kRrk......',
+      '.......kRk......',
+      '.......kRk......',
+      '......kRrrk.....',
+      '.l...kRrrrrk...l',
+      '..l.kRrrrrrrk.l.',
+      '.l..kRrrrrrrk..l',
+      '..l.kRrrrrrrk.l.',
+      '.l...kRrrrrk...l',
+      '..kk..kRrrk..kk.',
+      '.kcck..kkk..kcck',
+      '.kcRckk...kkcRck',
+      '..kcck.....kcck.',
+      '...kk.......kk..',
     ],
   },
   radroach: {

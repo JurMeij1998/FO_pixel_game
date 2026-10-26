@@ -232,3 +232,25 @@ describe('GridMap', () => {
     expect(map.reachableFrom(map.playerStart).has(`${footlocker.x},${footlocker.y + 1}`)).toBe(true);
   });
 });
+
+describe('GridMap exits, darkness and props', () => {
+  const map = GridMap.parse({
+    name: 'ruin',
+    rows: ['{{{-P', '--`-1'],
+    chests: {},
+    exits: { '1': { to: 'down', look: 'stairsDown' } },
+    dark: true,
+  });
+
+  it('keeps how an exit looks, and whether the map is dark', () => {
+    expect(map.exits).toEqual([{ x: 4, y: 1, to: 'down', look: 'stairsDown' }]);
+    expect(map.dark).toBe(true);
+  });
+
+  it('draws a prop in a heap of props on the nearest ground further out', () => {
+    const heap = GridMap.parse({ name: 'heap', rows: ['{{{{{{{{', '{{{{{{{{', '{{{{{{{{', '{{{{{{{{', '{{{{{{-P'], chests: {} });
+    expect(heap.groundAt(5, 4)).toBe('pavement'); // walkable right beside it
+    expect(heap.groundAt(3, 3)).toBe('pavement'); // three tiles out
+    expect(heap.groundAt(0, 0)).toBe('dirt'); // nothing within three tiles
+  });
+});

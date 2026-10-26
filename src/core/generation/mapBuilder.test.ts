@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GridMap } from '../gridMap';
 import { Random } from '../random';
-import { MapBuilder, type Prefab } from './mapBuilder';
+import { flipVertical, MapBuilder, type Prefab } from './mapBuilder';
 
 /** A hut with its keeper (K) inside and a chest that belongs to the keeper's group. */
 const HUT: Prefab = {
@@ -54,5 +54,63 @@ describe('MapBuilder residents and owned chests', () => {
     b.connect(':');
     expect(trees()).toBe(before - 1);
     expect(b.toMapDef('t').rows[2][4]).toBe('A'); // the resident is still in the gap
+  });
+});
+
+describe('MapBuilder stairs, doors and chests', () => {
+  /** A room with stairs against its west wall, and its door in the bottom wall. */
+  const STAIRWELL: Prefab = {
+    name: 'stairwell',
+    rows: ['#####', '#___#', '#___#', '##/##', '  :  '],
+    entrance: { x: 2, y: 4 },
+    stairs: { x: 1, y: 1 },
+  };
+
+  it('puts stairs inside a building as an exit with the stairs look, reachable through the door', () => {
+    const b = new MapBuilder(12, 10, '.', 7);
+    b.addExit('south', 'outside', ':');
+    b.stamp(STAIRWELL, 3, 2, new Random(1));
+    b.addStairs({ x: 3 + STAIRWELL.stairs!.x, y: 2 + STAIRWELL.stairs!.y }, 'up', 'attic');
+    b.connect(':');
+    const map = GridMap.parse(b.toMapDef('house'), 'house');
+    const stairs = map.exitAt(4, 3)!;
+    expect(stairs).toEqual({ x: 4, y: 3, to: 'attic', look: 'stairsUp' });
+    expect(map.tileAt(4, 3)).toBe('floor'); // the marker stands on the room's floor
+    expect(map.buildingAt(4, 3)).toBeDefined();
+    const arrival = map.arrivalFrom('attic');
+    expect(map.buildingAt(arrival.x, arrival.y)).toBe(map.buildingAt(4, 3));
+    expect(map.reachableFrom(map.arrivalFrom('outside')).has('4,3')).toBe(true);
+  });
+
+  it('starts beside the first stairs on a map with no edge exits', () => {
+    const b = new MapBuilder(6, 5, '_', 1);
+    b.addStairs({ x: 2, y: 2 }, 'down', 'below');
+    expect(b.start).not.toBeNull();
+    expect(Math.abs(b.start!.x - 2) + Math.abs(b.start!.y - 2)).toBe(1);
+  });
+
+  it('turns stairs around with the prefab', () => {
+    expect(flipVertical(STAIRWELL).stairs).toEqual({ x: 1, y: 3 });
+    expect(flipVertical(STAIRWELL).rows[3]).toBe('#___#');
+  });
+
+  it('locks a door it was asked to', () => {
+    const b = new MapBuilder(12, 10, '.', 7);
+    b.addExit('south', 'outside', ':');
+    b.stamp(STAIRWELL, 3, 2, new Random(1));
+    b.lockDoor({ x: 5, y: 5 }, 40);
+    expect(() => b.lockDoor({ x: 4, y: 4 }, 40)).toThrow(/No door/);
+    b.connect(':');
+    expect(GridMap.parse(b.toMapDef('house'), 'house').doorAt(5, 5)?.lock).toBe(40);
+  });
+
+  it("never names a chest 'o', the rock tile, so a map can have more than 14 chests", () => {
+    const b = new MapBuilder(30, 3, '.', 7);
+    b.addExit('west', 'outside', ':');
+    for (let x = 3; x < 23; x++) b.addChest({ x, y: 0 }, `Crate ${x}`, [['rope', 1]]);
+    b.connect(':');
+    const map = GridMap.parse(b.toMapDef('crates'), 'crates');
+    expect(map.chests).toHaveLength(20);
+    expect(map.tiles.flat()).not.toContain('rock');
   });
 });
