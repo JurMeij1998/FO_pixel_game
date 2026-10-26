@@ -343,8 +343,9 @@ src/
   gfx/        Procedurally generated placeholder pixel art
   audio/      Synthesised sound effects
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting, and the pure logic
-              behind the HUD and screens: AP gauge and its placement, health bars, the
-              shared glow, dialog box, barter lists, the message log, creation screen keys
+              behind the HUD and screens: AP gauge and its placement, health bars and worn-gear
+              warnings, the shared glow, dialog box, barter lists, workbench rows, the message
+              log, creation screen keys
   scenes/     Phaser scenes: Boot, Menu, Creation, World, Hud, Inventory, Loot, Lockpick,
               Workbench, Dialog, Barter, Character, Pause, GameOver, Controls; flow.ts switches
               between menus and the game
@@ -355,3 +356,20 @@ src/
 
 Everything rules-related lives in `core/`, so it can be tested without a browser, and the
 rendering layer can change (or be ported) without touching the rules.
+
+## Working on the code
+
+The project skill in `.claude/skills/wasteland-game/` is the developer guide, written for
+Claude Code sessions but just as readable by people:
+
+- `SKILL.md`: the architecture and why it's built this way, design decisions (including ones
+  tried and rejected), pitfalls, and working conventions.
+- `references/workflow.md`: feature branches and squash-merged PRs, several sessions working
+  side by side (worktrees, dev server ports, files that often conflict), the docs every
+  feature updates, and checking changes in headless Chrome.
+- `references/extending.md`: recipes for adding items, creatures, people, dialog actions,
+  skills, tiles, biomes and sounds.
+- `references/roadmap.md`: planned features, and what past reviews fixed.
+
+Every feature updates this README, the skill and the roadmap in its own branch, so they
+always describe `main`.
