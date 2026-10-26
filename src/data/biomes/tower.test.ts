@@ -39,6 +39,9 @@ describe('tower biome (upper floors)', () => {
       expect([up.x, up.y, up.look]).toEqual([UP_STAIRS.x, UP_STAIRS.y, 'stairsUp']);
       expect(map.arrivalFrom('city')).toEqual({ x: DOWN_STAIRS.x + 1, y: DOWN_STAIRS.y });
       expect(map.arrivalFrom('roof')).toEqual({ x: UP_STAIRS.x + 1, y: UP_STAIRS.y });
+      // Both stand on the corridor's floor, not a room's (floorboards) from behind the wall.
+      expect(map.tileAt(down.x, down.y)).toBe('floor');
+      expect(map.tileAt(up.x, up.y)).toBe('floor');
     }
   });
 

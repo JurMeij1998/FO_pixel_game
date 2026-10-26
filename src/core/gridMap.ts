@@ -557,11 +557,18 @@ function groundUnderMarker(rows: string[], x: number, y: number): TileType {
   };
   const beside = [rows[y][x - 1], rows[y][x + 1], rows[y - 1]?.[x], rows[y + 1]?.[x]].map(ground).find((t) => t);
   if (beside) return beside;
-  for (let dy = -2; dy <= 2; dy++) {
-    for (let dx = -2; dx <= 2; dx++) {
-      const tile = ground(rows[y + dy]?.[x + dx]);
-      if (tile) return tile;
-    }
+  // Nearest first (diagonals before two steps away), so stairs in a corridor corner take the
+  // corridor's floor, not a room's behind the wall.
+  for (const [dx, dy] of NEARBY) {
+    const tile = ground(rows[y + dy]?.[x + dx]);
+    if (tile) return tile;
   }
   return 'dirt';
 }
+
+/** Offsets up to two tiles away, nearest first (reading order among equally near ones). */
+const NEARBY: ReadonlyArray<[number, number]> = (() => {
+  const offsets: Array<[number, number]> = [];
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (dx || dy) offsets.push([dx, dy]);
+  return offsets.sort((a, b) => Math.hypot(...a) - Math.hypot(...b));
+})();

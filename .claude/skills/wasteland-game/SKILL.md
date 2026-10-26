@@ -90,7 +90,9 @@ drawn exactly like hand-made ones.
   travel and arrival work unchanged. Rejected: several floors inside one map (saves, roofs,
   sight and pathing would all need a floor index). An upper floor (`tower` biome) is exactly
   the tower prefab's footprint, outer walls on the map edge, its stairs where the floor below
-  has them (`DOWN_STAIRS`). It's too small for `SAFE_SPAWN_DISTANCE`, so creatures there only
+  has them (`DOWN_STAIRS`), as long as the tower faces south as drawn: the city puts towers in
+  the top row of blocks first, and only mirrored in the bottom row when exit roads leave no
+  room (never with the world's one east exit). It's too small for `SAFE_SPAWN_DISTANCE`, so creatures there only
   stand in rooms behind closed doors, which block sight just as well; `playabilityProblems`
   checks it. Stairs only enter the fingerprint when a map has some, so older maps' saves fit.
 - **Darkness is drawing only** (`Biome.dark` → `MapDef.dark` → `GridMap.dark`; the World scene

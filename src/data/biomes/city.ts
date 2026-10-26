@@ -310,12 +310,16 @@ export const CITY: Biome = {
       });
     }
 
-    // The towers first, each on a whole front of its own in the top or bottom row (only those
-    // blocks are deep enough), with its stairs up to the floor above.
-    const deep = fronts.filter((f) => f.entranceRow === rows[0][1] || f.entranceRow === rows[2][0]);
+    // The towers first, each on a whole front of its own in the top or bottom row of blocks
+    // (only those are deep enough), with its stairs up to the floor above. The top row comes
+    // first: facing south, as drawn, the floor plan and the stairs line up with the floors
+    // above (data/biomes/tower.ts). A tower facing north is mirrored, which doesn't matter for
+    // play; it only happens when roads in from other exits leave no room in the top row.
+    const facingSouth = fronts.filter((f) => f.entranceRow === rows[0][1]);
+    const facingNorth = fronts.filter((f) => f.entranceRow === rows[2][0]);
     const arrivals: GridPos[] = [...entries];
     for (const way of stairs) {
-      const front = takeTowerFront(b, rng, deep);
+      const front = takeTowerFront(b, rng, facingSouth) ?? takeTowerFront(b, rng, facingNorth);
       if (!front) throw new Error('No room for another tower');
       fronts.splice(fronts.indexOf(front.front), 1);
       b.addStairs(front.stairs, 'up', way.to);
@@ -344,8 +348,9 @@ export const CITY: Biome = {
     }
     scatter(b, RUBBLE, 0.05, rng, (x, y) => b.get(x, y) !== ASPHALT && farFrom({ x, y }, arrivals, 3));
 
-    // A dumpster or two worth a look.
-    for (let i = rng.int(0, 2); i > 0; i--) {
+    // Maybe a dumpster worth a look. (At most one: with every street front full of buildings
+    // with chests, the city already has 24, and a map holds 25.)
+    for (let i = rng.int(0, 1); i > 0; i--) {
       const spot = findOpenTile(b, rng, (pos) => hasRoomAround(b, pos) && farFrom(pos, occupied, 4));
       if (spot) b.addChest(spot, 'Dumpster', rollLoot(JUNK_LOOT, rng));
     }

@@ -244,8 +244,8 @@ wild dogs and radroaches roaming the streets.
 
 The cave (`data/biomes/cave.ts`) is solid rock hollowed into caverns (noise smoothed into
 chambers, joined by winding tunnels), with underground pools and boulders. It's **dark**:
-only the area around you is lit, and things further off are dim shapes (`Biome.dark`; the
-World scene draws the darkness). Radroaches, mole rats and **radscorpions** (armoured, hard
+only a few tiles around you are lit, fading to near black further off, though the health
+bars of what you're fighting still show (`Biome.dark`; the World scene draws the darkness). Radroaches, mole rats and **radscorpions** (armoured, hard
 hitting, slow) live there; a radscorpion nest guards the bones of their victims with good
 loot, there's often an abandoned miners' camp with a workbench, and the remains of people
 who got lost.
@@ -254,7 +254,8 @@ The city (`data/biomes/city.ts`) is a big ruined grid: two streets across and tw
 blocks lined with buildings whose doors face the street (apartments, corner shops, a clinic
 with a locked medicine cabinet, a garage with a workbench, burnt-out shells), back lots of
 rubble with now and then a raiders' den, and feral ghouls, wild dogs, radroaches and the odd
-raider in the streets. Its two **office towers** have stairs in the lobby: one has two floors
+raider in the streets. Its two **office towers** (on the northern blocks, facing south, so
+their floor plan matches the floors above, unless roads in from other exits leave no room there) have stairs in the lobby: one has two floors
 above it, the other one. An upper floor (`data/biomes/tower.ts`) is the tower's footprint: a
 corridor with the stairs at one end and offices or flats off it, each behind a door and under
 its own roof, some locked, some with squatters inside; the top floor has a hard-locked safe.

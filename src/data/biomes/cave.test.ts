@@ -31,11 +31,13 @@ describe('cave biome', () => {
   });
 
   it('is dark, walled in by rock, and its exits look like cave mouths', () => {
-    const map = GridMap.parse(generateMap(CAVE, 7, EXITS), 'cave');
-    expect(map.dark).toBe(true);
-    expect(map.exits[0].look).toBe('cave');
-    const edge = map.tiles.flatMap((row, y) => row.filter((_t, x) => x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1));
-    expect(edge.filter((t) => t !== 'caveWall').length).toBe(1); // just the way out
+    for (const seed of SEEDS) {
+      const map = GridMap.parse(generateMap(CAVE, seed, EXITS), 'cave');
+      expect(map.dark).toBe(true);
+      expect(map.exits[0].look).toBe('cave');
+      const edge = map.tiles.flatMap((row, y) => row.filter((_t, x) => x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1));
+      expect(edge.filter((t) => t !== 'caveWall').length).toBe(1); // just the way out
+    }
   });
 
   it('has radscorpions, and usually a miners camp with a workbench you can reach', () => {

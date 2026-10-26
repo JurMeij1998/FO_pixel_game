@@ -118,7 +118,11 @@ export const CAVE: Biome = {
     const entries = exits.map((exit) => b.addExit(exit.side, exit.to, FLOOR, exit.look));
     const arrival = entries[0];
     for (const entry of entries) blob(b, entry, 2.5, FLOOR, rng);
-    border(b, WALL, 1); // the room round the entries mustn't open up the edge beside the way out
+    // The room round the entries mustn't open up the edge beside the way out, and connect()
+    // mustn't carve a passage along it either.
+    border(b, WALL, 1);
+    for (let x = 0; x < b.width; x++) for (const y of [0, b.height - 1]) b.lock(x, y);
+    for (let y = 0; y < b.height; y++) for (const x of [0, b.width - 1]) b.lock(x, y);
 
     // A few big chambers, each joined to the first entry by a winding tunnel, so the caves
     // read as one system rather than pockets that connect() bores single-file passages to.

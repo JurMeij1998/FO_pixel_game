@@ -3,7 +3,7 @@ import { generateAttempt, generateMap, type ExitRequest, type StairsRequest } fr
 import { GridMap } from '../../core/gridMap';
 import { CITY } from './city';
 import { playabilityProblems, workbenches } from './playability';
-import { TOWER_HEIGHT, TOWER_WIDTH } from './tower';
+import { DOWN_STAIRS, TOWER_HEIGHT, TOWER_WIDTH } from './tower';
 
 const EXITS: ExitRequest[] = [{ side: 'east', to: 'wasteland' }];
 const STAIRS: StairsRequest[] = [
@@ -18,8 +18,10 @@ const MANY_CITIES = 20_000;
 const LAYOUTS: Record<string, [ExitRequest[], StairsRequest[]]> = {
   'east, two towers': [EXITS, STAIRS],
   'east and north, one tower': [[...EXITS, { side: 'north', to: 'plains' }], STAIRS.slice(0, 1)],
-  'west and south, three towers': [
+  // Roads in cut through blocks, so some towers have to go in the bottom row.
+  'north, west and south, three towers': [
     [
+      { side: 'north', to: 'plains' },
       { side: 'west', to: 'forest' },
       { side: 'south', to: 'village' },
     ],
@@ -57,6 +59,9 @@ describe('city biome', () => {
         expect(Math.max(...xs) - Math.min(...xs) + 1).toBe(TOWER_WIDTH);
         const ys = [...lobby.roof].map((p) => p.y);
         expect(Math.max(...ys) - Math.min(...ys) + 1).toBeLessThanOrEqual(TOWER_HEIGHT);
+        // With only the east exit (the world's layout), always facing south, as the floors
+        // above are drawn: the stairs where theirs are.
+        expect([stairs.x - Math.min(...xs), stairs.y - Math.min(...ys)]).toEqual([DOWN_STAIRS.x, DOWN_STAIRS.y]);
       }
     }
   }, MANY_CITIES);
