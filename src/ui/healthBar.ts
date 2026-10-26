@@ -1,4 +1,5 @@
 import type { Character } from '../core/character';
+import { WORN_AT } from '../core/condition';
 import { itemName } from './format';
 
 /**
@@ -68,4 +69,21 @@ export function weaponLine(player: Character): string {
   const magazine = player.activeWeapon?.weapon?.magazineSize;
   if (!attack.ammo || magazine === undefined) return name;
   return `${name} ${player.loadedRounds()}/${magazine} (+${player.backpack.count(attack.ammo)})`;
+}
+
+/**
+ * Whether the weapon in hand is badly worn (35% or below, broken included): the HUD shows its
+ * line in the warning colour, so you see trouble coming before it breaks.
+ */
+export function weaponWorn(player: Character): boolean {
+  return player.activeWeapon !== null && player.weaponCondition() <= WORN_AT;
+}
+
+/**
+ * A warning line for the armour you wear once it's badly worn ("Steel Armor (30%)", or
+ * "(broken)" once it has fallen apart); null while it's fine, or with none on.
+ */
+export function armorWarning(player: Character): string | null {
+  const key = player.equippedKey('armor');
+  return key && player.slotCondition('armor') <= WORN_AT ? itemName(key) : null;
 }

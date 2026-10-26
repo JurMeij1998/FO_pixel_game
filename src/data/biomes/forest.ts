@@ -37,6 +37,7 @@ const CAMP_LOOT: LootTable = {
     { itemId: '10mm_pistol', min: 1, max: 1, weight: 1 },
     { itemId: 'leather_armor', min: 1, max: 1, weight: 1 },
     { itemId: 'steel_armor', min: 1, max: 1, weight: 1 },
+    { itemId: 'repair_kit', min: 1, max: 2, weight: 1 },
   ],
 };
 

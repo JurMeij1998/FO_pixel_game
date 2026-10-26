@@ -45,7 +45,10 @@ export interface ArmorStats {
 }
 
 export interface ConsumableStats {
-  heal: number;
+  /** Hit points it restores. */
+  heal?: number;
+  /** Patches the most worn piece of equipped gear up to this condition (a repair kit; core/condition.ts). */
+  patchUpTo?: number;
 }
 
 export interface ItemDef {
@@ -161,6 +164,15 @@ const DEFINITIONS: ItemDef[] = [
     value: 175,
     description: 'A healing chemical injected straight into the bloodstream.',
     consumable: { heal: 15 },
+  },
+  {
+    id: 'repair_kit',
+    name: 'Repair Kit',
+    category: 'consumable',
+    weight: 2,
+    value: 60,
+    description: 'Tape, wire, rivets and a few tools. Patches worn gear up enough to keep it working.',
+    consumable: { patchUpTo: 35 },
   },
   {
     id: 'ammo_10mm',

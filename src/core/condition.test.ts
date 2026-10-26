@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buyPrice, sellPrice } from './barter';
+import { buyPrice, repairPrice, sellPrice } from './barter';
 import { Character } from './character';
 import { Combat } from './combat';
 import {
   afterRepair,
   afterWear,
+  BASE_REPAIR_SKILL,
+  FIELD_REPAIR_UP_TO,
+  repairShare,
   conditionLabel,
   damageShare,
   hitPenalty,
@@ -19,11 +22,11 @@ import { rollLoot, FOUND_CONDITION } from './generation/tables';
 import { GridMap } from './gridMap';
 import { conditionOf, getItem, itemIdOf, itemKey } from './items';
 import { Random } from './random';
-import { repairables, repairItem, salvageItem, salvageYield } from './repair';
+import { repairables, repairForCaps, repairItem, salvageItem, salvageYield } from './repair';
 import { loadGame, saveGame } from './save';
 import { repairCostLine, workbenchRows } from '../ui/workbench';
 import { describeItem, itemName } from '../ui/format';
-import { weaponLine } from '../ui/healthBar';
+import { armorWarning, weaponLine, weaponWorn } from '../ui/healthBar';
 
 const average = () => new Character('Tester', { strength: 5, perception: 5, endurance: 5, charisma: 5, intelligence: 5, agility: 5, luck: 5 });
 
@@ -215,9 +218,9 @@ describe('repairing at a workbench', () => {
       ['10mm Pistol (in hand)', '30%'],
       ['Knife', 'broken'],
     ]);
-    expect(repairCostLine('10mm_pistol@30')).toBe('Repair costs: 6 scrap metal');
-    expect(repairCostLine('knife@0')).toBe('Repair costs: 2 scrap metal');
-    expect(repairCostLine('knife')).toBe(''); // nothing to repair: nothing shown
+    expect(repairCostLine('10mm_pistol@30', 15)).toBe('Repair costs: 6 scrap metal');
+    expect(repairCostLine('knife@0', 15)).toBe('Repair costs: 2 scrap metal');
+    expect(repairCostLine('knife', 15)).toBe(''); // nothing to repair: nothing shown
   });
 
   it('repairs fully with enough scrap metal, in hand or in the backpack', () => {
@@ -381,5 +384,120 @@ describe('salvaging at a workbench', () => {
   it('refuses what has nothing to salvage', () => {
     const player = average();
     expect(salvageItem(player, { slot: 'armor' }).ok).toBe(false);
+  });
+});
+
+describe('the Repair skill', () => {
+  const tinker = (intelligence: number) =>
+    new Character('Tinker', { strength: 5, perception: 5, endurance: 5, charisma: 5, intelligence, agility: 5, luck: 5 });
+
+  it('starts at 3 x Intelligence, 15% for an average character', () => {
+    expect(average().skill('repair')).toBe(BASE_REPAIR_SKILL);
+    expect(tinker(10).skill('repair')).toBe(30);
+  });
+
+  it('makes repairs cheaper the higher it is, dearer below average', () => {
+    expect(repairShare(15)).toBe(1);
+    expect(repairShare(65)).toBe(0.5);
+    expect(repairShare(200)).toBe(0.4);
+    expect(repairShare(0)).toBeCloseTo(1.15);
+    expect(materialToRepair('hunting_rifle@0', 15)).toBe(15);
+    expect(materialToRepair('hunting_rifle@0', 65)).toBe(8);
+    expect(materialToRepair('knife@0', 200)).toBe(1); // never free
+    // A skilled hand restores more per piece too.
+    expect(afterRepair('hunting_rifle@0', 4, 65)).toBe('hunting_rifle@50');
+  });
+
+  it('gets more out of salvaging: one more piece for every 35% above average', () => {
+    expect(salvageYield('10mm_pistol@20', 15)?.amount).toBe(1);
+    expect(salvageYield('10mm_pistol@20', 49)?.amount).toBe(1);
+    expect(salvageYield('10mm_pistol@20', 50)?.amount).toBe(2);
+    expect(salvageYield('10mm_pistol', 85)?.amount).toBe(4);
+  });
+
+  it("uses the player's own skill at the workbench", () => {
+    const player = armed('hunting_rifle@0');
+    player.skillBonus.repair = 50; // 65%
+    player.backpack.add(SCRAP, 20);
+    expect(repairables(player)[0].amount).toBe(8);
+    repairItem(player, { slot: 'primary' });
+    expect(player.backpack.count(SCRAP)).toBe(12);
+  });
+});
+
+describe('repair kits', () => {
+  it('patch the most worn piece of equipped gear up to 35%, anywhere', () => {
+    const player = armed('10mm_pistol@20');
+    player.backpack.add('leather_armor@5');
+    player.equip('leather_armor@5', 'armor');
+    player.backpack.add('repair_kit', 2);
+    expect(player.use('repair_kit')).toMatchObject({ ok: true, message: 'You patch up the Leather Armor with the Repair Kit: 35%.' });
+    expect(player.slotCondition('armor')).toBe(FIELD_REPAIR_UP_TO);
+    player.use('repair_kit');
+    expect(player.weaponCondition()).toBe(35);
+    expect(player.backpack.count('repair_kit')).toBe(0);
+  });
+
+  it("aren't used up when nothing equipped is that worn", () => {
+    const player = armed('10mm_pistol@60');
+    player.backpack.add('repair_kit');
+    expect(player.use('repair_kit')).toMatchObject({ ok: false, message: 'None of your gear is worn badly enough to need the Repair Kit.' });
+    expect(player.backpack.count('repair_kit')).toBe(1);
+  });
+
+  it('say what they do', () => {
+    expect(describeItem('repair_kit')).toMatch(/Patches your most worn gear up to 35%/);
+  });
+});
+
+describe('repairs at a trader', () => {
+  it('cost caps by how worn and how good the item is, with the Charisma markup', () => {
+    expect(repairPrice('10mm_pistol', 5)).toBe(0);
+    expect(repairPrice('10mm_pistol@0', 10)).toBe(125); // half its value of 250
+    expect(repairPrice('10mm_pistol@50', 10)).toBe(63);
+    expect(repairPrice('10mm_pistol@50', 1)).toBeGreaterThan(repairPrice('10mm_pistol@50', 10));
+    expect(repairPrice('hunting_rifle@50', 10)).toBeGreaterThan(repairPrice('10mm_pistol@50', 10));
+  });
+
+  it('repair to perfect for caps, which go to the trader', () => {
+    const player = armed('10mm_pistol@50');
+    player.backpack.add('bottle_caps', 100);
+    const stock = new Character('Gus', player.special).backpack; // any container will do
+    const price = repairPrice('10mm_pistol@50', player.special.charisma);
+    expect(repairForCaps(player, stock, { slot: 'primary' })).toMatchObject({ ok: true, repaired: '10mm_pistol' });
+    expect(player.equippedKey('primary')).toBe('10mm_pistol');
+    expect(player.backpack.count('bottle_caps')).toBe(100 - price);
+    expect(stock.count('bottle_caps')).toBe(price);
+  });
+
+  it("refuse when you can't pay", () => {
+    const player = armed('hunting_rifle@0');
+    const stock = new Character('Gus', player.special).backpack;
+    expect(repairForCaps(player, stock, { slot: 'primary' }).ok).toBe(false);
+    expect(player.equippedKey('primary')).toBe('hunting_rifle@0');
+  });
+
+  it('show the price in caps', () => {
+    expect(repairCostLine('10mm_pistol@50', 15, 75)).toBe('Repair costs: 75 caps');
+    expect(repairCostLine('10mm_pistol', 15, 0)).toBe('');
+  });
+});
+
+describe('warnings before gear breaks', () => {
+  it('flag the weapon in hand at 35% or below', () => {
+    expect(weaponWorn(armed('10mm_pistol@36'))).toBe(false);
+    expect(weaponWorn(armed('10mm_pistol@35'))).toBe(true);
+    expect(weaponWorn(armed('knife@0'))).toBe(true);
+    expect(weaponWorn(average())).toBe(false); // fists
+  });
+
+  it('show the armour worn once it is badly worn', () => {
+    const player = average();
+    expect(armorWarning(player)).toBeNull();
+    player.backpack.add('steel_armor@30');
+    player.equip('steel_armor@30', 'armor');
+    expect(armorWarning(player)).toBe('Steel Armor (30%)');
+    player.replaceEquipped('armor', 'steel_armor@80');
+    expect(armorWarning(player)).toBeNull();
   });
 });

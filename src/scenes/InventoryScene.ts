@@ -6,7 +6,7 @@ import type { ActionResult } from '../core/result';
 import { state } from '../state';
 import { describeItem, itemName, sortedStacks, stackRows } from '../ui/format';
 import { ListCursor } from '../ui/listCursor';
-import { quickAction } from '../ui/quickAction';
+import { quickAction, useSound } from '../ui/quickAction';
 import { COLORS, HEADER_TEXT, TEXT } from '../ui/theme';
 import { addButton, bindCursorKeys, closeOverlay, drawPanel, ListView, PANEL } from '../ui/widgets';
 
@@ -198,7 +198,7 @@ export class InventoryScene extends Phaser.Scene {
     } else if (item.category === 'armor') {
       actions.push({ label: 'Wear', run: () => player.equip(itemId, 'armor'), sound: 'equip' });
     } else if (item.consumable) {
-      actions.push({ label: 'Use', run: () => player.use(itemId), sound: 'stimpak' });
+      actions.push({ label: 'Use', run: () => player.use(itemId), sound: useSound(item) });
     }
     actions.push({ label: 'Drop one', run: () => player.drop(itemId) });
     return actions;

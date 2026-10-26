@@ -48,9 +48,14 @@ Roughly in the order discussed with the user:
   when someone can see you; owners for houses once villages have residents; closing doors in combat
   (today only walking into one opens it there); people opening doors outside combat (they
   stand still until a fight); lockpicks as an item that helps, as in Fallout.
-- **More from gear condition** (`core/condition.ts`, `core/repair.ts`): a Repair skill
-  (cheaper or better repairs), more materials, traders repairing for caps, and enemies'
-  weapons and armour (creatures don't wear today).
+- **More from gear condition** (`core/condition.ts`, `core/repair.ts`): more materials, and
+  enemies' weapons and armour (creatures don't wear today; a raider's worn gun could jam).
+- **Crafting at the workbench.** Recipes that turn scrap metal and leather into ammo, a spear,
+  leather armour or repair kits; recipes found or bought, and gated by the Repair skill. The
+  materials and the workbench screen are already there.
+- **Weapon mods.** Spend scrap metal at a workbench on a longer barrel (+range), a lighter
+  frame (-AP) or a bigger magazine. A mod could live in the item key like the condition does
+  (`itemKey` in core/items.ts), so modded weapons stay their own stacks and save as they are.
 - **Tagged skills and traits at character creation** (`scenes/CreationScene.ts`, rules in
   `core/creation.ts`): choosing the tagged skills, as in Fallout (every character still tags
   Small Guns and Melee Weapons), and perhaps traits.

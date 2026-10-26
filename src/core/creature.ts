@@ -148,6 +148,7 @@ const DEFINITIONS: CreatureDef[] = [
       ['leather_jacket', 1],
       ['steel_armor', 1],
       ['leather', 4],
+      ['repair_kit', 3],
       ['bottle_caps', 300],
     ],
     dialog: {
@@ -157,6 +158,7 @@ const DEFINITIONS: CreatureDef[] = [
           text: 'Welcome to my store, stranger. Look around all you like, but if you break anything, you buy it!',
           replies: [
             { text: "Let's barter.", next: 'anything_else', action: 'barter' },
+            { text: 'Can you fix up my gear?', next: 'anything_else', action: 'repair' },
             { text: 'Goodbye.', action: 'leave' },
           ],
         },
@@ -164,6 +166,7 @@ const DEFINITIONS: CreatureDef[] = [
           text: 'Anything else?',
           replies: [
             { text: "Let's barter.", action: 'barter' },
+            { text: 'Can you fix up my gear?', action: 'repair' },
             { text: 'Goodbye.', action: 'leave' },
           ],
         },

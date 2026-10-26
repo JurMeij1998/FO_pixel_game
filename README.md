@@ -163,6 +163,19 @@ repairs, X salvages (press it twice: it asks first), Esc closes.
 **Steel armour** (AC +20, DR 40%, against leather armour's +15 and 25%) is heavy (30 lb) and
 dear: Gus sells one, and the forest's logging camp may have one lying about.
 
+The **Repair** skill (3 x Intelligence: 15% for an average character) sets what repairs take:
+the listed costs are for 15%, each point above makes them 1% cheaper (half at 65%, at least
+1 piece) and below dearer, and every 35% above 15% adds a piece to what salvaging gives.
+
+A **Repair Kit** patches your most worn piece of equipped gear (either hand, or the armour)
+back up to 35%, wherever you are: use it from the inventory. Gus sells them, and they turn up
+in houses, barns and the logging camp. And **Gus repairs** too: ask him "Can you fix up my
+gear?" and he repairs anything to perfect for caps (half of what it lost in value, with the
+same Charisma markup as his prices), no materials or skill needed.
+
+Badly worn gear shows on the HUD before it breaks: the weapon line turns orange-red at 35% or
+below, and worn armour gets a line of its own above it.
+
 ## Maps and biomes
 
 The world is a set of maps joined by exits (signposts on the map edge); walking onto one

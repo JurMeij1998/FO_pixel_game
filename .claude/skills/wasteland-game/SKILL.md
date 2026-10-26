@@ -88,7 +88,11 @@ takes either. Anything comparing items by id should go through `itemIdOf`; anyth
 one should use `itemName(key)` (ui/format.ts), which adds the condition. What wears has
 `durability` (wear, repair cost, material): weapons per attack, armour per hit taken. Wear,
 its effects below 35% and repair costs are in `core/condition.ts`; a broken weapon refuses to
-attack with `AttackProblemCode` 'broken', and armour at 0% protects nothing. Only a worn gun rolls for a slow reload, so good guns don't
+attack with `AttackProblemCode` 'broken', and armour at 0% protects nothing. Repair costs
+scale with the Repair skill (`repairShare`; listed costs are for 15%). The workbench screen
+doubles as a trader's repair service (opened from dialog action 'repair' with `{ trader }`):
+caps instead of materials (`repairForCaps`, `repairPrice`), no salvage, and closing wakes the
+conversation like the barter screen. Only a worn gun rolls for a slow reload, so good guns don't
 shift combat's random numbers.
 
 **Saves store only what changes.** Format v2 (`core/save.ts`): world seed, current map, player,

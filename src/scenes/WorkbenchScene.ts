@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { playSound } from '../audio/sfx';
+import { CAPS, repairPrice } from '../core/barter';
 import { MATERIALS, materialToRepair } from '../core/condition';
+import type { Creature } from '../core/creature';
 import { getItem } from '../core/items';
-import { materialName, repairItem, salvageItem, salvageYield } from '../core/repair';
+import { materialName, repairForCaps, repairItem, salvageItem, salvageYield } from '../core/repair';
 import { state } from '../state';
 import { describeItem } from '../ui/format';
 import { ListCursor } from '../ui/listCursor';
@@ -28,6 +30,10 @@ const ACTION_GAP = 30;
  * the right shows the chosen item, and below the list (under INVENTORY) the materials you have.
  * W/S (or the arrows) choose, E (or the Repair button) repairs what needs it, X (or Salvage)
  * breaks the item down for a little material (asking once first), Esc closes.
+ *
+ * Opened from a trader's conversation instead ("Can you fix up my gear?"), it's their repair
+ * service: they repair to perfect for caps (repairForCaps), there's no salvaging, the inventory
+ * shows your caps, and closing it goes back to the conversation.
  */
 export class WorkbenchScene extends Phaser.Scene {
   private cursor!: ListCursor;
@@ -43,14 +49,22 @@ export class WorkbenchScene extends Phaser.Scene {
   /** One line per repair material, with how much of it you have on the right. */
   private materials: Phaser.GameObjects.Text[] = [];
   private feedback!: Phaser.GameObjects.Text;
+  /** The trader doing the repairs, or null at a workbench. */
+  private trader: Creature | null = null;
+  private closed = false;
 
   constructor() {
     super('Workbench');
   }
 
+  init(data?: { trader?: Creature }): void {
+    this.trader = data?.trader ?? null;
+    this.closed = false;
+  }
+
   create(): void {
-    drawPanel(this, 'WORKBENCH');
-    addButton(this, PANEL.x + PANEL.width - 130, PANEL.y + 18, 'Close', () => closeOverlay(this));
+    drawPanel(this, this.trader ? `REPAIRS - ${this.trader.name.toUpperCase()}` : 'WORKBENCH');
+    addButton(this, PANEL.x + PANEL.width - 130, PANEL.y + 18, 'Close', () => this.close());
 
     this.rows = workbenchRows(state.player);
     this.confirmingSalvage = null;
@@ -62,7 +76,7 @@ export class WorkbenchScene extends Phaser.Scene {
       this.refresh();
     });
     this.add.text(LEFT, INVENTORY_TOP - 32, 'INVENTORY', HEADER_TEXT);
-    this.materials = MATERIALS.map((_, i) => this.add.text(LEFT, INVENTORY_TOP + i * 24, '', TEXT));
+    this.materials = this.inventoryItems().map((_, i) => this.add.text(LEFT, INVENTORY_TOP + i * 24, '', TEXT));
 
     this.details = this.add.text(RIGHT, LIST_TOP - 32, '', { ...TEXT, wordWrap: { width: PANEL.x + PANEL.width - RIGHT - 30 } });
     this.cost = this.add.text(RIGHT, 380, '', TEXT);
@@ -75,8 +89,30 @@ export class WorkbenchScene extends Phaser.Scene {
     const keyboard = this.input.keyboard!;
     keyboard.on('keydown-E', (event: KeyboardEvent) => !event.repeat && this.repair());
     keyboard.on('keydown-X', (event: KeyboardEvent) => !event.repeat && this.salvage());
-    keyboard.on('keydown-ESC', () => closeOverlay(this));
+    keyboard.on('keydown-ESC', () => this.close());
     this.refresh();
+  }
+
+  /** What the INVENTORY list shows: the repair materials at a workbench, your caps at a trader's. */
+  private inventoryItems(): readonly string[] {
+    return this.trader ? [CAPS] : MATERIALS;
+  }
+
+  /** At a trader's, what they charge to repair this to perfect; undefined at a workbench. */
+  private price(key: string): number | undefined {
+    return this.trader ? repairPrice(key, state.player.special.charisma) : undefined;
+  }
+
+  /** Back to the world, or to the conversation the trader's repairs were opened from. */
+  private close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    if (!this.trader) {
+      closeOverlay(this);
+      return;
+    }
+    this.scene.wake('Dialog');
+    this.scene.stop();
   }
 
   private get selected(): WorkbenchRow | undefined {
@@ -87,7 +123,9 @@ export class WorkbenchScene extends Phaser.Scene {
     const row = this.selected;
     // Nothing to repair (it's perfect): E does nothing, as there's no Repair button either.
     if (!row || materialToRepair(row.itemKey) === 0) return;
-    const result = repairItem(state.player, row.target);
+    const result = this.trader
+      ? repairForCaps(state.player, this.trader.contents, row.target)
+      : repairItem(state.player, row.target);
     this.feedback.setText(result.message).setColor(result.ok ? COLORS.text : COLORS.warn);
     if (result.ok) playSound('reload');
     this.rows = workbenchRows(state.player);
@@ -103,7 +141,7 @@ export class WorkbenchScene extends Phaser.Scene {
   /** Salvages the chosen item, the second time it's asked for: it's gone for good. */
   private salvage(): void {
     const row = this.selected;
-    const salvage = row ? salvageYield(row.itemKey) : null;
+    const salvage = row && !this.trader ? salvageYield(row.itemKey, state.player.skill('repair')) : null;
     if (!row || !salvage) return;
     if (this.confirmingSalvage !== row.key) {
       this.confirmingSalvage = row.key;
@@ -131,7 +169,7 @@ export class WorkbenchScene extends Phaser.Scene {
 
     const backpack = state.player.backpack;
     // Laid out like the gear list's rows: name on the left, amount in its right-hand column.
-    MATERIALS.forEach((material, i) => {
+    this.inventoryItems().forEach((material, i) => {
       const amount = String(backpack.count(material));
       this.materials[i]
         .setText(`  ${getItem(material).name}`.padEnd(LIST_COLUMNS - amount.length) + amount)
@@ -148,10 +186,10 @@ export class WorkbenchScene extends Phaser.Scene {
     }
     this.details.setText(describeItem(row.itemKey)).setColor(COLORS.text);
     // Nothing to repair: no cost line and no Repair button (E then just says it's in perfect condition).
-    const cost = repairCostLine(row.itemKey);
+    const cost = repairCostLine(row.itemKey, state.player.skill('repair'), this.price(row.itemKey));
     this.cost.setText(cost).setColor(COLORS.text);
     this.repairButton.setVisible(cost !== '');
     // Salvage moves up into Repair's place when there's nothing to repair.
-    this.salvageButton.setVisible(true).setY(cost !== '' ? ACTIONS_TOP + ACTION_GAP : ACTIONS_TOP);
+    this.salvageButton.setVisible(!this.trader).setY(cost !== '' ? ACTIONS_TOP + ACTION_GAP : ACTIONS_TOP);
   }
 }

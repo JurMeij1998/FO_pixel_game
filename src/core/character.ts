@@ -2,7 +2,7 @@ import { afterWear, damageShare, hitPenalty, isBroken, protectionShare, WORN_AT 
 import { ItemContainer } from './container';
 import type { Attack, Fighter } from './fighter';
 import { isGridPos, type GridPos } from './grid';
-import { conditionOf, getItem, itemIdOf, type ItemDef } from './items';
+import { conditionOf, getItem, itemIdOf, itemKey, type ItemDef } from './items';
 import { failure, success, type ActionResult } from './result';
 import * as derived from './stats';
 import { SKILL_NAMES, SKILLS, SPECIAL_KEYS, type Skill, type Special } from './stats';
@@ -49,7 +49,7 @@ export class Character implements Fighter {
   /** Unspent points from levelling up. */
   skillPoints = 0;
   /** Points spent on each skill, added on top of the base value. */
-  readonly skillBonus: Record<Skill, number> = { smallGuns: 0, meleeWeapons: 0, unarmed: 0, lockpick: 0 };
+  readonly skillBonus: Record<Skill, number> = { smallGuns: 0, meleeWeapons: 0, unarmed: 0, lockpick: 0, repair: 0 };
   /** Max HP gained from levelling up. */
   private bonusHitPoints = 0;
 
@@ -372,13 +372,33 @@ export class Character implements Fighter {
   use(itemId: string): ActionResult {
     const item = getItem(itemId);
     if (this.backpack.count(itemId) === 0) return failure(`You don't have a ${item.name}.`);
-    if (!item.consumable) return failure(`You can't use the ${item.name}.`);
+    const patchUpTo = item.consumable?.patchUpTo;
+    if (patchUpTo !== undefined) return this.patchUp(item, patchUpTo);
+    const heal = item.consumable?.heal;
+    if (heal === undefined) return failure(`You can't use the ${item.name}.`);
     if (this.hitPoints >= this.maxHitPoints) return failure('You are already at full health.');
 
     this.backpack.remove(itemId);
-    const healed = Math.min(item.consumable.heal, this.maxHitPoints - this.hitPoints);
+    const healed = Math.min(heal, this.maxHitPoints - this.hitPoints);
     this.hitPoints += healed;
     return success(`You use the ${item.name} and heal ${healed} HP.`);
+  }
+
+  /**
+   * A repair kit (`kit`): patches the most worn piece of equipped gear (either hand, the armour)
+   * up to `upTo`, if anything is below it, using up the kit.
+   */
+  private patchUp(kit: ItemDef, upTo: number): ActionResult {
+    const worn = EQUIP_SLOTS.filter((slot) => {
+      const key = this.equipment[slot];
+      return key !== null && getItem(key).durability !== undefined && conditionOf(key) < upTo;
+    }).sort((a, b) => this.slotCondition(a) - this.slotCondition(b));
+    const slot = worn[0];
+    if (!slot) return failure(`None of your gear is worn badly enough to need the ${kit.name}.`);
+    const key = this.equipment[slot]!;
+    this.backpack.remove(kit.id);
+    this.equipment[slot] = itemKey(itemIdOf(key), upTo);
+    return success(`You patch up the ${getItem(key).name} with the ${kit.name}: ${upTo}%.`);
   }
 
   /** Throws one away. There are no piles on the ground yet, so it is gone for good. */

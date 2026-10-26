@@ -3,7 +3,7 @@ import { isMuted } from '../audio/sfx';
 import { COMBAT_LABEL, GAME_HEIGHT, GAME_WIDTH, HUD_BOTTOM, WORLD_ZOOM } from '../config';
 import { state } from '../state';
 import { glintActive, glowColor, SHINE_WIDTH } from '../ui/glow';
-import { healthFill, healthLabel, isLowHealth, weaponLine } from '../ui/healthBar';
+import { armorWarning, healthFill, healthLabel, isLowHealth, weaponLine, weaponWorn } from '../ui/healthBar';
 import { logLines, MESSAGE_EVENT } from '../ui/messages';
 import { shownHitPoints } from '../ui/shownHealth';
 import { COLORS, SMALL_TEXT, TEXT } from '../ui/theme';
@@ -36,6 +36,8 @@ export class HudScene extends Phaser.Scene {
   private combatLabel!: Phaser.GameObjects.Text;
   private mutedLabel!: Phaser.GameObjects.Text;
   private weapon!: Phaser.GameObjects.Text;
+  /** The armour you wear, while it's badly worn. */
+  private armor!: Phaser.GameObjects.Text;
   /** The bar's black box and red health, redrawn only when health changes. */
   private healthBar!: Phaser.GameObjects.Graphics;
   /** Its border, redrawn every frame to pulse and shine. */
@@ -61,6 +63,8 @@ export class HudScene extends Phaser.Scene {
 
     // Right-aligned with the bar, so a long gun name grows to the left instead of off the screen.
     this.weapon = this.add.text(BAR_X + BAR_WIDTH, BAR_Y - 6, '', { ...TEXT, ...ON_MAP }).setOrigin(1, 1);
+    // Above it, only while it's badly worn: the armour you wear (ui/healthBar.ts armorWarning).
+    this.armor = this.add.text(BAR_X + BAR_WIDTH, BAR_Y - 30, '', { ...TEXT, color: COLORS.warn, ...ON_MAP }).setOrigin(1, 1);
     this.healthBar = this.add.graphics();
     this.healthBorder = this.add.graphics();
     this.healthText = this.add
@@ -89,7 +93,9 @@ export class HudScene extends Phaser.Scene {
     const turn = !combat || combat.outcome ? '' : combat.isPlayerTurn ? ' - YOUR TURN' : ' - ENEMY TURN';
     this.combatLabel.setVisible(combat !== null).setText(`COMBAT${turn}`);
     this.mutedLabel.setVisible(isMuted());
-    this.weapon.setText(weaponLine(state.player));
+    // Badly worn gear shows in the warning colour, before it breaks.
+    this.weapon.setText(weaponLine(state.player)).setColor(weaponWorn(state.player) ? COLORS.warn : COLORS.text);
+    this.armor.setText(armorWarning(state.player) ?? '');
     this.drawHealth();
     // The game loop's clock, shared with the AP gauge's glow, so the two shine together.
     this.drawHealthBorder(this.game.loop.time);

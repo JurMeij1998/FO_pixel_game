@@ -61,6 +61,23 @@ export function valueShare(condition: number): number {
   return BROKEN_VALUE_SHARE + (1 - BROKEN_VALUE_SHARE) * (condition / PERFECT);
 }
 
+/**
+ * The Repair skill a repair's listed cost is for (an average character's: 3 x Intelligence 5).
+ * Every point above it makes repairs cheaper, every point below dearer (see repairShare).
+ */
+export const BASE_REPAIR_SKILL = 15;
+
+/** The share of an item's listed repair cost a repair takes at this Repair skill: 1 at 15%, half at 65%. */
+export function repairShare(skill: number): number {
+  return Math.max(0.4, Math.min(1.2, 1 - (skill - BASE_REPAIR_SKILL) / 100));
+}
+
+/** A full repair's cost in material for someone with this Repair skill: at least 1. */
+function repairCostAt(key: string, skill: number): number {
+  const cost = getItem(key).durability?.repairCost ?? 0;
+  return cost === 0 ? 0 : Math.max(1, Math.round(cost * repairShare(skill)));
+}
+
 /** The key the item has after one use's wear (unchanged for anything that doesn't wear). */
 export function afterWear(key: string): string {
   const wear = getItem(key).durability?.wear;
@@ -68,18 +85,26 @@ export function afterWear(key: string): string {
   return itemKey(itemIdOf(key), conditionOf(key) - wear);
 }
 
-/** How much of its material it takes to repair this item to perfect: 0 if it is, or it doesn't wear. */
-export function materialToRepair(key: string): number {
-  const cost = getItem(key).durability?.repairCost ?? 0;
-  return Math.ceil((cost * (PERFECT - conditionOf(key))) / PERFECT);
+/**
+ * How much of its material it takes to repair this item to perfect, at this Repair skill: 0 if
+ * it is, or it doesn't wear.
+ */
+export function materialToRepair(key: string, skill = BASE_REPAIR_SKILL): number {
+  return Math.ceil((repairCostAt(key, skill) * (PERFECT - conditionOf(key))) / PERFECT);
 }
 
-/** The key the item has after repairing it with this much material: each piece restores 100% / repairCost. */
-export function afterRepair(key: string, material: number): string {
-  const cost = getItem(key).durability?.repairCost;
+/** The key the item has after repairing it with this much material: each piece restores 100% / its full repair's cost. */
+export function afterRepair(key: string, material: number, skill = BASE_REPAIR_SKILL): string {
+  const cost = repairCostAt(key, skill);
   if (!cost) return key;
   return itemKey(itemIdOf(key), conditionOf(key) + (material * PERFECT) / cost);
 }
+
+/**
+ * Patches gear up to this condition, wherever you are, with a repair kit: back to working
+ * order (it stops working worse at 35%), but no further; that takes a workbench.
+ */
+export const FIELD_REPAIR_UP_TO = WORN_AT;
 
 /** How an item's condition reads in lists: "62%", or "broken". */
 export function conditionLabel(condition: number): string {

@@ -62,7 +62,7 @@ export class DialogScene extends Phaser.Scene {
       const number = Number(event.key);
       if (!event.repeat && Number.isInteger(number) && number >= 1) this.answer(number - 1);
     });
-    // Coming back from the barter screen: the conversation goes on where it was.
+    // Coming back from the barter or repair screen: the conversation goes on where it was.
     const onWake = () => {
       keyboard.resetKeys();
       this.show();
@@ -127,6 +127,10 @@ export class DialogScene extends Phaser.Scene {
     } else if (answered.action === 'barter') {
       this.scene.sleep();
       this.scene.launch('Barter', { trader: this.person });
+    } else if (answered.action === 'repair') {
+      // The workbench screen, as the trader's repair service; it wakes this conversation on closing.
+      this.scene.sleep();
+      this.scene.launch('Workbench', { trader: this.person });
     } else {
       this.show();
     }

@@ -38,9 +38,14 @@ export function workbenchRows(player: Character): WorkbenchRow[] {
   });
 }
 
-/** What repairing an item to perfect takes, for under its details: "Repair costs: 4 leather"; nothing when there's nothing to repair. */
-export function repairCostLine(key: string): string {
+/**
+ * What repairing an item to perfect takes, for under its details: "Repair costs: 4 leather" at
+ * a workbench (at this Repair skill), "Repair costs: 75 caps" at a trader (given `price`, their
+ * price for it); nothing when there's nothing to repair.
+ */
+export function repairCostLine(key: string, skill: number, price?: number): string {
+  if (price !== undefined) return price > 0 ? `Repair costs: ${price} caps` : '';
   const material = getItem(key).durability?.material;
-  const amount = materialToRepair(key);
+  const amount = materialToRepair(key, skill);
   return material && amount > 0 ? `Repair costs: ${amount} ${materialName(material)}` : '';
 }

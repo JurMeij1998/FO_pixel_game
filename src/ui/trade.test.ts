@@ -43,6 +43,7 @@ describe('barter screen lists', () => {
     expect(theirs).toEqual([
       { key: 'leather_jacket', label: 'Leather Jacket', detail: '300c' },
       { key: 'steel_armor', label: 'Steel Armor', detail: '2160c' },
+      { key: 'repair_kit', label: 'Repair Kit x3', detail: '72c' },
       { key: 'stimpak', label: 'Stimpak x2', detail: '210c' },
       { key: 'ammo_223', label: '.223 Rounds x20', detail: '5c' },
       { key: 'ammo_10mm', label: '10mm Rounds x40', detail: '3c' },

@@ -31,6 +31,21 @@ function worth(key: string): number {
   return getItem(key).value * valueShare(conditionOf(key));
 }
 
+/** A trader's repairs cost this share of what an item lost in value from wear, before the Charisma markup. */
+const REPAIR_SHARE = 0.5;
+
+/**
+ * What a trader charges to repair an item to perfect, in caps: half of its value times how
+ * worn it is (a broken pistol costs half the pistol's value), with the same Charisma markup as
+ * buying. 0 for anything perfect.
+ */
+export function repairPrice(key: string, charisma: number): number {
+  const worn = (100 - conditionOf(key)) / 100;
+  if (worn <= 0) return 0;
+  const markup = 1 + 0.04 * (10 - clampCharisma(charisma));
+  return Math.max(1, Math.ceil(getItem(key).value * worn * REPAIR_SHARE * markup));
+}
+
 function clampCharisma(charisma: number): number {
   return Math.max(1, Math.min(10, charisma));
 }

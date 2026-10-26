@@ -51,7 +51,8 @@ export function describeItem(key: string): string {
   }
   if (item.armor) lines.push(`AC +${item.armor.armorClass}   DR ${item.armor.damageResist}%`);
   if (item.durability) lines.push(`Condition ${conditionLabel(conditionOf(key))}`);
-  if (item.consumable) lines.push(`Heals ${item.consumable.heal} HP`);
+  if (item.consumable?.heal) lines.push(`Heals ${item.consumable.heal} HP`);
+  if (item.consumable?.patchUpTo) lines.push(`Patches your most worn gear up to ${item.consumable.patchUpTo}%`);
   lines.push(`Weight ${item.weight} lb   Value ${item.value} caps`);
   return lines.join('\n');
 }
