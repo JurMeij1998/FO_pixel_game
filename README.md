@@ -201,11 +201,17 @@ Badly worn gear shows on the HUD before it breaks: the weapon line turns orange-
 
 ## Maps and biomes
 
-The world is a set of maps joined by exits (signposts on the map edge); walking onto one
-takes you to the linked map, next to its exit back. `data/world.ts` lists the maps and how
-they connect. A map is either drawn by hand as ASCII art (`data/wasteland.ts`) or generated
-from a **biome**: the wasteland's east exit leads to a randomly generated forest, its south
-exit to a randomly generated village.
+The world is a set of maps joined by exits (signposts on the map edge, a cave mouth into a
+cave, stairs inside a building); walking onto one takes you to the linked map, next to its
+exit back. `data/world.ts` lists the maps and how they connect. A map is either drawn by hand
+as ASCII art (`data/wasteland.ts`) or generated from a **biome**. From the wasteland, the
+east exit leads to a forest, the south exit to a village, a cave mouth in the rocks to the
+north into a cave, and the west exit to a ruined city.
+
+**Floors are maps of their own.** A building with more than one floor has stairs (an exit
+inside it, `StairsRequest` in `data/world.ts`) to a separate generated map for each upper
+floor, with its own map id (`city_tower1_f2`, ...), so it saves and is travelled to like any
+other map. Walking onto the stairs takes you up (or down), beside the stairs on the other floor.
 
 Generated maps are rebuilt from a seed (the world seed, which is new for every game, plus the
 map id), so the same game always gets the same forest and saves only store what changed:
@@ -215,7 +221,8 @@ A biome's generator draws onto a `MapBuilder` (`core/generation/`), which turns 
 ordinary ASCII `MapDef`, so generated maps are parsed, saved and drawn like hand-made ones.
 Afterwards it carves paths so every exit, chest and creature can be reached. The toolkit:
 
-- `MapBuilder`: paint tiles, stamp prefabs, place chests, creatures and exits.
+- `MapBuilder`: paint tiles, stamp prefabs, place chests, creatures, exits and stairs
+  (`addStairs`, usually at a prefab's `stairs` spot).
 - `Prefab`: a hand-drawn structure in the map legend, with `$` for its chest, `&` for its
   creatures and capital letters for its residents, particular people who are always there
   (a logging camp, a hunter's cabin, the general store with Gus and the guard, ...). Its
@@ -235,10 +242,27 @@ and brick houses on both sides (doors facing the street), a general store where 
 keeps shop, Doc Mendez's clinic, a barn with hay and vermin, fenced fields with mole rats, a well, and feral ghouls,
 wild dogs and radroaches roaming the streets.
 
-**Adding a biome** (village, plains, caves...):
+The cave (`data/biomes/cave.ts`) is solid rock hollowed into caverns (noise smoothed into
+chambers, joined by winding tunnels), with underground pools and boulders. It's **dark**:
+only the area around you is lit, and things further off are dim shapes (`Biome.dark`; the
+World scene draws the darkness). Radroaches, mole rats and **radscorpions** (armoured, hard
+hitting, slow) live there; a radscorpion nest guards the bones of their victims with good
+loot, there's often an abandoned miners' camp with a workbench, and the remains of people
+who got lost.
+
+The city (`data/biomes/city.ts`) is a big ruined grid: two streets across and two down, the
+blocks lined with buildings whose doors face the street (apartments, corner shops, a clinic
+with a locked medicine cabinet, a garage with a workbench, burnt-out shells), back lots of
+rubble with now and then a raiders' den, and feral ghouls, wild dogs, radroaches and the odd
+raider in the streets. Its two **office towers** have stairs in the lobby: one has two floors
+above it, the other one. An upper floor (`data/biomes/tower.ts`) is the tower's footprint: a
+corridor with the stairs at one end and offices or flats off it, each behind a door and under
+its own roof, some locked, some with squatters inside; the top floor has a hard-locked safe.
+
+**Adding a biome** (plains...):
 
 1. Write `data/biomes/<name>.ts` exporting a `Biome`: size, names, base and path tiles, and
-   a `generate(builder, { rng, exits })` that paints terrain, stamps prefabs and places
+   a `generate(builder, { rng, exits, stairs })` that paints terrain, stamps prefabs and places
    loot and creatures. Use only `rng` for randomness so maps can be rebuilt from their seed.
 2. If it needs new tiles, add them to `TileType` and `LEGEND` in `core/gridMap.ts` (and the
    blocking/opaque sets), and a painter in `gfx/textures.ts`; TypeScript flags any you miss.
@@ -249,8 +273,8 @@ wild dogs and radroaches roaming the streets.
 
 ## Levelling
 
-Kills give XP (radroach 25, wild dog 35, mole rat 40, feral ghoul 50, raider 100), and so
-do quests. Level 2 takes 100 XP, level 3 300,
+Kills give XP (radroach 25, wild dog 35, mole rat 40, feral ghoul 50, raider 100,
+radscorpion 120), and so do quests. Level 2 takes 100 XP, level 3 300,
 level 4 600, and so on. Each level adds 3 + Endurance/2 max HP and 5 + 2 x Intelligence skill
 points, spent on the character sheet (C). Tagged skills gain 2% per point, others 1%.
 The level-up message tells you when you have points to spend.
@@ -259,7 +283,7 @@ The level-up message tells you when you have points to spend.
 
 All sound effects are synthesised at runtime with the Web Audio API (`audio/sfx.ts`), so,
 like the art, there are no asset files: footsteps (a gravel crunch outdoors, a harder tap on
-floors), weapon swings, layered gunshots (crack, overdriven blast, boom, echo), bites, hits,
+floors and city pavement), weapon swings, layered gunshots (crack, overdriven blast, boom, echo), bites, hits,
 ricochets, deaths, reloads, pickups, a level-up jingle and menu blips. Each attack's `sound`
 field (on weapons and creatures) picks what it sounds like. M toggles sound on any screen,
 and is remembered.
@@ -365,7 +389,8 @@ src/
     result.ts     ActionResult: success or failure plus a message for the log
     save.ts       Game state (all visited maps, the quest log) to and from plain JSON
     generation/   Map generation: Biome, MapBuilder, prefabs, loot/spawn tables, terrain
-  data/       Content: the wasteland map, biomes/, and world.ts (which maps exist)
+  data/       Content: the wasteland map, biomes/ (forest, village, cave, city, and tower for
+              the city towers' upper floors), and world.ts (which maps exist, how they connect)
   gfx/        Procedurally generated placeholder pixel art
   audio/      Synthesised sound effects
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting, and the pure logic

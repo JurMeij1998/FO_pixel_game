@@ -84,6 +84,25 @@ drawn exactly like hand-made ones.
 - `data/world.ts` lists every map (fixed, or generated with requested exits). Map ids are save
   keys, so renaming one loses that map's saved state.
 - Creatures are placed out of sight of the arrival point, so nothing attacks on arrival.
+- **Each floor of a building is a map of its own.** Stairs are exits inside a building
+  (`StairsRequest` in world.ts, `MapBuilder.addStairs`, the `stairsUp`/`stairsDown` exit
+  `look`) leading to a separately generated map with its own id (`city_tower1_f2`), so saves,
+  travel and arrival work unchanged. Rejected: several floors inside one map (saves, roofs,
+  sight and pathing would all need a floor index). An upper floor (`tower` biome) is exactly
+  the tower prefab's footprint, outer walls on the map edge, its stairs where the floor below
+  has them (`DOWN_STAIRS`). It's too small for `SAFE_SPAWN_DISTANCE`, so creatures there only
+  stand in rooms behind closed doors, which block sight just as well; `playabilityProblems`
+  checks it. Stairs only enter the fingerprint when a map has some, so older maps' saves fit.
+- **Darkness is drawing only** (`Biome.dark` → `MapDef.dark` → `GridMap.dark`; the World scene
+  lays a darkness texture centred on the player). It changes no rule: sight ranges are as
+  elsewhere, and health bars and the target marker sit above it so a fight in the dark can
+  be followed.
+- **Rocks, rubble and workbenches are props** drawn over the ground around them
+  (`propTextureKey`, `GridMap.groundAt`), so the same boulder sits on cave floor or dirt. A
+  marker boxed in by walls and other markers (stairs beside the start) takes its ground from
+  two tiles out instead of falling back to a dirt square.
+- Chest markers skip letters that are tiles (`o` is a rock): a 15th chest used to turn into
+  a boulder and break the map. Mind this if you add a letter to `LEGEND`.
 
 **Items are strings: an id, or for worn gear an item key.** A weapon's or armour's condition
 lives in its key (`10mm_pistol@62.5`; `itemKey`, `conditionOf` in `core/items.ts`; a perfect one is just
