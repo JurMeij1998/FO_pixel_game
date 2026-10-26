@@ -11,7 +11,7 @@ import { LOCKS } from '../core/locks';
 export const WASTELAND: MapDef = {
   name: 'Wasteland',
   rows: [
-    'oooooooooooooooooooooooooooooooo',
+    'ooooo3oooooooooooooooooooooooooo',
     'o......,,......o.......,......~o',
     'o.#########....o..,.....H...~~~o',
     'o.#___a___#.........,.......~~~o',
@@ -19,7 +19,7 @@ export const WASTELAND: MapDef = {
     'o.#__FP___#..........oo......~~o',
     'o.####/####..,.......oo.......~o',
     'o.............................,1',
-    'o..,..........,......,.........o',
+    '4..,..........,......,.........o',
     'o.........oo..........#######..o',
     'o...,.....oo..........#__b__#..o',
     'o.....................#_____#..o',
@@ -76,6 +76,8 @@ export const WASTELAND: MapDef = {
   exits: {
     '1': { to: 'forest' },
     '2': { to: 'village' },
+    '3': { to: 'cave', look: 'cave' }, // a cave mouth in the rocks
+    '4': { to: 'city' },
   },
   doors: {
     '25,12': { lock: LOCKS.easy },
