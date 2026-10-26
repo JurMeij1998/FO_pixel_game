@@ -12,7 +12,8 @@ Recipes for the common additions. Each lists where the pieces live and what is e
    need `durability`: `wear` (condition lost per attack, or per hit taken for armour, in
    percent), `repairCost` (how much material from broken to perfect; better gear costs more)
    and `material` (`scrap_metal`, `leather`; a new one goes in `MATERIALS` in
-   core/condition.ts and `SHORT_MATERIAL` in ui/workbench.ts). To place a worn one, use its
+   core/condition.ts; it needs an item of its own in `DEFINITIONS`, named as messages should
+   say it). To place a worn one, use its
    key: `itemKey('10mm_pistol', 55)`; found loot comes worn by itself (`rollLoot`).
 3. Armor needs `armor: { armorClass, damageResist }`. Consumables need `consumable` with what
    they do: `heal` (HP) and/or `patchUpTo` (a repair kit's condition); a new effect goes in

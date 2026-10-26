@@ -31,7 +31,7 @@ function worth(key: string): number {
   return getItem(key).value * valueShare(conditionOf(key));
 }
 
-/** A trader's repairs cost this share of what an item lost in value from wear, before the Charisma markup. */
+/** A trader's repairs cost this share of an item's value times how worn it is, before the Charisma markup. */
 const REPAIR_SHARE = 0.5;
 
 /**

@@ -1,4 +1,4 @@
-import { getItem } from './items';
+import { getItem, normalKey } from './items';
 
 export interface ItemStack {
   readonly itemId: string;
@@ -29,9 +29,9 @@ export class ItemContainer {
     return this.stacks.find((stack) => stack.itemId === itemId)?.quantity ?? 0;
   }
 
-  add(itemId: string, quantity = 1): void {
+  add(key: string, quantity = 1): void {
     assertQuantity(quantity);
-    getItem(itemId); // throws on unknown ids
+    const itemId = normalKey(key); // throws on unknown ids
     const stack = this.stacks.find((s) => s.itemId === itemId);
     if (stack) stack.quantity += quantity;
     else this.stacks.push({ itemId, quantity });

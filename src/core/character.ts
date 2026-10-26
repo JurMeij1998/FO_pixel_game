@@ -2,7 +2,7 @@ import { afterWear, damageShare, hitPenalty, isBroken, protectionShare, WORN_AT 
 import { ItemContainer } from './container';
 import type { Attack, Fighter } from './fighter';
 import { isGridPos, type GridPos } from './grid';
-import { conditionOf, getItem, itemIdOf, itemKey, type ItemDef } from './items';
+import { conditionOf, getItem, itemIdOf, itemKey, normalKey, type ItemDef } from './items';
 import { failure, success, type ActionResult } from './result';
 import * as derived from './stats';
 import { SKILL_NAMES, SKILLS, SPECIAL_KEYS, type Skill, type Special } from './stats';
@@ -118,8 +118,7 @@ export class Character implements Fighter {
     c.activeWeaponSlot = data.activeWeaponSlot;
     for (const slot of EQUIP_SLOTS) {
       const id = data.equipment[slot];
-      if (id) getItem(id); // throws on unknown ids
-      c.equipment[slot] = id;
+      c.equipment[slot] = id ? normalKey(id) : id; // throws on unknown ids
     }
     c.backpack.setData(data.backpack);
     c.level = nonNegativeInteger(data.level, 1) || 1;
@@ -234,7 +233,7 @@ export class Character implements Fighter {
 
   /**
    * Wears the weapon in hand by one attack. Returns what happened to it worth telling: it just
-   * broke, or it just got badly worn (35% or below), or nothing.
+   * broke, or it just got badly worn (below 35%), or nothing.
    */
   wearWeapon(): 'broke' | 'worn' | null {
     return this.wear(this.activeWeaponSlot);
@@ -252,7 +251,7 @@ export class Character implements Fighter {
     this.equipment[slot] = afterWear(key);
     const after = this.slotCondition(slot);
     if (isBroken(after) && !isBroken(before)) return 'broke';
-    if (after <= WORN_AT && before > WORN_AT) return 'worn';
+    if (after < WORN_AT && before >= WORN_AT) return 'worn';
     return null;
   }
 
@@ -328,6 +327,7 @@ export class Character implements Fighter {
     const item = this.equippedItem(slot);
     const weapon = item?.weapon;
     if (!item || !weapon?.ammo || !weapon.magazineSize) return "That doesn't need reloading.";
+    if (this.weaponBroken) return `Your ${item.name} is broken. Repair it at a workbench.`;
     if (this.loaded[slot] === weapon.magazineSize) return `The ${item.name} is already fully loaded.`;
     if (this.backpack.count(weapon.ammo) === 0) return `You have no ${getItem(weapon.ammo).name} left.`;
     return null;

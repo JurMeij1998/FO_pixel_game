@@ -85,11 +85,12 @@ drawn exactly like hand-made ones.
   keys, so renaming one loses that map's saved state.
 - Creatures are placed out of sight of the arrival point, so nothing attacks on arrival.
 
-**Items are strings: an id, or for a worn weapon an item key.** A weapon's condition lives in
-its key (`10mm_pistol@62.5`; `itemKey`, `conditionOf` in `core/items.ts`; a perfect one is just
-its id), so a worn weapon is its own stack and its condition goes wherever the string goes:
+**Items are strings: an id, or for worn gear an item key.** A weapon's or armour's condition
+lives in its key (`10mm_pistol@62.5`; `itemKey`, `conditionOf` in `core/items.ts`; a perfect one is just
+its id), so a worn item is its own stack and its condition goes wherever the string goes:
 containers, equipment slots, loot, barter, saves, list keys. That avoided giving
-`ItemContainer` item instances, and old saves (plain ids) load as perfect weapons. `getItem`
+`ItemContainer` item instances, and old saves (plain ids) load as perfect weapons. Containers
+and loaded equipment rewrite keys with `normalKey`, so "knife@50.0" and "knife@50" stack. `getItem`
 takes either. Anything comparing items by id should go through `itemIdOf`; anything showing
 one should use `itemName(key)` (ui/format.ts), which adds the condition. What wears has
 `durability` (wear, repair cost, material): weapons per attack, armour per hit taken. Wear,
@@ -98,7 +99,7 @@ attack with `AttackProblemCode` 'broken', and armour at 0% protects nothing. Rep
 scale with the Repair skill (`repairShare`; listed costs are for 15%), and so does salvage
 (`salvageYield`: 1 piece below 50%, else 2, plus one per 35% of Repair above 15). A Repair
 Kit (`consumable.patchUpTo`) patches the most worn equipped item up to 35% anywhere; it only
-gets you out of trouble, never back to good. The HUD warns from 35% (`weaponWorn`,
+gets you out of trouble, never back to good. The HUD warns below 35%, where the effects start (`weaponWorn`,
 `armorWarning` in ui/healthBar.ts) instead of popping messages. The workbench screen
 doubles as a trader's repair service (opened from dialog action 'repair' with `{ trader }`):
 caps instead of materials (`repairForCaps`, `repairPrice`), no salvage, and closing wakes the
@@ -153,8 +154,9 @@ waits for the World's RESUME, after the World's own autosave, so a lock picked i
 creatures with `opensDoors` (people, raiders) path through unlocked doors, opening them.
 
 **UI structure.** The world is drawn at integer zoom 3 (`WORLD_ZOOM`) for crisp pixels. HUD,
-menus and overlays are separate 1:1 scenes; overlays pause the World while open. Dialog
-sleeps while the barter screen is open and wakes when it closes, so the conversation goes on.
+menus and overlays are separate 1:1 scenes; overlays pause the World while open, and are always launched with data (`openOverlay` passes
+`{}`), since Phaser hands a screen launched without any its previous launch's data. Dialog
+sleeps while the barter or trader-repair screen is open and wakes when it closes, so the conversation goes on.
 `ui/widgets.ts` has `ListView` (pooled rows, click modifiers) and `MenuList` (keyboard and
 mouse, ignores key auto-repeat so a held key from the previous screen can't pick an option).
 The AP gauge (`ui/apGauge.ts`) lives in world space: the AP number in a round pixel seal with a

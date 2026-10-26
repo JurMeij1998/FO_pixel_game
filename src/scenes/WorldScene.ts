@@ -939,8 +939,12 @@ export class WorldScene extends Phaser.Scene {
     this.fightWith(angered);
   }
 
-  /** Pauses the world and shows a screen on top of it; the screen resumes the world when it closes. */
-  private openOverlay(key: string, data?: object): void {
+  /**
+   * Pauses the world and shows a screen on top of it; the screen resumes the world when it
+   * closes. Always with data: Phaser hands a screen launched without any the data of its
+   * previous launch, which made a barn workbench open as Gus's repair counter.
+   */
+  private openOverlay(key: string, data: object = {}): void {
     if (this.busy) return;
     this.scene.pause();
     this.scene.launch(key, data);

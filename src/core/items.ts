@@ -2,12 +2,18 @@ import type { AttackSound } from './fighter';
 import type { Skill } from './stats';
 
 /**
- * Static item definitions. Everything else refers to items by a string: the item's id, or for a
- * worn weapon its id plus its condition ("10mm_pistol@62.5"; see itemKey). Containers store
- * (key, quantity) pairs, so a worn weapon is its own stack, and its condition goes wherever it
- * does: equipped, looted, sold, saved. getItem takes either.
+ * Static item definitions. Everything else refers to items by a string: the item's id, or for
+ * worn gear (weapons, armour) its id plus its condition ("10mm_pistol@62.5"; see itemKey).
+ * Containers store (key, quantity) pairs, so a worn item is its own stack, and its condition
+ * goes wherever it does: equipped, looted, sold, saved. getItem takes either.
  */
 export type ItemCategory = 'weapon' | 'armor' | 'consumable' | 'ammo' | 'misc';
+
+/**
+ * Below this condition a weapon or armour works worse (core/condition.ts). It lives here, not
+ * there, because the repair kit's definition uses it.
+ */
+export const WORN_AT = 35;
 
 export interface WeaponStats {
   skill: Skill;
@@ -172,7 +178,8 @@ const DEFINITIONS: ItemDef[] = [
     weight: 2,
     value: 60,
     description: 'Tape, wire, rivets and a few tools. Patches worn gear up enough to keep it working.',
-    consumable: { patchUpTo: 35 },
+    // Back to working order, no further: that takes a workbench.
+    consumable: { patchUpTo: WORN_AT },
   },
   {
     id: 'ammo_10mm',
@@ -252,6 +259,15 @@ const CONDITION_MARK = '@';
 export function itemKey(itemId: string, condition: number): string {
   const rounded = Math.round(Math.max(0, Math.min(PERFECT, condition)) * 10) / 10;
   return rounded >= PERFECT ? itemId : `${itemId}${CONDITION_MARK}${rounded}`;
+}
+
+/**
+ * The key written the way itemKey writes it, for keys from outside (a save): "knife@100" and
+ * "knife@abc" become "knife", "knife@50.0" becomes "knife@50", and something that doesn't wear
+ * loses any condition, so equal items stack. Throws on unknown ids, like getItem.
+ */
+export function normalKey(key: string): string {
+  return getItem(key).durability ? itemKey(itemIdOf(key), conditionOf(key)) : itemIdOf(key);
 }
 
 export function itemIdOf(key: string): string {

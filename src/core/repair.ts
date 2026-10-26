@@ -76,7 +76,7 @@ export function repairItem(player: Character, target: RepairTarget): ActionResul
   const condition = conditionLabel(conditionOf(repaired));
   const message =
     used < needed
-      ? `You patch up the ${name} with ${used} ${material}: ${condition}. A full repair takes ${needed}.`
+      ? `You patch up the ${name} with ${used} ${material}: ${condition}. A full repair takes ${materialToRepair(repaired, skill)} more.`
       : `You repair the ${name} with ${used} ${material}: good as new.`;
   return { ...success(message), repaired };
 }

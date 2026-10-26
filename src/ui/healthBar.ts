@@ -72,11 +72,11 @@ export function weaponLine(player: Character): string {
 }
 
 /**
- * Whether the weapon in hand is badly worn (35% or below, broken included): the HUD shows its
+ * Whether the weapon in hand is badly worn (below 35%, broken included): the HUD shows its
  * line in the warning colour, so you see trouble coming before it breaks.
  */
 export function weaponWorn(player: Character): boolean {
-  return player.activeWeapon !== null && player.weaponCondition() <= WORN_AT;
+  return player.activeWeapon !== null && player.weaponCondition() < WORN_AT;
 }
 
 /**
@@ -85,5 +85,5 @@ export function weaponWorn(player: Character): boolean {
  */
 export function armorWarning(player: Character): string | null {
   const key = player.equippedKey('armor');
-  return key && player.slotCondition('armor') <= WORN_AT ? itemName(key) : null;
+  return key && player.slotCondition('armor') < WORN_AT ? itemName(key) : null;
 }

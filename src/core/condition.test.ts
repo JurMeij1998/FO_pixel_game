@@ -6,7 +6,6 @@ import {
   afterRepair,
   afterWear,
   BASE_REPAIR_SKILL,
-  FIELD_REPAIR_UP_TO,
   repairShare,
   conditionLabel,
   damageShare,
@@ -20,7 +19,7 @@ import {
 } from './condition';
 import { rollLoot, FOUND_CONDITION } from './generation/tables';
 import { GridMap } from './gridMap';
-import { conditionOf, getItem, itemIdOf, itemKey } from './items';
+import { conditionOf, getItem, itemIdOf, itemKey, WORN_AT } from './items';
 import { Random } from './random';
 import { repairables, repairForCaps, repairItem, salvageItem, salvageYield } from './repair';
 import { loadGame, saveGame } from './save';
@@ -53,6 +52,20 @@ describe('item keys', () => {
     expect(getItem('10mm_pistol@12').name).toBe('10mm Pistol');
   });
 
+  it('are written one way however they come in, so equal items stack', () => {
+    const player = average();
+    player.backpack.add('knife@100');
+    player.backpack.add('knife@nonsense');
+    player.backpack.add('knife@50.0');
+    player.backpack.add('knife@50');
+    player.backpack.add('stimpak@50'); // doesn't wear
+    expect(player.backpack.toData()).toEqual([
+      ['knife', 2],
+      ['knife@50', 2],
+      ['stimpak', 1],
+    ]);
+  });
+
   it('keep worn weapons apart from good ones in a container', () => {
     const player = average();
     player.backpack.add('knife');
@@ -66,7 +79,7 @@ describe('item keys', () => {
 });
 
 describe('weapon condition', () => {
-  it('only matters at 35% or below, more so the lower it gets', () => {
+  it('only matters below 35%, more so the lower it gets', () => {
     expect(wornness(100)).toBe(0);
     expect(wornness(35)).toBe(0);
     expect(wornness(17.5)).toBeCloseTo(0.5);
@@ -102,8 +115,33 @@ describe('weapon condition', () => {
     expect(materialToRepair('10mm_pistol@99')).toBe(1); // any wear takes at least one piece
     expect(afterRepair('10mm_pistol@50', 2)).toBe('10mm_pistol@75');
     expect(afterRepair('10mm_pistol@50', 4)).toBe('10mm_pistol');
-    expect(conditionLabel(62.3)).toBe('63%');
+    expect(conditionLabel(62.3)).toBe('62%');
     expect(conditionLabel(0)).toBe('broken');
+  });
+
+  it('labels conditions rounded down, so a label never claims a threshold not yet reached', () => {
+    expect(conditionLabel(34.5)).toBe('34%'); // already worn
+    expect(conditionLabel(49.6)).toBe('49%'); // still salvages for 1
+    expect(conditionLabel(0.4)).toBe('1%'); // not broken yet
+  });
+
+  it('never costs more for a repair done a piece at a time', () => {
+    // A broken Leather Jacket takes 3 leather; one at a time must not make it 4.
+    let jacket = 'leather_jacket@0';
+    let used = 0;
+    while (materialToRepair(jacket) > 0) {
+      jacket = afterRepair(jacket, 1);
+      used++;
+    }
+    expect(used).toBe(materialToRepair('leather_jacket@0'));
+    let armor = 'steel_armor@0';
+    used = 0;
+    while (materialToRepair(armor) > 0) {
+      armor = afterRepair(armor, 1);
+      used++;
+    }
+    expect(used).toBe(materialToRepair('steel_armor@0'));
+    expect(afterRepair('leather_jacket@0', 1)).toBe('leather_jacket@33.4');
   });
 
   it('makes a worn weapon worth less, both buying and selling', () => {
@@ -138,6 +176,7 @@ describe('a worn weapon in hand', () => {
     expect(player.wearWeapon()).toBe('worn');
     expect(player.equippedKey('primary')).toBe('knife@34.9');
     expect(player.wearWeapon()).toBe(null);
+    expect(armed('knife@35.5').wearWeapon()).toBe(null); // at 35% it still works as it should
     const nearlyBroken = armed('knife@0.4');
     expect(nearlyBroken.wearWeapon()).toBe('broke');
     expect(nearlyBroken.weaponBroken).toBe(true);
@@ -170,6 +209,16 @@ describe('a worn weapon in combat', () => {
   it("can't attack once broken", () => {
     const { combat, raider } = pit('knife@0', () => 0);
     expect(combat.attackProblem(raider)).toMatchObject({ code: 'broken', message: 'Your Knife is broken. Repair it at a workbench.' });
+  });
+
+  it("can't be reloaded once broken, and doesn't roll for it", () => {
+    let rolls = 0;
+    const { player, combat } = pit('10mm_pistol@0', () => (rolls++, 0));
+    player.backpack.add('ammo_10mm', 12);
+    const before = combat.actionPoints;
+    expect(combat.reload()).toMatchObject({ ok: false, message: 'Your 10mm Pistol is broken. Repair it at a workbench.' });
+    expect(combat.actionPoints).toBe(before);
+    expect(rolls).toBe(0);
   });
 
   it('wears with each attack, and says so as it breaks', () => {
@@ -223,6 +272,12 @@ describe('repairing at a workbench', () => {
     expect(repairCostLine('knife', 15)).toBe(''); // nothing to repair: nothing shown
   });
 
+  it('shows how many of a worn item share a stack', () => {
+    const player = average();
+    player.backpack.add('knife@20', 2);
+    expect(workbenchRows(player).map((r) => r.label)).toEqual(['Knife x2']);
+  });
+
   it('repairs fully with enough scrap metal, in hand or in the backpack', () => {
     const player = armed('10mm_pistol@50');
     player.backpack.add(SCRAP, 10);
@@ -240,7 +295,7 @@ describe('repairing at a workbench', () => {
     player.backpack.add(SCRAP, 3);
     const result = repairItem(player, { slot: 'primary' });
     expect(result).toMatchObject({ ok: true, repaired: 'hunting_rifle@20' });
-    expect(result.message).toMatch(/patch up the Hunting Rifle with 3 scrap metal: 20%\. A full repair takes 15\./);
+    expect(result.message).toMatch(/patch up the Hunting Rifle with 3 scrap metal: 20%\. A full repair takes 12 more\./);
     expect(player.backpack.count(SCRAP)).toBe(0);
   });
 
@@ -432,7 +487,8 @@ describe('repair kits', () => {
     player.equip('leather_armor@5', 'armor');
     player.backpack.add('repair_kit', 2);
     expect(player.use('repair_kit')).toMatchObject({ ok: true, message: 'You patch up the Leather Armor with the Repair Kit: 35%.' });
-    expect(player.slotCondition('armor')).toBe(FIELD_REPAIR_UP_TO);
+    expect(player.slotCondition('armor')).toBe(WORN_AT);
+    expect(armorWarning(player)).toBeNull(); // back in working order: no warning
     player.use('repair_kit');
     expect(player.weaponCondition()).toBe(35);
     expect(player.backpack.count('repair_kit')).toBe(0);
@@ -484,9 +540,9 @@ describe('repairs at a trader', () => {
 });
 
 describe('warnings before gear breaks', () => {
-  it('flag the weapon in hand at 35% or below', () => {
-    expect(weaponWorn(armed('10mm_pistol@36'))).toBe(false);
-    expect(weaponWorn(armed('10mm_pistol@35'))).toBe(true);
+  it('flag the weapon in hand below 35%', () => {
+    expect(weaponWorn(armed('10mm_pistol@35'))).toBe(false); // where a repair kit leaves it
+    expect(weaponWorn(armed('10mm_pistol@34.9'))).toBe(true);
     expect(weaponWorn(armed('knife@0'))).toBe(true);
     expect(weaponWorn(average())).toBe(false); // fists
   });

@@ -136,7 +136,7 @@ Every weapon and every piece of armour has a condition, from 100% (perfect) down
 ("10mm Pistol (62%)"). Each attack wears the weapon in hand, and each hit you take the armour
 you wear, by their own amount (`durability.wear` in `core/items.ts`: a knife 0.5%, the
 pistol 1.5%, the hunting rifle 2.5% per attack; a leather jacket 2%, leather armour 1.5%,
-steel armour 0.8% per hit). At 35% or below they work worse, the more so the lower they get
+steel armour 0.8% per hit). Below 35% they work worse, the more so the lower they get
 (`core/condition.ts`):
 
 - a gun hits less often (down to -30%), does less damage (down to half), and a reload can
@@ -168,13 +168,13 @@ the listed costs are for 15%, each point above makes them 1% cheaper (half at 65
 1 piece) and below dearer, and every 35% above 15% adds a piece to what salvaging gives.
 
 A **Repair Kit** patches your most worn piece of equipped gear (either hand, or the armour)
-back up to 35%, wherever you are: use it from the inventory. Gus sells them, and they turn up
+back up to 35% (working order again), wherever you are: use it from the inventory. Gus sells them, and they turn up
 in houses, barns and the logging camp. And **Gus repairs** too: ask him "Can you fix up my
-gear?" and he repairs anything to perfect for caps (half of what it lost in value, with the
-same Charisma markup as his prices), no materials or skill needed.
+gear?" and he repairs anything to perfect for caps (half its value times how worn it is, so
+a broken pistol costs half the pistol's value, with the same Charisma markup as his prices), no materials or skill needed.
 
-Badly worn gear shows on the HUD before it breaks: the weapon line turns orange-red at 35% or
-below, and worn armour gets a line of its own above it.
+Badly worn gear shows on the HUD before it breaks: the weapon line turns orange-red below
+35%, and worn armour gets a line of its own above it.
 
 ## Maps and biomes
 
@@ -316,7 +316,7 @@ src/
     creation.ts   Character creation: the build (name, gender, stats, difficulty), point rules
     difficulty.ts Difficulty levels and what they change in combat
     items.ts      Item definitions (weight, value, weapon/armor stats) and item keys
-                  (an id, plus a worn weapon's condition)
+                  (an id, plus worn gear's condition)
     condition.ts  Wear of weapons and armour: what it does below 35%, breaking, prices,
                   repair costs
     repair.ts     Repairing and salvaging gear at a workbench (scrap metal, leather)

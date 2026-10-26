@@ -28,9 +28,11 @@ export function workbenchRows(player: Character): WorkbenchRow[] {
       : target.slot === 'armor' ? ' (wearing)'
       : target.slot === player.activeWeaponSlot ? ' (in hand)'
       : ' (other hand)';
+    // Identical worn items share a stack, and a repair or salvage takes one of them.
+    const count = 'slot' in target ? 1 : player.backpack.count(key);
     return {
       key: 'slot' in target ? `slot:${target.slot}` : `pack:${key}`,
-      label: `${getItem(key).name}${where}`,
+      label: `${getItem(key).name}${count > 1 ? ` x${count}` : ''}${where}`,
       detail: conditionLabel(conditionOf(key)),
       target,
       itemKey: key,
