@@ -154,6 +154,20 @@ const DEFINITIONS: CreatureDef[] = [
     loot: [['bottle_caps', 3]],
   },
   {
+    // Lives in the caves: armoured, hits hard, but slow and short-sighted in the dark.
+    id: 'radscorpion',
+    name: 'Radscorpion',
+    maxHitPoints: 28,
+    actionPoints: 6,
+    armorClass: 5,
+    damageResist: 15,
+    critChance: 5,
+    sightRange: 5,
+    experience: 120,
+    attack: { name: 'sting', damageMin: 4, damageMax: 10, apCost: 4, range: 1, ranged: false, hitChance: 55, sound: 'bite' },
+    loot: [],
+  },
+  {
     id: 'raider',
     name: 'Raider',
     opensDoors: true,
