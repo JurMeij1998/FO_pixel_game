@@ -39,6 +39,11 @@ missing.
   active, run `gh auth switch --user JurMeij1998`. PRs here must never come from the work
   account.
 - **The user sometimes opens the PR themselves:** check `gh pr view feature/<name>` first.
+- **Push from the Bash tool:** from the PowerShell tool, `git push` fails with "could not
+  read Username" because Git Credential Manager can't prompt there.
+- **Pushing is allowed, merging never is:** `.claude/settings.local.json` allows pushing
+  `feature/*` branches and the `gh pr` commands without asking. It denies `pr merge`, merges
+  through `gh api` and pushes to `main`. The user merges every PR on GitHub.
 - Open it with
   `gh pr create --repo JurMeij1998/FO_pixel_game --base main --head feature/<name> --title "..." --body-file <file>`.
   The body always comes from a file (company rule: no long text on the command line).
