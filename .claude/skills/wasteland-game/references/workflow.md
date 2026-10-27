@@ -18,15 +18,38 @@ how to check a change in the real game. Read it before starting a feature or a r
    `git diff main...HEAD` (give it this skill to read first, the list of what the branch
    adds, and the kinds of bugs to hunt: state lost across saves or screens, thresholds,
    determinism of the RNG streams, scene reuse). Fix what it confirms, with the user's go.
-6. **Push and open a PR**, squash-merged into `main` as one commit. `gh` isn't installed:
-   push with `git push -u origin feature/<name>`, then give the user the compare link
-   `https://github.com/JurMeij1998/FO_pixel_game/compare/main...feature/<name>?expand=1`
-   plus a title and a PR description to paste (ending with the "Generated with Claude Code"
-   line). The user merges it on GitHub with "Squash and merge".
+6. **Push and open a PR**, squash-merged into `main` as one commit: push with
+   `git push -u origin feature/<name>`, then open it with `gh` (below), the description
+   written to a file first and ending with the "Generated with Claude Code" line. The user
+   merges it on GitHub with "Squash and merge"; never merge it yourself.
 7. **After the merge:** `git checkout main && git pull`, and delete the branch locally and on
    the remote (`git branch -D`, `git push origin --delete`) when the user asks.
 
 CI (`.github/workflows`) runs typecheck, tests and build on every push and PR.
+
+### Opening a PR with `gh`
+
+`gh` is the portable zip (no admin rights on this laptop), in
+`%LOCALAPPDATA%\Programs\gh\bin`. That folder is on the user PATH, but a shell started before
+it was added won't find it, so call `"$env:LOCALAPPDATA\Programs\gh\bin\gh.exe"` if `gh` is
+missing.
+
+- **Two accounts are logged in:** the user's personal `JurMeij1998`, which owns the repo, and
+  their work account. Check `gh auth status` before opening a PR and, if the work account is
+  active, run `gh auth switch --user JurMeij1998`. PRs here must never come from the work
+  account.
+- **The user sometimes opens the PR themselves:** check `gh pr view feature/<name>` first.
+- **Push from the Bash tool:** from the PowerShell tool, `git push` fails with "could not
+  read Username" because Git Credential Manager can't prompt there.
+- **Pushing is allowed, merging never is:** `.claude/settings.local.json` allows pushing
+  `feature/*` branches and the `gh pr` commands without asking. It denies `pr merge`, merges
+  through `gh api` and pushes to `main`. The user merges every PR on GitHub.
+- Open it with
+  `gh pr create --repo JurMeij1998/FO_pixel_game --base main --head feature/<name> --title "..." --body-file <file>`.
+  The body always comes from a file (company rule: no long text on the command line).
+- If `gh` is unavailable, fall back to the compare link
+  `https://github.com/JurMeij1998/FO_pixel_game/compare/main...feature/<name>?expand=1`
+  plus a title and a description to paste.
 
 ## Several sessions at once
 

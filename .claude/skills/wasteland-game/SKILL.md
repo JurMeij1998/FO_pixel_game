@@ -194,8 +194,9 @@ itself, a misplaced arrival point.
 
 **Branches and PRs.** Every feature gets its own `feature/<name>` branch (in its own worktree
 when other sessions are active), a read-only review agent before merging, and one PR that the
-user squash-merges on GitHub. `gh` isn't installed, so push and hand over the compare link and
-a description to paste. Details in `references/workflow.md`.
+user squash-merges on GitHub. Push and open the PR with `gh` (portable install, not always on
+the PATH; check that the personal account `JurMeij1998` is active, not the work one). Details
+in `references/workflow.md`.
 
 **Keep every edit self-consistent.** The user usually has `npm run dev` running. If a change is
 spread over several saves (say, a call added before its import), Vite's watcher can miss the
