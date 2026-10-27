@@ -104,19 +104,29 @@ Recipes for the common additions. Each lists where the pieces live and what is e
    `blocksSight`), and map generation counts them as a way through.
 3. Add a painter to `TILE_PAINTERS` in `src/gfx/textures.ts`; TypeScript does flag a missing one.
    Paint the same ground as its usual surroundings underneath, or it shows as a square of a
-   different colour (trees on brown dirt looked like green squares in the village).
-4. Footsteps: `WorldScene.showStride()` picks `stepFloor` for hard floors, gravel otherwise.
+   different colour (trees on brown dirt looked like green squares in the village). An
+   obstacle that turns up on many grounds (a boulder, rubble) is better a prop: add a
+   transparent painter to `PROP_PAINTERS`, and the World scene draws it over the ground
+   around it (`GridMap.groundAt`).
+4. Footsteps: `WorldScene.showStride()` picks `stepFloor` for hard floors (floor, planks,
+   pavement, asphalt), gravel otherwise.
 
 ## Biome
 
 1. Write `src/data/biomes/<name>.ts` exporting a `Biome`: `id`, `version` (start at 1; bump it
    whenever a change makes the same seed build a different map, so saves drop the old map's
-   state), `names`, `width`, `height`, `baseTile`, `pathTile`, and
-   `generate(builder, { rng, exits })`. Use the toolkit in
+   state), `names`, `width`, `height`, `baseTile`, `pathTile`, `dark` for an underground one,
+   and `generate(builder, { rng, exits, stairs })`. Use the toolkit in
    `src/core/generation/`:
    - `MapBuilder`: `set`/`paint` tiles, `stamp` prefabs, `addChest`, `addCreature`,
-     `addExit(side, to, pathChar)` (call it for every requested exit; it rolls its own offset from
-     a per-exit seed and returns the entry tile), `lock` tiles that nothing may be built on (roads).
+     `addExit(side, to, pathChar, look)` (call it for every requested exit, passing its `look`;
+     it rolls its own offset from a per-exit seed and returns the entry tile), `addStairs(pos,
+     direction, to)` for every requested stairs (generateMap throws if one is missing), `lock`
+     tiles that nothing may be built on (roads), `lockDoor` for a door the biome built itself.
+   - Another floor of a building is another map: give the building's prefab a `stairs` spot,
+     place the stairs there, and list the floor above in world.ts with `stairs` back down
+     (see the city and tower biomes). Upper floors too small for `SAFE_SPAWN_DISTANCE` keep
+     their creatures behind closed doors instead.
    - `Prefab`: ASCII structure with `$` chest and `&` creature slots, an `entrance` just outside
      its door (`/`); `flipVertical()` turns it around for the other side of a street. Walls
      and doors around a floor make it a building with a roof (`core/buildings.ts`): give a
@@ -131,7 +141,8 @@ Recipes for the common additions. Each lists where the pieces live and what is e
      with its creature slots kept away from the arrivals.
    Only use `rng` for randomness. Keep creature spawns (including prefab creatures) out of sight
    of every arrival point (`farFrom(entries, SAFE_SPAWN_DISTANCE)`). A layout that throws is
-   retried with another seed, but that hides bugs: the tests should pass on the first attempt. Check each prefab by hand: a door that opens onto an inner wall makes
+   retried with another seed, but that hides bugs: the tests should pass on the first attempt
+   (test with `generateAttempt`, which doesn't retry, as cave/city/tower tests do). Check each prefab by hand: a door that opens onto an inner wall makes
    the whole structure unreachable, and `connect()` will then throw.
 2. Register it in `src/data/biomes/index.ts`.
 3. Give it a place in `src/data/world.ts` with its exits, plus a matching exit on the
@@ -140,7 +151,8 @@ Recipes for the common additions. Each lists where the pieces live and what is e
    creatures and you arrive at its start; that's fine, but worth telling the user.
 4. Copy `src/data/biomes/village.test.ts`: determinism, `playabilityProblems(map)` over ~40
    seeds and several exit layouts (every exit, chest and creature reachable; nothing sees any
-   arrival), and composition checks.
+   arrival), and composition checks. `data/world.test.ts` checks every exit in the world has
+   a way back and every generated map is playable for a few world seeds.
 5. Print a couple of generated maps as ASCII and look at them before trying it in the browser.
 
 ## Sound

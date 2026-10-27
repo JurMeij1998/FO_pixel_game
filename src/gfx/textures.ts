@@ -34,14 +34,101 @@ export function createTextures(scene: Phaser.Scene): void {
   createSealTexture(scene);
   createDoorTextures(scene);
   createTexture(scene, WORKBENCH, TILE_SIZE, TILE_SIZE, paintWorkbench);
+  for (const [type, draw] of Object.entries(PROP_PAINTERS)) {
+    for (let variant = 0; variant < TILE_VARIANTS; variant++) {
+      createTexture(scene, `prop_${type}_${variant}`, TILE_SIZE, TILE_SIZE, draw);
+    }
+  }
   for (const material of ['wood', 'brick'] as const) {
     for (let variant = 0; variant < TILE_VARIANTS; variant++) {
       createTexture(scene, roofTextureKey(material, variant), TILE_SIZE, TILE_SIZE, ROOF_PAINTERS[material]);
     }
   }
+  createTexture(scene, DARKNESS, DARKNESS_WIDTH, DARKNESS_HEIGHT, paintDarkness);
 }
 
 export const WORKBENCH = 'workbench';
+
+/**
+ * Obstacles drawn over the ground around them (GridMap.groundAt) rather than with a ground of
+ * their own, so a boulder sits on cave floor in a cave and on dirt outside, and rubble on
+ * pavement in the street and on floorboards indoors.
+ */
+const PROP_PAINTERS: Partial<Record<TileType, Painter>> = {
+  rock: paintBoulder,
+  rubble: paintRubble,
+};
+
+/**
+ * The texture a tile is drawn with on top of its ground (`GridMap.groundAt`), or null for a
+ * tile that is its own ground. A workbench is drawn like a chest.
+ */
+export function propTextureKey(type: TileType, x: number, y: number): string | null {
+  if (type === 'workbench') return WORKBENCH;
+  if (!PROP_PAINTERS[type]) return null;
+  return tileTextureKey(type, x, y).replace('tile_', 'prop_');
+}
+
+/**
+ * Darkness for underground maps, drawn centred on the player: clear around them, deepening in
+ * steps to nearly black further out. Big enough to cover the screen wherever the player is on
+ * it (the camera stops at the map's edges, so the player isn't always in the middle).
+ */
+export const DARKNESS = 'darkness';
+const DARKNESS_WIDTH = 672;
+const DARKNESS_HEIGHT = 448;
+/** Fully lit within this many pixels of the player, at its darkest from the outer radius on. */
+const LIGHT_INNER = 2.5 * TILE_SIZE;
+const LIGHT_OUTER = 6.5 * TILE_SIZE;
+const DARKEST = 0.9;
+const DARK_STEPS = 6;
+
+function paintDarkness(ctx: CanvasRenderingContext2D): void {
+  // Two-pixel blocks and a few steps of shade, so the edge of the light looks pixelated like the rest.
+  for (let y = 0; y < DARKNESS_HEIGHT; y += 2) {
+    for (let x = 0; x < DARKNESS_WIDTH; x += 2) {
+      const d = Math.hypot(x + 1 - DARKNESS_WIDTH / 2, y + 1 - DARKNESS_HEIGHT / 2);
+      const t = Math.min(1, Math.max(0, (d - LIGHT_INNER) / (LIGHT_OUTER - LIGHT_INNER)));
+      const alpha = (Math.ceil(t * DARK_STEPS) / DARK_STEPS) * DARKEST;
+      if (alpha === 0) continue;
+      ctx.fillStyle = `rgba(6, 5, 10, ${alpha.toFixed(3)})`;
+      ctx.fillRect(x, y, 2, 2);
+    }
+  }
+}
+
+/** A boulder, lit from the top left, on a transparent background. */
+function paintBoulder(ctx: CanvasRenderingContext2D): void {
+  for (let y = 0; y < TILE_SIZE; y++) {
+    for (let x = 0; x < TILE_SIZE; x++) {
+      const dx = (x - 7.5) / 7;
+      const dy = (y - 8.5) / 6;
+      const d = dx * dx + dy * dy;
+      if (d > 1) continue;
+      pixel(ctx, x, y, d > 0.7 ? '#55524b' : x + y < 14 ? '#8e8a7f' : '#77736a');
+    }
+  }
+}
+
+/** A heap of broken concrete with a bent bit of rebar, on a transparent background. */
+function paintRubble(ctx: CanvasRenderingContext2D, rand: () => number): void {
+  for (let i = 0; i < 6; i++) {
+    const w = 3 + Math.floor(rand() * 4);
+    const h = 2 + Math.floor(rand() * 3);
+    const x = 1 + Math.floor(rand() * (TILE_SIZE - w - 2));
+    const y = 2 + Math.floor(rand() * (TILE_SIZE - h - 3));
+    ctx.fillStyle = '#3e3c38'; // shadow and outline
+    ctx.fillRect(x, y + 1, w + 1, h);
+    ctx.fillStyle = rand() < 0.5 ? '#8a8780' : '#757269';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#a19e96'; // lit top edge
+    ctx.fillRect(x, y, w, 1);
+  }
+  ctx.fillStyle = '#7a4a2a'; // rebar
+  const y = 4 + Math.floor(rand() * 8);
+  ctx.fillRect(2 + Math.floor(rand() * 4), y, 6, 1);
+  pixel(ctx, 9, y - 1, '#7a4a2a');
+}
 
 /**
  * A workbench seen from above, about a chest's size, on a transparent background (drawn over
@@ -257,16 +344,73 @@ const TILE_PAINTERS: Record<TileType, Painter> = {
     }
   },
 
+  // Rocks and rubble are drawn as props (PROP_PAINTERS) over the ground around them; these are fallbacks.
   rock: (ctx, rand) => {
     paintDirt(ctx, rand);
-    for (let y = 0; y < TILE_SIZE; y++) {
+    paintBoulder(ctx);
+  },
+
+  rubble: (ctx, rand) => {
+    TILE_PAINTERS.pavement(ctx, rand);
+    paintRubble(ctx, rand);
+  },
+
+  // Bare rock underfoot: dark, with grit and the odd pebble.
+  caveFloor: (ctx, rand) => {
+    fill(ctx, '#2f2a24');
+    speckle(ctx, rand, ['#38322b', '#27231e', '#40392f'], 34);
+    for (let i = 0; i < 2; i++) {
+      const x = 1 + Math.floor(rand() * 13);
+      const y = 1 + Math.floor(rand() * 13);
+      pixel(ctx, x, y, '#544c42');
+      pixel(ctx, x + 1, y, '#40392f');
+      pixel(ctx, x, y + 1, '#1e1a16');
+    }
+  },
+
+  // Solid rock, standing above the floor: lighter, in blocky facets lit from the top left.
+  caveWall: (ctx, rand) => {
+    fill(ctx, '#4e4840');
+    for (let i = 0; i < 6; i++) {
+      const w = 5 + Math.floor(rand() * 6);
+      const h = 4 + Math.floor(rand() * 4);
+      const x = Math.floor(rand() * (TILE_SIZE - 3)) - 2;
+      const y = Math.floor(rand() * (TILE_SIZE - 3)) - 2;
+      ctx.fillStyle = '#2e2a25'; // the crack below and to the right of a facet
+      ctx.fillRect(x + 1, y + 1, w, h);
+      ctx.fillStyle = rand() < 0.5 ? '#5c554b' : '#554e45';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#6e665a'; // lit top edge
+      ctx.fillRect(x, y, w, 1);
+    }
+    speckle(ctx, rand, ['#3e3933', '#665f54'], 12);
+  },
+
+  // Concrete slabs, cracked here and there.
+  pavement: (ctx, rand) => {
+    fill(ctx, '#77756e');
+    speckle(ctx, rand, ['#6e6c65', '#807e77', '#6a6861'], 30);
+    ctx.fillStyle = '#5f5d57';
+    ctx.fillRect(0, 0, TILE_SIZE, 1);
+    ctx.fillRect(0, 0, 1, TILE_SIZE);
+    if (rand() < 0.5) {
+      let x = 3 + Math.floor(rand() * 10);
+      for (let y = 1; y < TILE_SIZE; y++) {
+        if (rand() < 0.4) x += rand() < 0.5 ? -1 : 1;
+        if (rand() < 0.75) pixel(ctx, x, y, '#5a5852');
+      }
+    }
+  },
+
+  // Old asphalt, faded, with the odd crack.
+  asphalt: (ctx, rand) => {
+    fill(ctx, '#3d3e40');
+    speckle(ctx, rand, ['#46474a', '#343537', '#4c4c4c'], 40);
+    if (rand() < 0.5) {
+      let y = 3 + Math.floor(rand() * 10);
       for (let x = 0; x < TILE_SIZE; x++) {
-        const dx = (x - 7.5) / 7;
-        const dy = (y - 8.5) / 6;
-        const d = dx * dx + dy * dy;
-        if (d > 1) continue;
-        const color = d > 0.7 ? '#55524b' : x + y < 14 ? '#8e8a7f' : '#77736a';
-        pixel(ctx, x, y, color);
+        if (rand() < 0.35) y += rand() < 0.5 ? -1 : 1;
+        if (rand() < 0.7) pixel(ctx, x, y, '#2c2d2f');
       }
     }
   },

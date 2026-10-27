@@ -1,5 +1,5 @@
 import { addPos, DIRECTIONS, type GridPos } from '../grid';
-import { isBlockingTile, LEGEND, type DoorDef, type MapDef, type TileType } from '../gridMap';
+import { isBlockingTile, LEGEND, type DoorDef, type ExitLook, type MapDef, type TileType } from '../gridMap';
 import { hashSeed, Random } from '../random';
 import { rollCreature, rollLoot, type LootTable, type SpawnTable } from './tables';
 
@@ -26,20 +26,29 @@ export interface Prefab {
   creatures?: SpawnTable;
   /** Letter in the rows to the creature id of the person standing there, e.g. the shopkeeper. */
   residents?: Record<string, string>;
+  /**
+   * Where stairs to another floor can go, relative to the top-left corner (a floor tile). The
+   * prefab doesn't place them: the biome calls `MapBuilder.addStairs` there, with where they lead.
+   */
+  stairs?: GridPos;
 }
 
 /**
- * The prefab upside down, entrance included: a house whose door faces south becomes one whose
- * door faces north, for the other side of a street.
+ * The prefab upside down, entrance (and stairs) included: a house whose door faces south
+ * becomes one whose door faces north, for the other side of a street.
  */
 export function flipVertical(prefab: Prefab): Prefab {
+  const flip = (p: GridPos): GridPos => ({ x: p.x, y: prefab.rows.length - 1 - p.y });
   return {
     ...prefab,
     rows: [...prefab.rows].reverse(),
-    entrance: { x: prefab.entrance.x, y: prefab.rows.length - 1 - prefab.entrance.y },
+    entrance: flip(prefab.entrance),
+    ...(prefab.stairs && { stairs: flip(prefab.stairs) }),
   };
 }
 
+/** Letters for chests: a to z, but not the ones that are tiles ('o' is a rock), or a 15th chest would turn into one. */
+const CHEST_LETTERS = [...'abcdefghijklmnopqrstuvwxyz'].filter((c) => !LEGEND[c]);
 const KEEP = ' ';
 const CHEST_SLOT = '$';
 const CREATURE_SLOT = '&';
@@ -71,7 +80,8 @@ export class MapBuilder {
   private readonly doors = new Map<string, DoorDef>();
   /** Residents stay where they are (until a fight), so paths go around them, not through. */
   private readonly creatures: Array<{ pos: GridPos; creatureId: string; resident: boolean }> = [];
-  private readonly exits: Array<{ pos: GridPos; side: Side; to: string }> = [];
+  /** Exits on an edge have a `side`; stairs, inside the map, have none. */
+  private readonly exits: Array<{ pos: GridPos; side: Side | null; to: string; look?: ExitLook }> = [];
   /** Places that must be reachable from the start once the map is finished. */
   private readonly landmarks: GridPos[] = [];
 
@@ -142,7 +152,7 @@ export class MapBuilder {
     const height = prefab.rows.length;
     const width = prefab.rows[0].length;
     if (x < margin || y < margin || x + width > this.width - margin || y + height > this.height - margin) return false;
-    const reserved = [...this.landmarks, ...this.exits.map((e) => addPos(e.pos, inwardStep(e.side)))];
+    const reserved = [...this.landmarks, ...this.exits.map((e) => (e.side ? addPos(e.pos, inwardStep(e.side)) : e.pos))];
     for (let dy = 0; dy < height; dy++) {
       for (let dx = 0; dx < width; dx++) {
         if (prefab.rows[dy][dx] === KEEP) continue;
@@ -216,7 +226,7 @@ export class MapBuilder {
    * and its destination), not the biome's, so adding an exit to a map doesn't reshuffle where
    * the others are. Exits on the same side keep at least 3 tiles apart.
    */
-  addExit(side: Side, to: string, pathChar: string): GridPos {
+  addExit(side: Side, to: string, pathChar: string, look?: ExitLook): GridPos {
     const rng = new Random(hashSeed(this.seed, 'exit', side, to));
     const along = side === 'north' || side === 'south' ? this.width : this.height;
     const at = (offset: number): GridPos =>
@@ -234,9 +244,35 @@ export class MapBuilder {
       this.set(p.x, p.y, pathChar);
       this.locked[p.y][p.x] = true;
     }
-    this.exits.push({ pos, side, to });
+    this.exits.push({ pos, side, to, ...(look && { look }) });
     this.start ??= inside;
     return inside;
+  }
+
+  /**
+   * Puts stairs to another floor (a map of its own) on an open tile inside the map, usually a
+   * spot inside a building (`Prefab.stairs`). Stepping onto them takes the player there, so
+   * keep them out of the way, e.g. against a wall. If there's no start yet, it becomes the
+   * first free tile beside them.
+   */
+  addStairs(pos: GridPos, direction: 'up' | 'down', to: string): void {
+    if (!this.isOpen(pos.x, pos.y)) throw new Error(`Can't put stairs at (${pos.x}, ${pos.y})`);
+    this.exits.push({ pos, side: null, to, look: direction === 'up' ? 'stairsUp' : 'stairsDown' });
+    this.locked[pos.y][pos.x] = true;
+    this.start ??= DIRECTIONS.map((d) => addPos(pos, d)).find((p) => this.isOpen(p.x, p.y)) ?? null;
+    if (!this.start) throw new Error(`No room beside the stairs at (${pos.x}, ${pos.y})`);
+  }
+
+  /** Locks a door (a `/` tile) outside a prefab, e.g. one a biome built itself. */
+  lockDoor(pos: GridPos, lock: number): void {
+    if (this.tileAt(pos.x, pos.y) !== 'door') throw new Error(`No door at (${pos.x}, ${pos.y})`);
+    const key = `${pos.x},${pos.y}`;
+    this.doors.set(key, { ...this.doors.get(key), lock });
+  }
+
+  /** The maps the exits and stairs placed so far lead to. */
+  exitDestinations(): string[] {
+    return this.exits.map((e) => e.to);
   }
 
   /**
@@ -262,8 +298,8 @@ export class MapBuilder {
 
     rows[this.start.y][this.start.x] = 'P';
     this.chests.forEach((chest, i) => {
-      if (i >= 26) throw new Error('A map can hold at most 26 chests');
-      const letter = String.fromCharCode(97 + i);
+      const letter = CHEST_LETTERS[i];
+      if (!letter) throw new Error(`A map can hold at most ${CHEST_LETTERS.length} chests`);
       rows[chest.pos.y][chest.pos.x] = letter;
       def.chests[letter] = {
         name: chest.name,
@@ -289,7 +325,7 @@ export class MapBuilder {
       if (i >= 9) throw new Error('A map can have at most 9 exits');
       const digit = String(i + 1);
       rows[exit.pos.y][exit.pos.x] = digit;
-      def.exits![digit] = { to: exit.to };
+      def.exits![digit] = { to: exit.to, ...(exit.look && { look: exit.look }) };
     });
 
     def.rows = rows.map((row) => row.join(''));

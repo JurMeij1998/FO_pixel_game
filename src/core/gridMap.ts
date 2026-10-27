@@ -23,7 +23,12 @@ export type TileType =
   | 'hay'
   | 'shelf'
   | 'door'
-  | 'workbench';
+  | 'workbench'
+  | 'caveFloor'
+  | 'caveWall'
+  | 'pavement'
+  | 'asphalt'
+  | 'rubble';
 
 /** Map characters for each tile. Letters and digits are taken by markers, so tiles use symbols. */
 export const LEGEND: Readonly<Record<string, TileType>> = {
@@ -46,6 +51,11 @@ export const LEGEND: Readonly<Record<string, TileType>> = {
   ']': 'shelf',
   '/': 'door',
   '!': 'workbench',
+  '`': 'caveFloor',
+  '@': 'caveWall',
+  '-': 'pavement',
+  '>': 'asphalt',
+  '{': 'rubble',
 };
 
 const BLOCKING: ReadonlySet<TileType> = new Set<TileType>([
@@ -59,13 +69,15 @@ const BLOCKING: ReadonlySet<TileType> = new Set<TileType>([
   'hay',
   'shelf',
   'workbench',
+  'caveWall',
+  'rubble',
 ]);
 /**
- * Tiles you can't see (or shoot) through. Low obstacles (water, logs, fences, hay, shelves)
- * block walking only. A door is in neither: whether it blocks depends on whether it's open
+ * Tiles you can't see (or shoot) through. Low obstacles (water, logs, fences, hay, shelves,
+ * rubble) block walking only. A door is in neither: whether it blocks depends on whether it's open
  * (GridMap.isWalkable, blocksSight). Map generation counts doors as a way through.
  */
-const OPAQUE: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'tree', 'woodWall']);
+const OPAQUE: ReadonlySet<TileType> = new Set<TileType>(['wall', 'rock', 'tree', 'woodWall', 'caveWall']);
 
 export function isBlockingTile(tile: TileType): boolean {
   return BLOCKING.has(tile);
@@ -93,10 +105,12 @@ export interface MapDef {
   chests: Record<string, ChestDef>;
   /** Marker letter to creature id. */
   creatures?: Record<string, string>;
-  /** Marker digit to the id of the map it leads to. */
-  exits?: Record<string, { to: string }>;
+  /** Marker digit to the id of the map it leads to, and how it looks (a signpost unless given). */
+  exits?: Record<string, { to: string; look?: ExitLook }>;
   /** Doors (`/` tiles) that are locked or belong to someone, by position ("x,y"). */
   doors?: Record<string, DoorDef>;
+  /** Underground: only the area around the player is lit (drawn by the World scene). */
+  dark?: boolean;
 }
 
 export interface DoorDef {
@@ -144,12 +158,20 @@ export interface Door {
   leftToRight: boolean;
 }
 
+/**
+ * What an exit looks like: a signpost at the edge of the map (the default), a cave mouth, or
+ * stairs inside a building (which lead to the floor above or below, a map of its own).
+ */
+export type ExitLook = 'signpost' | 'cave' | 'stairsUp' | 'stairsDown';
+
 /** A walkable tile that takes the player to another map. */
 export interface Exit {
   x: number;
   y: number;
   /** Id of the map it leads to. */
   to: string;
+  /** Left out for a signpost. */
+  look?: ExitLook;
 }
 
 export class GridMap {
@@ -159,6 +181,9 @@ export class GridMap {
    * Null for hand-made maps.
    */
   generator: string | null = null;
+
+  /** Underground: only the area around the player is lit. Comes from the MapDef, never saved. */
+  dark = false;
 
   private constructor(
     /** Identifies the map in the world and in saves; see data/world.ts. */
@@ -232,7 +257,7 @@ export class GridMap {
         } else if (EXIT_MARKER.test(char)) {
           const exit = def.exits?.[char];
           if (!exit) throw new Error(`Map '${def.name}': no exit defined for '${char}'`);
-          exits.push({ x, y, to: exit.to });
+          exits.push({ x, y, to: exit.to, ...(exit.look && { look: exit.look }) });
         } else {
           throw new Error(`Map '${def.name}': unknown character '${char}' at (${x}, ${y})`);
         }
@@ -253,7 +278,9 @@ export class GridMap {
     for (const at of Object.keys(def.doors ?? {})) {
       if (!doors.some((d) => tileKey(d) === at)) throw new Error(`Map '${def.name}': door at (${at}) is not on a door tile`);
     }
-    return new GridMap(id, def.name, tiles, chests, creatures, exits, playerStart, doors, findBuildings(tiles));
+    const map = new GridMap(id, def.name, tiles, chests, creatures, exits, playerStart, doors, findBuildings(tiles));
+    map.dark = def.dark ?? false;
+    return map;
   }
 
   tileAt(x: number, y: number): TileType | null {
@@ -269,12 +296,24 @@ export class GridMap {
   }
 
   /**
-   * The ground a prop standing on this tile (a workbench) is drawn on: its first walkable
+   * The ground a prop standing on this tile (a workbench, rubble) is drawn on: its first walkable
    * neighbour's, as for markers, so a bench in a barn stands on planks and one outside on dirt.
+   * In a heap of props (rubble along the city's edge) it looks further out, ring by ring.
    */
   groundAt(x: number, y: number): TileType {
+    const ground = (t: TileType | null): t is TileType => t !== null && !BLOCKING.has(t) && t !== 'door';
     const neighbours = [this.tileAt(x - 1, y), this.tileAt(x + 1, y), this.tileAt(x, y - 1), this.tileAt(x, y + 1)];
-    return neighbours.find((t): t is TileType => t !== null && !BLOCKING.has(t) && t !== 'door') ?? 'dirt';
+    const next = neighbours.find(ground);
+    if (next) return next;
+    for (let r = 1; r <= 3; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const tile = this.tileAt(x + dx, y + dy);
+          if (ground(tile)) return tile;
+        }
+      }
+    }
+    return 'dirt';
   }
 
   doorAt(x: number, y: number): Door | undefined {
@@ -328,8 +367,9 @@ export class GridMap {
 
   /**
    * Where the player appears when arriving from another map: on the tile just inside the exit
-   * that leads back there, so stepping back onto it returns them. Exits sit on the map's edge,
-   * so of the exit's walkable neighbours this picks the one furthest from the edge.
+   * that leads back there, so stepping back onto it returns them. Most exits sit on the map's
+   * edge, so of the exit's walkable neighbours this picks the one furthest from the edge (for
+   * stairs, inside a building, any free neighbour will do; this picks one the same way).
    * Falls back to the map's player start.
    */
   arrivalFrom(fromMapId: string): GridPos {
@@ -505,13 +545,30 @@ export class GridMap {
 
 /**
  * The ground a marker stands on: the first walkable tile among its left, right, upper and
- * lower neighbours, so a chest against a wall still sits on the floor. If none is walkable
- * (an exit between edge trees, say) it's dirt: markers are things to stand on or beside, so
- * their ground must never block.
+ * lower neighbours, so a chest against a wall still sits on the floor. If none is (an exit
+ * between edge trees and the player start, or stairs against a wall beside the start), the
+ * nearest walkable tile two steps out, else dirt: markers are things to stand on or beside,
+ * so their ground must never block.
  */
 function groundUnderMarker(rows: string[], x: number, y: number): TileType {
-  const neighbours = [rows[y][x - 1], rows[y][x + 1], rows[y - 1]?.[x], rows[y + 1]?.[x]]
-    .map((char) => (char === undefined ? undefined : LEGEND[char]))
-    .filter((tile): tile is TileType => tile !== undefined);
-  return neighbours.find((tile) => !BLOCKING.has(tile) && tile !== 'door') ?? 'dirt';
+  const ground = (char: string | undefined): TileType | undefined => {
+    const tile = char === undefined ? undefined : LEGEND[char];
+    return tile !== undefined && !BLOCKING.has(tile) && tile !== 'door' ? tile : undefined;
+  };
+  const beside = [rows[y][x - 1], rows[y][x + 1], rows[y - 1]?.[x], rows[y + 1]?.[x]].map(ground).find((t) => t);
+  if (beside) return beside;
+  // Nearest first (diagonals before two steps away), so stairs in a corridor corner take the
+  // corridor's floor, not a room's behind the wall.
+  for (const [dx, dy] of NEARBY) {
+    const tile = ground(rows[y + dy]?.[x + dx]);
+    if (tile) return tile;
+  }
+  return 'dirt';
 }
+
+/** Offsets up to two tiles away, nearest first (reading order among equally near ones). */
+const NEARBY: ReadonlyArray<[number, number]> = (() => {
+  const offsets: Array<[number, number]> = [];
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (dx || dy) offsets.push([dx, dy]);
+  return offsets.sort((a, b) => Math.hypot(...a) - Math.hypot(...b));
+})();

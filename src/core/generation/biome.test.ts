@@ -40,4 +40,24 @@ describe('generateMap', () => {
     expect(generatorFingerprint({ ...biome, version: 2 }, exits)).not.toBe(generatorFingerprint(biome, exits));
     expect(generatorFingerprint(biome, [...exits, { side: 'east', to: 'away' }])).not.toBe(generatorFingerprint(biome, exits));
   });
+
+  it('adds stairs to the fingerprint only when there are any, so older maps keep theirs', () => {
+    const biome = flakyBiome(0);
+    const exits = [{ side: 'west' as const, to: 'home' }];
+    expect(generatorFingerprint(biome, exits, [])).toBe('flaky@1:west>home');
+    expect(generatorFingerprint(biome, exits, [{ direction: 'up', to: 'attic' }])).toBe('flaky@1:west>home;up>attic');
+  });
+
+  it("fails (and retries) when the biome doesn't place an exit or stairs it was asked for", () => {
+    // flakyBiome only places edge exits, never stairs.
+    expect(() => generateMap(flakyBiome(0), 1, [{ side: 'west', to: 'home' }], [{ direction: 'up', to: 'attic' }])).toThrow(
+      /didn't place the way to attic/,
+    );
+  });
+
+  it('marks the maps of a dark biome as dark', () => {
+    const dark = { ...flakyBiome(0), dark: true };
+    expect(generateMap(dark, 1, [{ side: 'west', to: 'home' }]).dark).toBe(true);
+    expect(generateMap(flakyBiome(0), 1, [{ side: 'west', to: 'home' }]).dark).toBeUndefined();
+  });
 });

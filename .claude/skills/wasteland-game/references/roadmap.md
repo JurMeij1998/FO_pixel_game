@@ -33,7 +33,10 @@ Roughly in the order discussed with the user:
   chapel, hermit, minefield...), some rare or unique. Later: map modifiers (burnt forest,
   irradiated forest) and possibly a randomly generated world layout (which biome lies behind
   an exit). `data/world.ts` is already data, so it could be generated from the seed.
-- **More biomes:** plains and caves (`smooth()` suits cave walls).
+- **Plains**, the one biome still open from the first list (caves and the city are built).
+  Ideas around those two, not yet asked for: light sources in the dark (a torch or flare as an
+  item, glowing fungus), deeper cave levels or a basement under a tower (more maps joined by
+  stairs, as the tower floors are), and more kinds of multi-storey buildings in the city.
 - **Touch controls** and mobile: an on-screen D-pad and action buttons, tap to attack and
   interact; package with Capacitor or as a PWA (Tauri or Electron for desktop).
 - **More people.** So far: Gus the village shopkeeper (dialog, Charisma-based barter), the
