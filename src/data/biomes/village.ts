@@ -54,6 +54,14 @@ const STORE_LOOT: LootTable = {
   ],
 };
 
+const CLINIC_LOOT: LootTable = {
+  rolls: [1, 2],
+  entries: [
+    { itemId: 'stimpak', min: 1, max: 2, weight: 3 },
+    { itemId: 'bottle_caps', min: 5, max: 20, weight: 1 },
+  ],
+};
+
 const BARN_LOOT: LootTable = {
   rolls: [2, 3],
   entries: [
@@ -136,6 +144,27 @@ export const GENERAL_STORE: Prefab = {
   residents: { G: 'shopkeeper', W: 'guard' },
 };
 
+/**
+ * Doc Mendez's clinic, a brick house with the doctor (D) inside. The medicine cabinet is his
+ * (the clinic's): taking from it, or picking its lock, turns him hostile. Open, so the door is
+ * never locked.
+ */
+export const CLINIC: Prefab = {
+  name: 'clinic',
+  rows: [
+    '#######',
+    '#__$__#',
+    '#_D___#',
+    '#_____#',
+    '###/###',
+    '   :   ',
+  ],
+  entrance: { x: 3, y: 5 },
+  chest: { name: 'Medicine Cabinet', loot: CLINIC_LOOT, owner: 'clinic', lock: LOCKS.medium },
+  owner: 'clinic',
+  residents: { D: 'doctor' },
+};
+
 /** Hay bales, a feed bin, a workbench (!) to repair weapons at, and vermin. Wide double doors, never locked. */
 const BARN: Prefab = {
   name: 'barn',
@@ -190,18 +219,19 @@ const WELL: Prefab = {
 
 /**
  * Buildings that line the street. Each `unique` one appears at most once per village; the
- * `required` one (the store, for its shopkeeper) exactly once.
+ * `required` ones (the store and the clinic, for the people in them) exactly once.
  */
 const STREET_BUILDINGS: Array<{ prefab: Prefab; weight: number; unique?: boolean; required?: boolean }> = [
   { prefab: WOODEN_HOUSE, weight: 4 },
   { prefab: BRICK_HOUSE, weight: 3 },
   { prefab: GENERAL_STORE, weight: 0, unique: true, required: true },
+  { prefab: CLINIC, weight: 0, unique: true, required: true },
   { prefab: BARN, weight: 1, unique: true },
 ];
 
 export const VILLAGE: Biome = {
   id: 'village',
-  version: 6,
+  version: 7,
   names: ['Dusty Hollow', 'New Plenty', 'Rustwater', 'Cinder Creek', 'Harmony Flats', 'Last Stop'],
   width: 48,
   height: 34,
@@ -229,6 +259,7 @@ export const VILLAGE: Biome = {
     const occupied: GridPos[] = [...entries];
     const built = lineStreet(b, rng, streetY, west, east, entries, occupied);
     if (!built.has(GENERAL_STORE)) throw new Error('No room on the street for the general store');
+    if (!built.has(CLINIC)) throw new Error('No room on the street for the clinic');
 
     // A well near the street, a field or two further out, each with a trail from the street.
     // Doors face the street: as drawn (door at the bottom) north of it, flipped south of it.

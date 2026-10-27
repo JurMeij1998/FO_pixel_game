@@ -3,6 +3,7 @@ import { buildKnownMap, buildMap } from '../data/world';
 import { Character } from './character';
 import { GridMap } from './gridMap';
 import { takeItem } from './loot';
+import { QuestLog } from './quests';
 import { loadGame, saveGame, SAVE_VERSION, type GameData } from './save';
 
 const SEED = 4242;
@@ -19,7 +20,7 @@ function freshGame(): GameData {
     luck: 5,
   });
   player.pos = { ...wasteland.playerStart };
-  return { player, worldSeed: SEED, difficulty: 'normal', maps: { wasteland }, currentMap: 'wasteland' };
+  return { player, worldSeed: SEED, difficulty: 'normal', quests: new QuestLog(), maps: { wasteland }, currentMap: 'wasteland' };
 }
 
 /** Goes through JSON like the real save does, so nothing relies on shared object references. */

@@ -110,8 +110,114 @@ const ROSA_PALETTE = {
   g: '#4a3424', // shoes
 };
 
+const MAGS_PALETTE = {
+  k: '#1a1a1a', // outline and eyes
+  h: '#4a3020', // dark hair
+  o: '#c88a30', // goggles pushed up
+  s: '#d0a07a', // skin
+  j: '#6a5a3a', // patched jacket
+  J: '#54472e', // jacket shade
+  b: '#8a6a40', // bag strap
+  B: '#7a5a34', // bag
+  p: '#4a4a3a', // trousers
+  g: '#2a2a2a', // boots
+};
+
+const SILAS_PALETTE = {
+  k: '#1a1a1a', // outline and eyes
+  t: '#6a4a2a', // hat
+  T: '#4a321c', // hat brim
+  s: '#c08a68', // skin
+  b: '#5a4030', // beard
+  c: '#8a6a44', // leather coat
+  C: '#6e5436', // coat shade
+  p: '#3e4a3a', // trousers
+  g: '#2a2a2a', // boots
+  x: '#9a7a4a', // spear shaft
+  X: '#c0c0c0', // spear head
+};
+
+const DOCTOR_PALETTE = {
+  k: '#1a1a1a', // outline and eyes
+  h: '#9a9a9a', // grey hair
+  s: '#c89070', // skin
+  e: '#8ac8e0', // glasses
+  w: '#e0e0d8', // white coat
+  W: '#b8b8b0', // coat shade
+  c: '#4a6a8a', // shirt
+  r: '#c83838', // red cross on the pocket
+  p: '#3a3a4a', // trousers
+  g: '#2a2a2a', // shoes
+};
+
 // Creature sprites (people included) are keyed by creature id (see core/creature.ts).
 export const SPRITES: Record<string, PixelSprite> = {
+  // Mags, the scavenger: goggles pushed up on her hair, a patched jacket, a bag on a strap.
+  mags: {
+    palette: MAGS_PALETTE,
+    rows: [
+      '................',
+      '.....kkkkkk.....',
+      '....khhhhhhk....',
+      '...khoohhoohk...',
+      '...khsssssshk...',
+      '...khsksskshk...',
+      '....kssssssk....',
+      '...kkjjbjjjkk...',
+      '..kjkjjjbjjkjk..',
+      '..kskJjjjbJksk..',
+      '...kkjjjjjBkk...',
+      '....kppkkBBk....',
+      '....kppkkppk....',
+      '....kggkkggk....',
+      '....kkk..kkk....',
+      '................',
+    ],
+  },
+  // Silas, the hunter: wide-brimmed hat, beard, leather coat, spear upright beside him.
+  silas: {
+    palette: SILAS_PALETTE,
+    rows: [
+      '..............X.',
+      '.....kkkkkk...x.',
+      '....kttttttk..x.',
+      '..kTTTTTTTTTTkx.',
+      '....kssssssk..x.',
+      '....kskssksk..x.',
+      '....kbssssbk..x.',
+      '...kkcbbbbckk.x.',
+      '..kckcCccCckckx.',
+      '..kskcCCCCckskx.',
+      '...kkccccccckkx.',
+      '....kppkkppk..x.',
+      '....kppkkppk..x.',
+      '....kggkkggk..x.',
+      '....kkk..kkk....',
+      '................',
+    ],
+  },
+  // Doc Mendez: grey hair, glasses, a white coat with a red cross on the pocket.
+  doctor: {
+    palette: DOCTOR_PALETTE,
+    rows: [
+      '................',
+      '.....kkkkkk.....',
+      '....khhhhhhk....',
+      '....khsssshk....',
+      '....keekkeek....',
+      '....kssssssk....',
+      '....kssssssk....',
+      '...kkwwccwwkk...',
+      '..kwkwwccwwkwk..',
+      '..kskwrccwWksk..',
+      '...kkwwccwwkk...',
+      '....kwWWWWwk....',
+      '....kppkkppk....',
+      '....kggkkggk....',
+      '....kkk..kkk....',
+      '................',
+    ],
+  },
   // Rosa, who takes you in at the start: long auburn hair, a green dress and an apron.
   rosa: {
     palette: ROSA_PALETTE,

@@ -137,6 +137,29 @@ moment you attack someone makes no sense to the user. Weak people get weak attac
 Prefabs place residents (particular people) with capital letters mapped in `residents`; paths
 are routed around them since they don't move until a fight.
 
+**Quests store only a status; everything else is read from the game.** `core/quests.ts` has
+the definitions (giver, goal: fetch / kill / deliver, reward) and a `QuestLog` that only
+remembers taken on ('active') or 'done' per quest id, saved as `quests` in the save (missing in
+older saves: an empty log; unknown ids and statuses are dropped). The stage a quest is at
+(`questStage`: new, active, ready, done, failed) is computed each time from the log, the
+backpack, the creatures on the maps and whether the one who hands it in is alive and friendly,
+so it can't drift from the world: loading a save, a scene restart or a person turning hostile
+need no bookkeeping. `finishQuest` only pays when the stage is 'ready' and marks it 'done' in
+the same call, so a reward can't be had twice. A kill goal is "every creature of that kind on that map
+dead" (no kill counter to keep in step with combat events); the finisher (giver, or a delivery's
+recipient) is looked up by creature id on a named map, and a quest whose finisher is dead or
+hostile is 'failed', even before it's offered; givers and finishers in generated maps must be guaranteed there (the
+village's clinic is a `required` street building). Dialog depends on quests through
+`when` conditions on replies and `greetings` (the first that holds replaces `start`), and a
+reply's `quest` step (start / finish) runs before moving to `next`, so that line already sees
+the new state. `Conversation` asks a `DialogWorld` (`questDialogWorld(state)`) for both,
+keeping `dialog.ts` free of game state; without one (`NO_WORLD`) quest replies stay hidden,
+which is why Gus's and the guard's reply lists in tests didn't change. What a step brings
+about (new quest, reward, level-up) shows under the person's line and goes to the message log.
+A delivery's item can be dropped, so its giver hands out another (`{ resupply }`) while the
+quest is 'active' (taken on, item gone). The quest list (J) does nothing until a quest has been
+taken on, like other unusable keys.
+
 **Doors, locks and roofs.** Doors are a tile (`/`) plus per-map state (`GridMap.doors`:
 open, and the lock's required skill or null), so generation treats a doorway as passable while
 `isWalkable`/`blocksSight` check whether it's closed. Buildings aren't declared anywhere: they

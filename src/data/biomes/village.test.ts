@@ -52,7 +52,7 @@ describe('village biome', () => {
     expect(onStreet.length).toBeGreaterThan(5);
   });
 
-  it('builds a proper village: several homes, always one store with its shopkeeper, usually a barn', () => {
+  it('builds a proper village: several homes, always one store with its shopkeeper and one clinic with its doctor, usually a barn', () => {
     const villages = SEEDS.map((seed) => GridMap.parse(generateMap(VILLAGE, seed, EXITS), 'village'));
     for (const map of villages) {
       const chests = map.chests.map((c) => c.name);
@@ -61,7 +61,8 @@ describe('village biome', () => {
       expect(chests.filter((n) => n === 'Stockroom Crate').length).toBe(1);
       expect(chests.filter((n) => n === 'Feed Bin').length).toBeLessThanOrEqual(1);
       const people = map.creatures.filter((c) => !c.hostile).map((c) => c.def.id);
-      expect(people.sort()).toEqual(['guard', 'shopkeeper']);
+      expect(people.sort()).toEqual(['doctor', 'guard', 'shopkeeper']);
+      expect(map.chests.find((c) => c.name === 'Medicine Cabinet')?.owner).toBe('clinic');
       expect(map.chests.find((c) => c.name === 'Stockroom Crate')?.owner).toBe('store');
     }
     expect(villages.filter((map) => map.chests.some((c) => c.name === 'Feed Bin')).length).toBeGreaterThan(SEEDS.length / 3);

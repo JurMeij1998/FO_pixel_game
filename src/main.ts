@@ -15,6 +15,7 @@ import { WorkbenchScene } from './scenes/WorkbenchScene';
 import { LootScene } from './scenes/LootScene';
 import { MenuScene } from './scenes/MenuScene';
 import { PauseScene } from './scenes/PauseScene';
+import { QuestsScene } from './scenes/QuestsScene';
 import { WorldScene } from './scenes/WorldScene';
 import { isTextEntry } from './ui/creationKeys';
 
@@ -51,6 +52,7 @@ new Phaser.Game({
     DialogScene,
     BarterScene,
     CharacterScene,
+    QuestsScene,
     PauseScene,
     GameOverScene,
     ControlsScene,

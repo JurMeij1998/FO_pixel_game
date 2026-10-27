@@ -44,6 +44,7 @@ behind it, and the guard outside by the door.
 | T               |                                  | Next target                   |
 | Tab / I         | Inventory (again to close)       | Inventory (costs 4 AP)        |
 | C               | Character sheet: browse S.P.E.C.I.A.L. and skills (with what each does), spend skill points | |
+| J               | Quests: the ones you've taken on and what's left to do (nothing until you have one) | |
 | Q               | Swap primary/secondary weapon    | Same, free                    |
 | R               | Reload the gun in hand           | Reload (costs 2 AP)           |
 | M               | Sound on/off                     | Sound on/off                  |
@@ -98,6 +99,28 @@ they leave their goods on their corpse. Hostility, and what Gus has left, are sa
 guard sees further than any monster, so a village whose store you've turned against you can
 greet you with gunfire as you arrive: the rule that nothing attacks on arrival only holds
 for creatures that start out hostile.
+
+## Quests
+
+Some people have an errand for you (`core/quests.ts`). Ask them ("Need anything?"), take it on,
+do it, and go back for the reward: caps, items and XP. What they say depends on how it stands:
+a reply to hand a quest in only shows once it's done, and they greet you differently while
+you're on it and after. Taking a quest on or handing it in shows under their line (and in the
+message log). **J** lists your quests: the open ones first, with what's left to do, then the
+finished and failed ones, dimmed.
+
+- **Mags**, a scavenger camped southeast of Rosa's shack: kill the radroaches by the pond
+  (*Pond Pests*: 40 caps, 100 XP).
+- **Silas**, a hunter by the water in the northeast of the wasteland: bring him 3 leather
+  (*Hides for Silas*: 30 caps, 10 .223 rounds, 75 XP).
+- **Doc Mendez**, in every village's clinic: take a medicine pouch to Mags (*Medicine for
+  Mags*: she pays 25 caps and a stimpak, 75 XP; lose the pouch and he makes up another). The
+  clinic's medicine cabinet is his.
+
+A quest fails if the one who'd hand it in (the giver, or for a delivery who it's for) is
+dead or has turned on you (and isn't offered at all then). Only which quests you've taken on and finished is saved; whether
+you have the items, whether the radroaches are dead and whether someone is still around is
+read from the game, so it can't get out of step with it.
 
 ## Doors, locks and roofs
 
@@ -209,7 +232,7 @@ stashes, and mole rats, radroaches and wild dogs kept out of sight of where you 
 
 The village (`data/biomes/village.ts`) is abandoned and overgrown: a main street with wooden
 and brick houses on both sides (doors facing the street), a general store where Gus still
-keeps shop, a barn with hay and vermin, fenced fields with mole rats, a well, and feral ghouls,
+keeps shop, Doc Mendez's clinic, a barn with hay and vermin, fenced fields with mole rats, a well, and feral ghouls,
 wild dogs and radroaches roaming the streets.
 
 **Adding a biome** (village, plains, caves...):
@@ -226,7 +249,8 @@ wild dogs and radroaches roaming the streets.
 
 ## Levelling
 
-Kills give XP (radroach 25, wild dog 35, mole rat 40, feral ghoul 50, raider 100). Level 2 takes 100 XP, level 3 300,
+Kills give XP (radroach 25, wild dog 35, mole rat 40, feral ghoul 50, raider 100), and so
+do quests. Level 2 takes 100 XP, level 3 300,
 level 4 600, and so on. Each level adds 3 + Endurance/2 max HP and 5 + 2 x Intelligence skill
 points, spent on the character sheet (C). Tagged skills gain 2% per point, others 1%.
 The level-up message tells you when you have points to spend.
@@ -323,7 +347,9 @@ src/
     container.ts  ItemContainer: stacks of items (backpack, chest)
     character.ts  Character: skills, levels, equipment slots, magazines
     creature.ts   Creature and people definitions (people: dialog, group, trade) and instances
-    dialog.ts     Conversations: lines, replies and what they lead to
+    dialog.ts     Conversations: lines, replies and what they lead to; lines and replies that
+                  depend on quests
+    quests.ts     Quests: definitions, the quest log (saved), stages read from the game, rewards
     barter.ts     Buying and selling, with prices based on Charisma
     fighter.ts    The Attack and Fighter interfaces shared by player and creatures
     combat.ts     Turn-based combat rules and enemy AI; emits events for the scene
@@ -337,17 +363,17 @@ src/
     lockPuzzle.ts The lockpicking puzzle: 3 to 5 pins, one order
     random.ts     Seeded random numbers, so generated maps can be rebuilt from a seed
     result.ts     ActionResult: success or failure plus a message for the log
-    save.ts       Game state (all visited maps) to and from plain JSON
+    save.ts       Game state (all visited maps, the quest log) to and from plain JSON
     generation/   Map generation: Biome, MapBuilder, prefabs, loot/spawn tables, terrain
   data/       Content: the wasteland map, biomes/, and world.ts (which maps exist)
   gfx/        Procedurally generated placeholder pixel art
   audio/      Synthesised sound effects
   ui/         Theme, widgets (panel, buttons, scrollable list), formatting, and the pure logic
               behind the HUD and screens: AP gauge and its placement, health bars and worn-gear
-              warnings, the shared glow, dialog box, barter lists, workbench rows, the message
-              log, creation screen keys
+              warnings, the shared glow, dialog box, barter lists, workbench rows, quest list rows,
+              the message log, creation screen keys
   scenes/     Phaser scenes: Boot, Menu, Creation, World, Hud, Inventory, Loot, Lockpick,
-              Workbench, Dialog, Barter, Character, Pause, GameOver, Controls; flow.ts switches
+              Workbench, Dialog, Barter, Character, Quests, Pause, GameOver, Controls; flow.ts switches
               between menus and the game
   state.ts    The running game (player + map), loaded from the save if there is one
   storage.ts  localStorage access for the save

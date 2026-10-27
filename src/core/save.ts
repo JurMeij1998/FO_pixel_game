@@ -2,6 +2,7 @@ import { Character, type CharacterData } from './character';
 import { isDifficulty, type Difficulty } from './difficulty';
 import { isGridPos, type GridPos } from './grid';
 import type { GridMap } from './gridMap';
+import { QuestLog, type QuestStatus } from './quests';
 import { hashSeed } from './random';
 
 /** Bump when the format changes; loadGame upgrades older versions it knows about. */
@@ -32,6 +33,8 @@ export interface SaveData {
   /** Missing in saves from before difficulty levels: those games were all on normal. */
   difficulty?: Difficulty;
   player: CharacterData;
+  /** Quests taken on and finished, by id; missing in saves from before quests (none taken on). */
+  quests?: Record<string, QuestStatus>;
   /** Only the maps that have been visited. */
   maps: Record<string, MapState>;
 }
@@ -47,6 +50,7 @@ export interface GameData {
   player: Character;
   worldSeed: number;
   difficulty: Difficulty;
+  quests: QuestLog;
   /** Every visited map, by id. */
   maps: Record<string, GridMap>;
   currentMap: string;
@@ -65,6 +69,7 @@ export function saveGame(game: GameData): SaveData {
     currentMap: game.currentMap,
     difficulty: game.difficulty,
     player: game.player.toData(),
+    quests: game.quests.toData(),
     maps,
   };
 }
@@ -106,7 +111,7 @@ export function loadGame(data: unknown, buildMap: MapBuilderFn, startMap: string
   const connected = current.reachableFrom(current.playerStart).has(`${player.pos.x},${player.pos.y}`);
   if (!standable || !connected) player.pos = { ...current.playerStart };
   const difficulty = isDifficulty(save.difficulty) ? save.difficulty : 'normal';
-  return { player, worldSeed: save.worldSeed, difficulty, maps, currentMap };
+  return { player, worldSeed: save.worldSeed, difficulty, quests: QuestLog.fromData(save.quests), maps, currentMap };
 }
 
 function upgrade(data: unknown): SaveData {

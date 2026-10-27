@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buyPrice, repairPrice, sellPrice } from './barter';
 import { Character } from './character';
 import { Combat } from './combat';
+import { QuestLog } from './quests';
 import {
   afterRepair,
   afterWear,
@@ -326,7 +327,7 @@ describe('found weapons', () => {
     const map = GridMap.parse({ name: 'shed', rows: ['#####', '#Pa_#', '#####'], chests: { a: { name: 'Box', contents: [['knife@44', 1]] } } });
     const player = average();
     player.pos = { ...map.playerStart };
-    const game = { player, worldSeed: 1, difficulty: 'normal' as const, maps: { shed: map }, currentMap: 'shed' };
+    const game = { player, worldSeed: 1, difficulty: 'normal' as const, quests: new QuestLog(), maps: { shed: map }, currentMap: 'shed' };
     const loaded = loadGame(JSON.parse(JSON.stringify(saveGame(game))), () => GridMap.parse({ name: 'shed', rows: ['#####', '#Pa_#', '#####'], chests: { a: { name: 'Box', contents: [['knife@44', 1]] } } }), 'shed');
     expect(loaded.maps.shed.chests[0].contents.count('knife@44')).toBe(1);
   });

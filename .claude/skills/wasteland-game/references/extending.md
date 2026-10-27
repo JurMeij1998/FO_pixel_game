@@ -50,11 +50,30 @@ Recipes for the common additions. Each lists where the pieces live and what is e
    from it (or picking its lock) theft, and their house the same `owner` (a prefab's `owner`,
    or a hand-made map's `doors` entry) to make picking its door's lock a crime too.
    `playabilityProblems` checks someone can reach a talking spot.
-4. Replies can carry an `action`: `barter` (opens the barter screen with their pack) and
+4. Lines can depend on quests: a reply's `when: { quest, stage }` (stage one of new, active,
+   ready, done, failed, or a list) hides it otherwise, `greetings` pick the opening line, and
+   `quest: { start }` / `{ finish }` takes a quest on or hands it in (see Quest below).
+5. Replies can carry an `action`: `barter` (opens the barter screen with their pack) and
    `repair` (opens the workbench screen in trader mode: they repair for caps) exist today. The
    Dialog scene sleeps while that screen is open, and the screen wakes it on close, so the
    conversation goes on. Update the reply lists in `ui/dialogBox.test.ts` and, for stock,
    `ui/trade.test.ts`.
+
+## Quest
+
+1. Add a `QuestDef` to `DEFINITIONS` in `src/core/quests.ts`: `id` (a save key: don't rename),
+   `title`, `giver` (`{ creature, map }`), a `goal` (`fetch` an item and quantity, `kill`
+   every creature of a kind on a map, or `deliver` an item, handed over on start, to
+   `{ creature, map }`), a `reward` (caps, items, experience), and the quest list's
+   `objective` and `whenReady` lines.
+2. In the giver's dialog: an offer reply with `when: { quest, stage: 'new' }` leading to a line
+   whose accepting reply has `quest: { start: id }`. In the finisher's (the giver, or the
+   delivery's recipient): a reply with `when: { stage: 'ready' }` and `quest: { finish: id }`.
+   `greetings` can change their opening line by stage. `validateDialog` checks the quest ids.
+3. The giver and finisher must be on the named map in every game: a hand-made map, or a
+   `required` prefab in a generated one. `quests.test.ts` checks the definitions against the
+   dialogs and the maps; add the new quest's stages there.
+4. Mention it in the README's Quests section.
 
 ## Dialog action
 
